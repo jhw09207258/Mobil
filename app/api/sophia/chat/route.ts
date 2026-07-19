@@ -14,6 +14,15 @@ const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
 // tools 를 아예 안 붙여서 반드시 텍스트 답으로 마무리되게 한다.
 const MAX_TOOL_ROUNDS = 4;
 
+// 요청 전체 예산(ms). NVIDIA fetch 에 타임아웃이 없으면 응답이 멈춘(hang)
+// 순간 함수가 maxDuration(60s)까지 대기하다 Vercel 에 강제 종료되어
+// FUNCTION_INVOCATION_TIMEOUT 만 남고 원인을 못 남긴다. 예산을 두어 그 전에
+// 스스로 중단하고 명확한 진단을 저장한다. maxDuration 보다 넉넉히 짧게 잡아
+// DB 기록·정리 시간을 남긴다.
+const REQUEST_BUDGET_MS = 48_000;
+// 개별 NVIDIA 호출(연결+스트림 소비 전체)에 허용하는 최대 시간.
+const PER_CALL_TIMEOUT_MS = 30_000;
+
 const SYSTEM_PROMPT = `You are Sophia, the AI assistant built into Mobil (a personal workspace for documents, code, sheets, files and mind maps). Be helpful, concise, and clear.
 
 You have tools to search, read, create, and edit the user's Mobil content, and to search external papers/GitHub code (Big Brother). Use them whenever they'd help answer the question or complete a request — don't just describe what you would do, actually call the tool. Search first if you need an id you don't already have. Before a 'replace' edit that overwrites existing content, briefly confirm that's what the user wants unless they clearly already asked for exactly that. After using a tool, tell the user plainly what you found or did (don't narrate the tool call itself).`;
@@ -53,10 +62,10 @@ type NvidiaCallResult =
 
 /** 키들을 순서대로 시도한다. 실패 시 업스트림 상태코드와 본문 일부를 그대로
  * 돌려줘 호출자가 강등(파라미터 변경) 여부를 판단하고, 사용자에게도 원인이
- * 보이게 한다. */
+ * 보이게 한다. deadline 을 넘겼거나 응답이 멈추면 타임아웃으로 중단한다. */
 async function callNvidia(
   messages: ChatMessage[],
-  opts: { tools: boolean; stream: boolean }
+  opts: { tools: boolean; stream: boolean; deadline: number }
 ): Promise<NvidiaCallResult> {
   const keys = getOrderedKeys();
   if (keys.length === 0) {
@@ -67,6 +76,12 @@ async function callNvidia(
   let lastDetail = "network error";
   for (let i = 0; i < keys.length; i++) {
     const isLastKey = i === keys.length - 1;
+    // 이 호출에 남은 시간 = min(호출당 상한, 요청 전체 예산의 잔여분).
+    const remaining = opts.deadline - Date.now();
+    if (remaining <= 500) {
+      return { ok: false, upstreamStatus: null, detail: "timed out before NVIDIA responded" };
+    }
+    const timeoutMs = Math.min(PER_CALL_TIMEOUT_MS, remaining);
     try {
       const res = await fetch(NVIDIA_API_URL, {
         method: "POST",
@@ -83,6 +98,9 @@ async function callNvidia(
           stream: opts.stream,
           ...(opts.tools ? { tools: SOPHIA_TOOLS } : {}),
         }),
+        // 타임아웃이 없으면 NVIDIA 가 응답을 멈췄을 때 함수 전체가 maxDuration
+        // 까지 매달려 FUNCTION_INVOCATION_TIMEOUT 만 남는다. 명시적으로 끊는다.
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (res.ok) return { ok: true, upstream: res };
       lastStatus = res.status;
@@ -99,8 +117,16 @@ async function callNvidia(
         return { ok: false, upstreamStatus: res.status, detail: lastDetail };
       }
     } catch (e) {
-      console.error(`[sophia] NVIDIA request failed (key ${i + 1}/${keys.length})`, e);
-      lastDetail = e instanceof Error ? e.message : "network error";
+      const timedOut =
+        e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
+      lastDetail = timedOut
+        ? `request timed out after ${Math.round(timeoutMs / 1000)}s — NVIDIA endpoint did not respond`
+        : e instanceof Error
+          ? e.message
+          : "network error";
+      console.error(`[sophia] NVIDIA request failed (key ${i + 1}/${keys.length})`, lastDetail);
+      // 타임아웃은 키를 바꿔도 같은 원인일 가능성이 높지만, 두 번째 키가
+      // 다른 계정/엔드포인트일 수 있으니 마지막 키까지는 시도해본다.
       if (isLastKey) return { ok: false, upstreamStatus: null, detail: lastDetail };
     }
   }
@@ -252,6 +278,10 @@ export async function POST(req: Request) {
 
   const isFirstMessage = (history ?? []).length <= 1;
 
+  // 이 요청이 스스로 멈춰야 하는 절대 시각(ms). 모든 NVIDIA 호출·도구 라운드가
+  // 이 안에서 끝나야 Vercel 이 함수를 죽이기 전에 진단을 남길 수 있다.
+  const deadline = Date.now() + REQUEST_BUDGET_MS;
+
   /** 사용자에게도, 나중에 DB 로그를 읽는 사람에게도 원인이 바로 보이도록
    * 흔한 실패 유형을 사람이 읽을 수 있는 힌트로 바꾼다. */
   const formatError = (r: { upstreamStatus: number | null; detail: string }): string => {
@@ -259,6 +289,9 @@ export async function POST(req: Request) {
     const d = r.detail || "no detail";
     if (d.includes("missing NVIDIA_API_KEY")) {
       return "Sophia isn't configured: no NVIDIA_API_KEY / NVIDIA_API_KEY_2 is set in this deployment's environment variables.";
+    }
+    if (d.includes("timed out")) {
+      return `Sophia's request to NVIDIA timed out — the NVIDIA API isn't responding from the server (region icn1). This usually means the endpoint or key is wrong, or NVIDIA is unreachable from this deployment. Detail: ${d}`;
     }
     if (s === 401 || s === 403) {
       return `Sophia's NVIDIA API key was rejected (HTTP ${s}). The key is missing, invalid, or lacks access to the model. Detail: ${d}`;
@@ -283,17 +316,31 @@ export async function POST(req: Request) {
     await supabase.from("ai_conversations").update({ title: nextTitle }).eq("id", conversationId);
   };
 
+  const isTimeout = (r: NvidiaCallResult) =>
+    !r.ok && r.upstreamStatus === null && r.detail.includes("timed out");
+  const isRejectedShape = (r: NvidiaCallResult) =>
+    !r.ok && r.upstreamStatus !== null && isInvalidRequestStatus(r.upstreamStatus);
+
   // 첫 업스트림 연결은 스트림을 열기 전에 확보한다 — 완전 실패(키 미설정,
   // 전 모드 거부 등)라면 이전처럼 적절한 HTTP 상태코드로 바로 응답할 수 있다.
   let toolsMode: ToolsMode = "stream";
-  let first: NvidiaCallResult = await callNvidia(messages, { tools: true, stream: true });
-  if (!first.ok && first.upstreamStatus !== null && isInvalidRequestStatus(first.upstreamStatus)) {
+  let first: NvidiaCallResult = await callNvidia(messages, { tools: true, stream: true, deadline });
+
+  // (a) 엔드포인트가 tools+stream "형식"을 거부(4xx)하면 tools+nonstream →
+  //     그것도 거부면 도구 끄기로 한 단계씩 강등.
+  if (isRejectedShape(first)) {
     toolsMode = "nonstream";
-    first = await callNvidia(messages, { tools: true, stream: false });
-  }
-  if (!first.ok && first.upstreamStatus !== null && isInvalidRequestStatus(first.upstreamStatus)) {
+    first = await callNvidia(messages, { tools: true, stream: false, deadline });
+    if (isRejectedShape(first)) {
+      toolsMode = "off";
+      first = await callNvidia(messages, { tools: false, stream: true, deadline });
+    }
+  } else if (isTimeout(first)) {
+    // (b) tools+stream 이 응답 없이 멈추면 도구 페이로드가 원인일 수 있으니
+    //     곧바로 "도구 없는 일반 챗봇"으로 한 번 더 시도한다(nonstream 은 건너뛴다
+    //     — 멈추는 상황에서 중간 단계에 예산을 더 쓰지 않기 위함).
     toolsMode = "off";
-    first = await callNvidia(messages, { tools: false, stream: true });
+    first = await callNvidia(messages, { tools: false, stream: true, deadline });
   }
   if (!first.ok) {
     // 스트림을 열기 전에 완전히 실패 — 진단을 DB 에도 남기고, 클라이언트에는
@@ -331,11 +378,16 @@ export async function POST(req: Request) {
           const isLastAllowedRound = round === MAX_TOOL_ROUNDS - 1;
 
           if (!pending) {
+            // 예산을 넘겼으면 더 부르지 않고, 지금까지 받은 답으로 마무리한다.
+            if (Date.now() >= deadline) {
+              if (!full) failed = "Sophia ran out of time before finishing (request budget exceeded).";
+              break;
+            }
             // 마지막 허용 라운드거나 도구가 꺼졌으면 tools 없이 스트리밍으로
             // 최종 답을 받는다. 그 외에는 현재 모드대로 도구를 붙인다.
             const useTools = !isLastAllowedRound && toolsMode !== "off";
             const wantStream = !useTools || toolsMode === "stream";
-            const attempt = await callNvidia(messages, { tools: useTools, stream: wantStream });
+            const attempt = await callNvidia(messages, { tools: useTools, stream: wantStream, deadline });
             if (!attempt.ok) {
               failed = formatError(attempt);
               break;

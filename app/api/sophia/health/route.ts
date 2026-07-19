@@ -45,7 +45,10 @@ async function probe(
         stream: opts.stream,
         ...(opts.tools ? { tools: PROBE_TOOL } : {}),
       }),
-      signal: AbortSignal.timeout(15000),
+      // NVIDIA 가 응답을 멈추는 게 바로 진단 대상이므로 짧게 끊는다 — 그래야
+      // health 자체가 FUNCTION_INVOCATION_TIMEOUT 으로 죽지 않고 "timed out"
+      // 이라는 결과를 돌려준다.
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -106,13 +109,15 @@ export async function GET() {
     });
   }
 
+  // 세 조합을 동시에 던진다 — 순차로 하면(각 8s) NVIDIA 가 멈춘 경우 총합이
+  // maxDuration 을 넘어 health 마저 타임아웃된다. 병렬이면 키당 ~8s 로 끝난다.
   const report = [];
   for (const key of keys) {
-    const results = [
-      await probe(key.value, { tools: false, stream: false }),
-      await probe(key.value, { tools: true, stream: false }),
-      await probe(key.value, { tools: true, stream: true }),
-    ];
+    const results = await Promise.all([
+      probe(key.value, { tools: false, stream: false }),
+      probe(key.value, { tools: true, stream: false }),
+      probe(key.value, { tools: true, stream: true }),
+    ]);
     report.push({
       key: key.name,
       keySuffix: `…${key.value.slice(-4)}`,
