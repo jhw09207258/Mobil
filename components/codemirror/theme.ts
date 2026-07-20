@@ -9,21 +9,21 @@ import { tags as t } from "@lezer/highlight";
 export const mobilEditorTheme = EditorView.theme(
   {
     "&": {
-      color: "#c3c8cf",
-      backgroundColor: "#0e1116",
+      color: "var(--text-1)",
+      backgroundColor: "var(--bg-1)",
       fontSize: "13.5px",
       height: "100%",
     },
     ".cm-content": {
       fontFamily:
         '"JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace',
-      caretColor: "#e6e8eb",
+      caretColor: "var(--text-0)",
       padding: "12px 0",
     },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#e6e8eb" },
+    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--text-0)" },
     "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       { backgroundColor: "rgba(79,124,172,0.30)" },
-    ".cm-panels": { backgroundColor: "#14181e", color: "#c3c8cf" },
+    ".cm-panels": { backgroundColor: "var(--bg-2)", color: "var(--text-1)" },
     ".cm-searchMatch": {
       backgroundColor: "rgba(201,146,46,0.28)",
       outline: "1px solid rgba(201,146,46,0.5)",
@@ -35,29 +35,29 @@ export const mobilEditorTheme = EditorView.theme(
     ".cm-activeLineGutter": { backgroundColor: "rgba(255,255,255,0.028)" },
     ".cm-selectionMatch": { backgroundColor: "rgba(79,124,172,0.18)" },
     ".cm-gutters": {
-      backgroundColor: "#0e1116",
-      color: "#5c636d",
+      backgroundColor: "var(--bg-1)",
+      color: "var(--text-3)",
       border: "none",
-      borderRight: "1px solid #23282f",
+      borderRight: "1px solid var(--border-0)",
     },
     ".cm-lineNumbers .cm-gutterElement": { padding: "0 12px 0 16px" },
     ".cm-foldPlaceholder": {
-      backgroundColor: "#222831",
-      border: "1px solid #3a424d",
-      color: "#8b929c",
+      backgroundColor: "var(--bg-4)",
+      border: "1px solid var(--border-2)",
+      color: "var(--text-2)",
     },
     "&.cm-focused .cm-matchingBracket": {
       backgroundColor: "rgba(79,124,172,0.28)",
       outline: "1px solid rgba(79,124,172,0.5)",
     },
     ".cm-tooltip": {
-      backgroundColor: "#14181e",
-      border: "1px solid #2c333c",
-      color: "#c3c8cf",
+      backgroundColor: "var(--bg-2)",
+      border: "1px solid var(--border-1)",
+      color: "var(--text-1)",
     },
     ".cm-tooltip-autocomplete ul li[aria-selected]": {
-      backgroundColor: "#222831",
-      color: "#e6e8eb",
+      backgroundColor: "var(--bg-4)",
+      color: "var(--text-0)",
     },
     ".cm-scroller": { overflow: "auto" },
   },
@@ -70,7 +70,7 @@ export const mobilHighlightStyle = HighlightStyle.define([
   { tag: [t.string, t.special(t.string), t.regexp], color: "#8fb573" },
   { tag: [t.number, t.bool, t.null, t.atom], color: "#d3a15f" },
   { tag: [t.function(t.variableName), t.function(t.propertyName)], color: "#6fa0cf" },
-  { tag: [t.definition(t.variableName), t.variableName], color: "#c3c8cf" },
+  { tag: [t.definition(t.variableName), t.variableName], color: "var(--text-1)" },
   { tag: [t.propertyName], color: "#6fa0cf" },
   { tag: [t.typeName, t.className, t.namespace], color: "#d0b86a" },
   { tag: [t.operator, t.punctuation, t.separator, t.bracket], color: "#9aa4af" },
@@ -81,7 +81,7 @@ export const mobilHighlightStyle = HighlightStyle.define([
   { tag: [t.link, t.url], color: "#5f8cbd", textDecoration: "underline" },
   { tag: [t.emphasis], fontStyle: "italic" },
   { tag: [t.strong], fontWeight: "bold" },
-  { tag: [t.meta, t.processingInstruction], color: "#8b929c" },
+  { tag: [t.meta, t.processingInstruction], color: "var(--text-2)" },
   { tag: [t.invalid], color: "#e7a79d" },
 ]);
 

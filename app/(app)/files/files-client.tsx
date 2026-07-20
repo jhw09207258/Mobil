@@ -393,7 +393,7 @@ export function FilesClient({
 const dropCss = `
 .dropzone {
   position: fixed; inset: 0; z-index: 50;
-  background: rgba(10,12,15,0.72);
+  background: rgba(0,0,0,0.72);
   display: flex; align-items: center; justify-content: center;
   pointer-events: none;
 }

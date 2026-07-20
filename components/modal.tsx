@@ -83,7 +83,7 @@ export function Modal({
 const modalCss = `
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(4, 6, 8, 0.66);
+  background: rgba(0, 0, 0, 0.66);
   display: flex; align-items: flex-start; justify-content: center;
   padding: 80px 20px 20px;
   backdrop-filter: blur(1px);
