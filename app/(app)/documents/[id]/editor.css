@@ -275,6 +275,40 @@
   height: 15px;
 }
 
+/* table */
+.ProseMirror .tableWrapper {
+  overflow-x: auto;
+  margin: 0.85em 0;
+}
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+.ProseMirror table td,
+.ProseMirror table th {
+  border: 1px solid var(--border-1);
+  padding: 6px 10px;
+  vertical-align: top;
+  min-width: 80px;
+}
+.ProseMirror table th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  background: var(--bg-3);
+  font-weight: 500;
+  text-align: left;
+}
+.ProseMirror table .selectedCell {
+  background: var(--accent-ghost);
+}
+.ProseMirror table p {
+  margin: 0;
+}
+
 /* slash command menu */
 .slash-popup {
   position: absolute;

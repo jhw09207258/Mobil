@@ -11,13 +11,9 @@ import {
   type SheetCell,
 } from "@/lib/outline-convert";
 import type { Json } from "@/lib/database.types";
-import type { MindElixirData } from "mind-elixir";
+import { parseInitialData } from "@/lib/mindmap-legacy";
 
 type TabResult = { id: string; title: string; seed: unknown } | { error: string };
-
-function isMindElixirData(data: unknown): data is MindElixirData {
-  return !!data && typeof data === "object" && "nodeData" in (data as Record<string, unknown>);
-}
 
 /** 마인드맵 → 새 문서(목차). 트리 depth 를 헤딩 레벨로 변환한다. */
 export async function createDocumentFromMindmap(mapId: string): Promise<TabResult> {
@@ -34,11 +30,12 @@ export async function createDocumentFromMindmap(mapId: string): Promise<TabResul
     .single();
   if (!map) return { error: "Map not found." };
 
-  if (!isMindElixirData(map.data)) {
-    return { error: "This map has no content to convert yet." };
-  }
-
-  const content = mindmapToDocumentJSON(map.data.nodeData);
+  // 아직 레거시(React Flow 시절) {nodes,edges} 형식 그대로 저장된 맵도
+  // 정규화해서 변환한다 — 캔버스는 parseInitialData 로 이 형식을 이미 정상
+  // 렌더링하므로, 소유자가 한 번도 재저장하지 않았다는 이유만으로 view-only
+  // 사용자의 변환을 막을 이유가 없다.
+  const normalized = parseInitialData(map.data, map.title);
+  const content = mindmapToDocumentJSON(normalized.nodeData);
   const title = `${map.title} (Outline)`;
 
   const { data, error } = await supabase
@@ -94,11 +91,8 @@ export async function createSheetFromMindmap(mapId: string): Promise<TabResult> 
     .single();
   if (!map) return { error: "Map not found." };
 
-  if (!isMindElixirData(map.data)) {
-    return { error: "This map has no content to convert yet." };
-  }
-
-  const cells = mindmapToSheetRows(map.data.nodeData);
+  const normalized = parseInitialData(map.data, map.title);
+  const cells = mindmapToSheetRows(normalized.nodeData);
   const sheetData = [
     {
       name: "Sheet1",
@@ -182,6 +176,7 @@ export async function createMindmapFromDocument(docId: string): Promise<TabResul
       id: data.id,
       title: data.title,
       data: data.data,
+      initialYjsState: null,
       isPublic: false,
       canEdit: true,
       isOwner: true,
@@ -232,6 +227,7 @@ export async function createMindmapFromSheet(sheetId: string): Promise<TabResult
       id: data.id,
       title: data.title,
       data: data.data,
+      initialYjsState: null,
       isPublic: false,
       canEdit: true,
       isOwner: true,

@@ -17,6 +17,10 @@ import Highlight from "@tiptap/extension-highlight";
 import Link from "@tiptap/extension-link";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableHeader from "@tiptap/extension-table-header";
+import TableCell from "@tiptap/extension-table-cell";
 import { ResizableImage } from "./resizable-image";
 import { SlashCommand } from "./slash-command";
 import type { Json } from "@/lib/database.types";
@@ -120,6 +124,7 @@ export function DocumentEditor({
   }
   const ydoc = ydocRef.current;
   const bootstrapped = useRef(false);
+  const isApplyingRemoteRef = useRef(false);
 
   const onExport = async (format: DocExportFormat) => {
     setShowExport(false);
@@ -147,13 +152,17 @@ export function DocumentEditor({
       ResizableImage.configure({ HTMLAttributes: { class: "doc-media" } }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Video,
       Placeholder.configure({ placeholder: "Write your idea here… (type / for commands)" }),
       SlashCommand,
     ],
     editorProps: { attributes: { class: "ProseMirror" } },
     onUpdate: () => {
-      if (canEdit) markDirty();
+      if (canEdit && !isApplyingRemoteRef.current) markDirty();
     },
   });
 
@@ -169,7 +178,7 @@ export function DocumentEditor({
 
   // Supabase Realtime Broadcast 로 다른 접속자와 Yjs 업데이트를 주고받는다.
   useEffect(() => {
-    return connectYjsBroadcast(ydoc, `doc:${docId}`);
+    return connectYjsBroadcast(ydoc, `doc:${docId}`, isApplyingRemoteRef);
   }, [ydoc, docId]);
 
   const persist = useCallback(

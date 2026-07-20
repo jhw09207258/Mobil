@@ -5,6 +5,7 @@ import "./canvas.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import * as Y from "yjs";
 import MindElixir, { type MindElixirData, type MindElixirInstance, type NodeObj } from "mind-elixir";
 import type { Json } from "@/lib/database.types";
 import { ShareDialog } from "@/components/share-dialog";
@@ -22,104 +23,19 @@ import { useWorkspace } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
 import { formatBytes } from "@/lib/format";
 import { createDocumentFromMindmap, createSheetFromMindmap } from "../../convert-actions";
-import { connectSnapshotBroadcast } from "@/lib/snapshot-broadcast";
+import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate } from "@/lib/yjs-transport";
+import { parseInitialData, type RefKind, type NodeMeta } from "@/lib/mindmap-legacy";
+import { countReferenceNodes } from "@/lib/outline-convert";
+import { flattenTree, syncFlatToYMap, readFlatFromYMap, reconstructTree, type FlatNode } from "@/lib/mindmap-yjs";
 
 type SaveState = "saved" | "dirty" | "saving";
 const AUTOSAVE_MS = 1200;
-
-type RefKind = "file" | "code" | "document";
-type NodeMeta = { kind: "note" } | { kind: RefKind; refId: string };
-
-// ---- 레거시(React Flow 시절) nodes/edges 그래프 → Mind Elixir 트리 변환 ----
-// 자유 배치 그래프는 트리가 아닐 수 있으므로: 들어오는 간선이 없는 노드를
-// 루트의 자식으로, BFS 로 도달한 간선만 트리 간선으로 채택하고, 남는 간선은
-// arrow(화살표)로, 고립/사이클 노드는 루트에 그대로 매단다.
-type LegacyNode = { id: string; type?: string; data?: { kind?: string; label?: string; refId?: string } };
-type LegacyEdge = { id: string; source: string; target: string };
-
-function isMindElixirData(data: unknown): data is MindElixirData {
-  return !!data && typeof data === "object" && "nodeData" in (data as Record<string, unknown>);
-}
-
-function legacyNodeToObj(n: LegacyNode): NodeObj {
-  const d = n.data ?? {};
-  if (n.type === "ref") {
-    return {
-      id: n.id,
-      topic: `[${d.kind}] ${d.label ?? ""}`,
-      metadata: { kind: d.kind, refId: d.refId } as NodeMeta,
-    };
-  }
-  return { id: n.id, topic: d.label || "Note", metadata: { kind: "note" } as NodeMeta };
-}
-
-function convertLegacyGraph(
-  nodes: LegacyNode[],
-  edges: LegacyEdge[],
-  fallbackTitle: string
-): MindElixirData {
-  const children = new Map<string, string[]>();
-  const incoming = new Map<string, number>();
-  for (const n of nodes) {
-    incoming.set(n.id, 0);
-    children.set(n.id, []);
-  }
-  for (const e of edges) {
-    if (!children.has(e.source) || !incoming.has(e.target)) continue;
-    children.get(e.source)!.push(e.target);
-    incoming.set(e.target, (incoming.get(e.target) ?? 0) + 1);
-  }
-
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const visited = new Set<string>();
-  const treeEdges = new Set<string>();
-  const buildTree = (id: string): NodeObj => {
-    visited.add(id);
-    const obj = legacyNodeToObj(byId.get(id)!);
-    const kids = (children.get(id) ?? []).filter((c) => !visited.has(c));
-    if (kids.length > 0) {
-      obj.children = kids.map((c) => {
-        treeEdges.add(`${id}->${c}`);
-        return buildTree(c);
-      });
-    }
-    return obj;
-  };
-
-  let roots = nodes.filter((n) => (incoming.get(n.id) ?? 0) === 0).map((n) => n.id);
-  if (roots.length === 0 && nodes.length > 0) roots = [nodes[0].id];
-
-  const rootChildren = roots.filter((id) => !visited.has(id)).map(buildTree);
-  const leftover = nodes.filter((n) => !visited.has(n.id)).map((n) => buildTree(n.id));
-
-  const nodeData: NodeObj = {
-    id: "root",
-    topic: fallbackTitle || "Untitled map",
-    children: [...rootChildren, ...leftover],
-  };
-
-  const arrows = edges
-    .filter((e) => !treeEdges.has(`${e.source}->${e.target}`))
-    .map((e) => ({ id: e.id, label: "", from: e.source, to: e.target }));
-
-  return { nodeData, arrows };
-}
-
-function parseInitialData(data: Json, fallbackTitle: string): MindElixirData {
-  if (isMindElixirData(data)) return data as MindElixirData;
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    const o = data as { nodes?: LegacyNode[]; edges?: LegacyEdge[] };
-    if (Array.isArray(o.nodes)) {
-      return convertLegacyGraph(o.nodes, Array.isArray(o.edges) ? o.edges : [], fallbackTitle);
-    }
-  }
-  return { nodeData: { id: "root", topic: fallbackTitle || "Untitled map", children: [] } };
-}
 
 function Inner({
   mapId,
   initialTitle,
   initialData,
+  initialYjsState,
   canEdit,
   isOwner,
   isPublic,
@@ -129,6 +45,7 @@ function Inner({
   mapId: string;
   initialTitle: string;
   initialData: Json;
+  initialYjsState: string | null;
   canEdit: boolean;
   isOwner: boolean;
   isPublic: boolean;
@@ -148,6 +65,9 @@ function Inner({
   const [showConvert, setShowConvert] = useState(false);
   const [converting, setConverting] = useState(false);
   const [preview, setPreview] = useState<{ kind: RefKind; refId: string; label: string } | null>(null);
+  const [selectedRef, setSelectedRef] = useState<{ kind: RefKind; refId: string; label: string } | null>(
+    null
+  );
   const [previewInfo, setPreviewInfo] = useState<
     { status: "loading" } | { status: "ready"; data: ReferencePreview } | { status: "error" } | null
   >(null);
@@ -155,7 +75,29 @@ function Inner({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleRef = useRef(title);
   const saveStateRef = useRef<SaveState>("saved");
-  const broadcastRef = useRef<ReturnType<typeof connectSnapshotBroadcast<MindElixirData>> | null>(null);
+  const isApplyingRemoteRef = useRef(false);
+  // 노드 트리를 Yjs 로 구조적으로 동기화한다(문서/코드처럼 Yjs CRDT를 쓰되,
+  // mind-elixir 에는 y-prosemirror 같은 공식 바인딩이 없어 lib/mindmap-yjs.ts
+  // 에서 직접 구현했다 — 트리를 "id -> 노드" 평면 Y.Map 으로 펼쳐 두면, 서로
+  // 다른 노드를 건드린 동시 편집은 Yjs 가 자동으로 병합해준다). lastSyncedRef
+  // 는 "마지막으로 Yjs 에 반영한 로컬 상태" — 다음 로컬 변경과 비교(diff)해
+  // 실제로 바뀐 노드만 쓰기 위한 기준선이다.
+  const ydocRef = useRef<Y.Doc | null>(null);
+  if (!ydocRef.current) {
+    const doc = new Y.Doc();
+    if (initialYjsState) {
+      try {
+        Y.applyUpdate(doc, decodeYUpdate(initialYjsState));
+      } catch {
+        // 손상된 스냅샷은 무시 — 아래 마운트 이펙트에서 기존 data 로 시드한다.
+      }
+    }
+    ydocRef.current = doc;
+  }
+  const ydoc = ydocRef.current;
+  const yNodes = ydoc.getMap<Y.Map<unknown>>("nodes");
+  const lastSyncedRef = useRef<Map<string, FlatNode>>(new Map());
+
   useEffect(() => {
     titleRef.current = title;
   }, [title]);
@@ -163,32 +105,51 @@ function Inner({
     saveStateRef.current = saveState;
   }, [saveState]);
 
-  // 다른 접속자와 전체 맵 스냅샷을 실시간으로 주고받는다(문서/코드의 Yjs
-  // CRDT 와 달리 진짜 병합은 아니고, 저장할 때마다 통째로 브로드캐스트).
+  // Supabase Realtime Broadcast 로 다른 접속자와 Yjs 업데이트를 주고받는다
+  // (문서/코드 에디터와 동일한 전송 계층 — lib/yjs-transport.ts).
   useEffect(() => {
-    const conn = connectSnapshotBroadcast<MindElixirData>(`mindmap:${mapId}`, (data) => {
-      // 로컬에 저장 안 된 편집이 있으면 방금 받은 스냅샷으로 덮어쓰지 않는다.
-      if (saveStateRef.current === "dirty") return;
-      meRef.current?.refresh(data);
-    });
-    broadcastRef.current = conn;
-    return () => conn.disconnect();
-  }, [mapId]);
+    return connectYjsBroadcast(ydoc, `mindmap:${mapId}`, isApplyingRemoteRef);
+  }, [ydoc, mapId]);
+
+  // 원격에서 온 구조 변경(다른 클라이언트의 로컬 diff 가 Yjs 에 쓴 내용)을
+  // 반영한다. isApplyingRemoteRef 로 우리 자신의 로컬 쓰기가 되돌아와
+  // observeDeep 을 다시 트리거하는 걸 걸러낸다(무한루프 방지, editor.tsx/
+  // code-editor.tsx 와 같은 패턴). 항상(로컬에 저장 안 된 편집이 있어도)
+  // 반영한다 — 아니면 diff 기준선(lastSyncedRef)이 Yjs 의 실제 상태와
+  // 어긋나, 다음 로컬 저장 때 방금 병합된 원격 변경을 다시 지워버릴 수 있다.
+  // 트레이드오프: 노드 텍스트를 한창 편집하던 중 원격 갱신이 오면 그 편집
+  // 화면이 refresh 로 끊길 수 있다(알려진 한계 — Enter/포커스아웃으로 자주
+  // 커밋하면 창이 줄어든다).
+  useEffect(() => {
+    const onDeepChange = () => {
+      if (!isApplyingRemoteRef.current) return;
+      const me = meRef.current;
+      if (!me) return;
+      const flat = readFlatFromYMap(yNodes);
+      const rebuilt = reconstructTree(flat);
+      if (!rebuilt) return;
+      const current = me.getData();
+      me.refresh({ ...current, nodeData: rebuilt });
+      lastSyncedRef.current = flat;
+    };
+    yNodes.observeDeep(onDeepChange);
+    return () => yNodes.unobserveDeep(onDeepChange);
+  }, [yNodes]);
 
   const persist = useCallback(async () => {
     const me = meRef.current;
     if (!me) return;
     setSaveState("saving");
     const data = me.getData();
-    const res = await saveMindMap(mapId, titleRef.current, data as unknown as Json);
+    const yjsState = encodeYUpdate(Y.encodeStateAsUpdate(ydoc));
+    const res = await saveMindMap(mapId, titleRef.current, data as unknown as Json, yjsState);
     if (res.ok) {
       setSaveState("saved");
-      broadcastRef.current?.send(data);
     } else {
       setSaveState("dirty");
       setError(res.error);
     }
-  }, [mapId]);
+  }, [mapId, ydoc]);
 
   const markDirty = useCallback(() => {
     setSaveState("dirty");
@@ -220,26 +181,55 @@ function Inner({
       keypress: canEdit,
       theme: MindElixir.DARK_THEME,
     }) as MindElixirInstance;
-    me.init(parseInitialData(initialData, initialTitle));
+
+    // arrows/summaries 는 Yjs 로 동기화하지 않는다(노드 트리만 CRDT 대상 —
+    // 저장할 때마다 통째로 반영되는 JSON 스냅샷(data 컬럼)에서 가져온다).
+    // 노드 트리 자체는 Yjs 상태가 있으면 그쪽이 더 최신이므로 그것을 쓴다.
+    const legacy = parseInitialData(initialData, initialTitle);
+    const existingFlat = readFlatFromYMap(yNodes);
+    let initTree: MindElixirData;
+    if (existingFlat.size > 0) {
+      const rebuilt = reconstructTree(existingFlat);
+      initTree = { nodeData: rebuilt ?? legacy.nodeData, arrows: legacy.arrows, summaries: legacy.summaries };
+      lastSyncedRef.current = existingFlat;
+    } else {
+      const seedFlat = flattenTree(legacy.nodeData);
+      ydoc.transact(() => syncFlatToYMap(yNodes, new Map(), seedFlat));
+      initTree = legacy;
+      lastSyncedRef.current = seedFlat;
+    }
+    me.init(initTree);
     meRef.current = me;
 
     const onOperation = () => {
+      const flat = flattenTree(me.getData().nodeData);
+      ydoc.transact(() => syncFlatToYMap(yNodes, lastSyncedRef.current, flat));
+      lastSyncedRef.current = flat;
       if (canEdit) markDirty();
     };
     me.bus.addListener("operation", onOperation);
 
-    const onDblClick = (e: MouseEvent) => {
-      const topicEl = (e.target as HTMLElement).closest("me-tpc") as
-        | (HTMLElement & { nodeObj?: NodeObj })
-        | null;
-      const meta = topicEl?.nodeObj?.metadata as NodeMeta | undefined;
-      if (!meta || meta.kind === "note") return;
-      setPreview({ kind: meta.kind, refId: meta.refId, label: topicEl!.nodeObj!.topic });
+    // 더블클릭은 mind-elixir 자체의 "노드 이름 바꾸기" 제스처와 겹친다 —
+    // editable 일 때 mind-elixir 는 더블클릭/더블탭을 자체 포인터 타이머로
+    // 감지해 항상 beginEdit() 을 호출하므로(우리 dblclick 리스너와는 완전히
+    // 독립적인 내부 로직이라 stopPropagation 으로도 막을 수 없다), 참조 노드를
+    // 더블클릭하면 미리보기가 열리는 동시에 이름 바꾸기 모드로도 들어가버렸다.
+    // 제스처로 경쟁하는 대신, 클릭마다 현재 선택 노드를 추적해 참조 노드가
+    // 선택돼 있으면 툴바에 "Open reference" 버튼을 보여주는 방식으로 바꿔
+    // 충돌 자체를 없앤다.
+    const onClick = () => {
+      const node = me.currentNode;
+      const meta = node?.nodeObj.metadata as NodeMeta | undefined;
+      if (node && meta && meta.kind !== "note") {
+        setSelectedRef({ kind: meta.kind, refId: meta.refId, label: node.nodeObj.topic ?? "" });
+      } else {
+        setSelectedRef(null);
+      }
     };
-    containerRef.current.addEventListener("dblclick", onDblClick);
+    containerRef.current.addEventListener("click", onClick);
 
     return () => {
-      containerRef.current?.removeEventListener("dblclick", onDblClick);
+      containerRef.current?.removeEventListener("click", onClick);
       me.destroy();
       meRef.current = null;
     };
@@ -274,6 +264,65 @@ function Inner({
     });
   };
 
+  // mind-elixir 의 insertParent()는 대상 노드에 parent 가 없으면(= 루트 노드)
+  // 조용히 아무 것도 하지 않고 리턴한다(라이브러리 자체 동작 — 상위에 상위를
+  // 또 붙일 수 없다는 트리 구조상 제약을 에러 없이 무시해버림). 새로 만든
+  // 마인드맵은 루트 노드 하나뿐이라 사용자가 맨 처음 시도하는 조작이 바로
+  // 이 케이스라, "상위 추가"가 안 먹는 것처럼 보이는 원인이었다. 루트일
+  // 때는 새 루트로 기존 트리 전체를 감싸는 방식으로 우리가 직접 구현한다.
+  const addParent = () => {
+    const me = meRef.current;
+    if (!me || !canEdit) return;
+    const target = me.currentNode;
+    if (!target) {
+      setError("Select a node first, then click + Parent.");
+      return;
+    }
+    if (!target.nodeObj.parent) {
+      const data = me.getData();
+      const newRoot: NodeObj = {
+        id: crypto.randomUUID(),
+        topic: "New node",
+        children: [data.nodeData],
+        metadata: { kind: "note" } as NodeMeta,
+      };
+      me.refresh({ ...data, nodeData: newRoot });
+      // me.refresh() 는 addChild/insertParent 등과 달리 "operation" 버스
+      // 이벤트를 쏘지 않는다 — 여기서 직접 Yjs 로 동기화해야 새 루트가
+      // 다른 접속자에게도 반영된다.
+      const flat = flattenTree(newRoot);
+      ydoc.transact(() => syncFlatToYMap(yNodes, lastSyncedRef.current, flat));
+      lastSyncedRef.current = flat;
+      markDirty();
+      return;
+    }
+    me.insertParent(target, {
+      id: crypto.randomUUID(),
+      topic: "New node",
+      metadata: { kind: "note" } as NodeMeta,
+    });
+  };
+
+  // mind-elixir 의 insertSibling()도 대상이 루트면 parent 가 없어 사일런트하게
+  // addChild() 로 대체 실행한다 — "동급 추가"를 눌렀는데 실제로는 하위가
+  // 생기는, 원인을 알기 어려운 동작이었다. 루트의 형제는 트리 구조상 애초에
+  // 성립하지 않으므로(맵마다 루트는 하나) 조용히 다른 동작으로 넘어가는 대신
+  // 명확히 안내하고 막는다.
+  const addSibling = () => {
+    const me = meRef.current;
+    if (!me || !canEdit) return;
+    const target = me.currentNode;
+    if (!target || !target.nodeObj.parent) {
+      setError("The root node can't have a sibling — a mind map has exactly one root.");
+      return;
+    }
+    me.insertSibling("after", target, {
+      id: crypto.randomUUID(),
+      topic: "New node",
+      metadata: { kind: "note" } as NodeMeta,
+    });
+  };
+
   const addReference = () => {
     const me = meRef.current;
     if (!me || !canEdit || !pick) return;
@@ -294,8 +343,23 @@ function Inner({
 
   const onConvert = async (target: "document" | "sheet") => {
     setShowConvert(false);
-    setConverting(true);
     setError(null);
+
+    // 문서/시트 변환은 참조 노드(파일/코드/문서 링크)의 metadata 를 옮기지
+    // 않고 topic 텍스트만 옮긴다 — 되돌릴 수 없이 평범한 텍스트가 되므로,
+    // 실제로 생성하기 전에 몇 개가 영향받는지 먼저 알리고 취소할 수 있게 한다.
+    // me.getData() 로 지금 화면의 최신 상태(저장 안 된 편집 포함)를 그대로 센다.
+    const me = meRef.current;
+    const refCount = me ? countReferenceNodes(me.getData().nodeData) : 0;
+    if (refCount > 0) {
+      const noun = refCount === 1 ? "reference node" : "reference nodes";
+      const ok = confirm(
+        `This map has ${refCount} ${noun} that will become plain text in the new ${target} — continue?`
+      );
+      if (!ok) return;
+    }
+
+    setConverting(true);
     // 변환은 DB 에 저장된 데이터를 읽으므로, 편집 권한이 있고 저장 안 된
     // 내용이 있을 수 있으면 먼저 강제로 저장한다(읽기 전용 뷰어는 저장 권한이
     // 없고 애초에 로컬 변경도 없으므로 건너뛴다).
@@ -374,8 +438,22 @@ function Inner({
           />
           {canEdit && (
             <>
-              <button className="btn btn-sm" onClick={addNote}>
+              <button
+                className="btn btn-sm"
+                onClick={addParent}
+                title="Add a node above the selected node (wraps the root if it's selected)"
+              >
+                + Parent
+              </button>
+              <button className="btn btn-sm" onClick={addNote} title="Add a child of the selected node">
                 + Note
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={addSibling}
+                title="Add a node at the same level as the selected node"
+              >
+                + Sibling
               </button>
               <select
                 className="mm-picker"
@@ -396,6 +474,15 @@ function Inner({
                 Fit view
               </button>
             </>
+          )}
+          {selectedRef && (
+            <button
+              className="btn btn-sm"
+              onClick={() => setPreview(selectedRef)}
+              title="Open a preview of the selected reference node"
+            >
+              Open reference
+            </button>
           )}
         </div>
         <div className="row" style={{ gap: 10 }}>

@@ -91,6 +91,21 @@ export function documentJSONToMindmapData(
 // ---------------------------------------------------------------------------
 export type SheetCell = { r: number; c: number; v: { v: string | number; m: string } };
 
+/** 마인드맵 → 문서/시트 변환 시 유실될 참조 노드(파일/코드/문서 링크) 개수.
+ * mindmapToDocumentJSON/mindmapToSheetRows 는 topic 텍스트만 옮기고
+ * metadata.kind/refId 는 옮기지 않으므로, 변환 전에 사용자에게 몇 개가
+ * 평범한 텍스트로 바뀌는지 미리 알려주는 용도로 쓴다. */
+export function countReferenceNodes(nodeData: NodeObj): number {
+  let count = 0;
+  const walk = (node: NodeObj) => {
+    const kind = (node.metadata as { kind?: string } | undefined)?.kind;
+    if (kind && kind !== "note") count++;
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(nodeData);
+  return count;
+}
+
 export function mindmapToSheetRows(nodeData: NodeObj): SheetCell[] {
   const rows: SheetCell[] = [
     { r: 0, c: 0, v: { v: "Level", m: "Level" } },

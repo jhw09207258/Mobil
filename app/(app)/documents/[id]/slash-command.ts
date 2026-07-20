@@ -52,6 +52,13 @@ const COMMANDS: SlashItem[] = [
     run: (editor, range) => editor.chain().focus().deleteRange(range).toggleTaskList().run(),
   },
   {
+    title: "Table",
+    desc: "Insert a 3×3 table",
+    icon: "▦",
+    run: (editor, range) =>
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
+  {
     title: "Quote",
     desc: "Capture a quote",
     icon: "❝",

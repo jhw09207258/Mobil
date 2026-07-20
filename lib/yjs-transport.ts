@@ -28,7 +28,19 @@ const REMOTE_ORIGIN = "remote-broadcast";
  * 수렴한다 — 세션 도중 끊겼다 다시 붙는 클라이언트는 다음 새로고침(스냅샷
  * 재로딩) 전까지 일시적으로 어긋날 수 있는 것이 이 방식의 알려진 한계다.
  */
-export function connectYjsBroadcast(ydoc: Y.Doc, topic: string): () => void {
+/**
+ * @param isApplyingRemoteRef 채워두면, 원격 업데이트를 ydoc 에 적용하는 동안
+ * (Y.applyUpdate 호출을 감싸는 동기 구간) true 로 설정된다. 편집기 쪽에서
+ * 이 값을 참조해 원격발 변경으로 트리거된 onUpdate/onChange 에서는 자동저장을
+ * 걸지 않게 하는 데 쓴다 — 그렇지 않으면 동시 편집자 수만큼 저장 요청이
+ * 배가되고(각자 서로의 변경에도 반응해 저장), 실제로는 자신이 안 건드린
+ * 순간에도 저장 상태 표시가 깜빡인다.
+ */
+export function connectYjsBroadcast(
+  ydoc: Y.Doc,
+  topic: string,
+  isApplyingRemoteRef?: { current: boolean }
+): () => void {
   const supabase = createClient();
   const channel = supabase.channel(topic, {
     // private: true 로 realtime.messages 의 RLS(0029 마이그레이션)를 태워
@@ -51,7 +63,12 @@ export function connectYjsBroadcast(ydoc: Y.Doc, topic: string): () => void {
     .on("broadcast", { event: "yupdate" }, ({ payload }) => {
       const u = (payload as { u?: string } | null)?.u;
       if (!u) return;
-      Y.applyUpdate(ydoc, decodeYUpdate(u), REMOTE_ORIGIN);
+      if (isApplyingRemoteRef) isApplyingRemoteRef.current = true;
+      try {
+        Y.applyUpdate(ydoc, decodeYUpdate(u), REMOTE_ORIGIN);
+      } finally {
+        if (isApplyingRemoteRef) isApplyingRemoteRef.current = false;
+      }
     })
     .subscribe();
 

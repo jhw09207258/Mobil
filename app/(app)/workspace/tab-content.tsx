@@ -125,6 +125,7 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
         mapId={d.id}
         initialTitle={d.title}
         initialData={d.data}
+        initialYjsState={d.initialYjsState}
         canEdit={d.canEdit}
         isOwner={d.isOwner}
         isPublic={d.isPublic}

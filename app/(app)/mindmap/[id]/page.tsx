@@ -18,7 +18,7 @@ export default async function MindMapEditorPage({
 
   const { data: map } = await supabase
     .from("mind_maps")
-    .select("id, owner_id, title, data, is_public, updated_at")
+    .select("id, owner_id, title, data, yjs_state, is_public, updated_at")
     .eq("id", id)
     .single();
 
@@ -52,6 +52,7 @@ export default async function MindMapEditorPage({
         mapId={map.id}
         initialTitle={map.title}
         initialData={map.data}
+        initialYjsState={map.yjs_state}
         canEdit={canEdit}
         isOwner={map.owner_id === userId}
         isPublic={map.is_public}

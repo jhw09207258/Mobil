@@ -24,7 +24,7 @@ export async function createMindMapTab(): Promise<{
   const { data, error } = await supabase
     .from("mind_maps")
     .insert({ owner_id: user.id, title: "Untitled map" })
-    .select("id, title, data")
+    .select("id, title, data, yjs_state")
     .single();
 
   if (error || !data) throw new Error("Failed to create map.");
@@ -40,6 +40,7 @@ export async function createMindMapTab(): Promise<{
       id: data.id,
       title: data.title,
       data: data.data,
+      initialYjsState: data.yjs_state,
       isPublic: false,
       canEdit: true,
       isOwner: true,
@@ -56,7 +57,7 @@ export async function getMindMapForTab(id: string) {
 
   const { data: map } = await supabase
     .from("mind_maps")
-    .select("id, owner_id, title, data, is_public, updated_at")
+    .select("id, owner_id, title, data, yjs_state, is_public, updated_at")
     .eq("id", id)
     .single();
 
@@ -79,6 +80,7 @@ export async function getMindMapForTab(id: string) {
     id: map.id,
     title: map.title,
     data: map.data,
+    initialYjsState: map.yjs_state,
     isPublic: map.is_public,
     canEdit,
     isOwner: map.owner_id === userId,
@@ -87,16 +89,24 @@ export async function getMindMapForTab(id: string) {
   };
 }
 
+/** 제목/노드 트리 저장. yjsState 는 실시간 동시편집용 Yjs 스냅샷(base64,
+ * Y.encodeStateAsUpdate) — 다음 접속자가 이 시점부터 이어서 동기화할 수
+ * 있도록 저장해둔다(documents/code_files 의 동일 패턴과 일치). */
 export async function saveMindMap(
   id: string,
   title: string,
-  data: Json
+  data: Json,
+  yjsState?: string | null
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const finalTitle = title.trim() || "Untitled map";
   const { error } = await supabase
     .from("mind_maps")
-    .update({ title: finalTitle, data })
+    .update({
+      title: finalTitle,
+      data,
+      ...(yjsState !== undefined ? { yjs_state: yjsState } : {}),
+    })
     .eq("id", id);
   if (error) return { ok: false, error: "Save failed." };
 

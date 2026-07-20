@@ -91,6 +91,7 @@ export function CodeEditor({
   }
   const ydoc = ydocRef.current;
   const ytext = ydoc.getText("content");
+  const isApplyingRemoteRef = useRef(false);
 
   useEffect(() => {
     nameRef.current = name;
@@ -106,7 +107,7 @@ export function CodeEditor({
 
   // Supabase Realtime Broadcast 로 다른 접속자와 Yjs 업데이트를 주고받는다.
   useEffect(() => {
-    return connectYjsBroadcast(ydoc, `code:${fileId}`);
+    return connectYjsBroadcast(ydoc, `code:${fileId}`, isApplyingRemoteRef);
   }, [ydoc, fileId]);
 
   const persist = useCallback(async () => {
@@ -136,7 +137,7 @@ export function CodeEditor({
   const onContentChange = useCallback(
     (v: string) => {
       contentRef.current = v;
-      markDirty();
+      if (!isApplyingRemoteRef.current) markDirty();
     },
     [markDirty]
   );

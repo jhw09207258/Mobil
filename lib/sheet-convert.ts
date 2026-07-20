@@ -16,6 +16,23 @@ type SheetLike = {
 const MAX_ROWS = 2000;
 const MAX_COLS = 200;
 
+// ExcelJS cell.value 는 수식/리치텍스트/하이퍼링크/오류/Date 등 원시값이 아닌
+// 형태로 오는 경우가 많다. 이를 무시하고 String(v) 로 바로 변환하면 모두
+// "[object Object]" 가 되어 셀 내용이 깨진다 — 각 형태에서 실제 표시값을 뽑는다.
+function excelCellToString(v: unknown): string {
+  if (v == null) return "";
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v !== "object") return String(v);
+  const obj = v as Record<string, unknown>;
+  if (Array.isArray(obj.richText)) {
+    return (obj.richText as { text?: string }[]).map((r) => r.text ?? "").join("");
+  }
+  if ("formula" in obj) return excelCellToString(obj.result);
+  if ("error" in obj) return String(obj.error ?? "");
+  if ("text" in obj) return excelCellToString(obj.text); // hyperlink cell
+  return String(v);
+}
+
 function sheetFromRows(name: string, id: string, rows: string[][], active: boolean): SheetLike {
   const celldata: CellData[] = [];
   let maxCol = 0;
@@ -81,8 +98,7 @@ export async function importFileToSheetData(fileName: string, bytes: Buffer): Pr
       ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
         const cells: string[] = [];
         row.eachCell({ includeEmpty: true }, (cell) => {
-          const v = cell.value;
-          cells.push(v == null ? "" : typeof v === "object" && "text" in (v as object) ? String((v as { text: unknown }).text) : String(v));
+          cells.push(excelCellToString(cell.value));
         });
         rows[rowNumber - 1] = cells;
       });

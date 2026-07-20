@@ -21,6 +21,7 @@ export function MindMapCanvasLoader(props: {
   mapId: string;
   initialTitle: string;
   initialData: Json;
+  initialYjsState: string | null;
   canEdit: boolean;
   isOwner: boolean;
   isPublic: boolean;

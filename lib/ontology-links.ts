@@ -26,13 +26,38 @@ function dedupe(links: LinkTarget[]): LinkTarget[] {
   return out;
 }
 
+type MindElixirRefNode = {
+  metadata?: { kind?: string; refId?: string };
+  children?: MindElixirRefNode[];
+};
+
+const REF_KINDS = new Set(["file", "code", "document"]);
+
 /**
- * 마인드맵 그래프에서 참조 노드(ref)를 링크 대상으로 추출한다. 이 마인드맵이
+ * 마인드맵에서 참조 노드(ref)를 링크 대상으로 추출한다. 이 마인드맵이
  * "포함"하는 오브젝트 목록으로 취급 — 참조 노드 간 개별 간선까지는 1차
  * 버전에서 다루지 않는다(마인드맵을 허브로 하는 단순 모델).
+ *
+ * lib/tags.ts 의 extractMindmapPlainText 와 마찬가지로 현재 저장 포맷
+ * (nodeData 트리, metadata.kind/refId)과 구형 React Flow 그래프
+ * ({nodes,edges}, type:"ref") 를 모두 지원한다.
  */
 export function extractMindmapLinks(data: Json): LinkTarget[] {
   if (!data || typeof data !== "object" || Array.isArray(data)) return [];
+
+  const nodeData = (data as { nodeData?: MindElixirRefNode }).nodeData;
+  if (nodeData && typeof nodeData === "object") {
+    const links: LinkTarget[] = [];
+    const walk = (n: MindElixirRefNode) => {
+      const kind = n.metadata?.kind;
+      const refId = n.metadata?.refId;
+      if (kind && REF_KINDS.has(kind) && refId) links.push({ to_kind: kind, to_id: refId });
+      for (const child of n.children ?? []) walk(child);
+    };
+    walk(nodeData);
+    return dedupe(links);
+  }
+
   const nodes = (data as { nodes?: unknown[] }).nodes;
   if (!Array.isArray(nodes)) return [];
 
