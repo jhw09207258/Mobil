@@ -41,6 +41,11 @@
   --steel: #4f7cac;
   --steel-hover: #5f8cbd;
 
+  /* 텍스트 선택(::selection) — accent-ghost 등 다른 용도의 저채도(12%) 틴트를
+     재사용하면 --bg-0/--bg-1 처럼 거의 검정에 가까운 배경 위에서는 선택
+     영역이 거의 안 보인다. 식별 가능하도록 충분히 진한 전용 색을 쓴다. */
+  --selection-bg: rgba(79, 124, 172, 0.45);
+
   /* 상태 */
   --ok: #4a9d5b;
   --warn: #c9922e;
@@ -95,7 +100,8 @@ a:hover {
 }
 
 ::selection {
-  background: var(--accent-ghost);
+  background: var(--selection-bg);
+  color: var(--text-0);
 }
 
 /* 스크롤바 — 투박한 각진 형태 */

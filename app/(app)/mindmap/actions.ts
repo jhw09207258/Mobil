@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
+import type { MindElixirData } from "mind-elixir";
 import { extractMindmapLinks } from "@/lib/ontology-links";
 import { extractTagsFromText, extractMindmapPlainText } from "@/lib/tags";
 
@@ -41,6 +42,56 @@ export async function createMindMapTab(): Promise<{
       title: data.title,
       data: data.data,
       initialYjsState: data.yjs_state,
+      isPublic: false,
+      canEdit: true,
+      isOwner: true,
+      myShareId: user.id,
+      items,
+    },
+  };
+}
+
+/** MindMup outline HTML 등 외부 파일에서 클라이언트가 이미 Mind Elixir 트리로
+ * 파싱해온 데이터를 그대로 새 마인드맵으로 저장한다(파싱은 브라우저의
+ * DOMParser 가 필요해 서버가 아니라 클라이언트에서 한다 — lib/mindmup-import.ts). */
+export async function createMindMapFromOutline(
+  title: string,
+  data: MindElixirData
+): Promise<{ id: string; title: string; seed: unknown } | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Authentication required." };
+
+  const finalTitle = title.trim() || "Untitled map";
+  const { data: inserted, error } = await supabase
+    .from("mind_maps")
+    .insert({ owner_id: user.id, title: finalTitle, data: data as unknown as Json })
+    .select("id, title, data")
+    .single();
+  if (error || !inserted) return { error: "Failed to import map." };
+
+  after(async () => {
+    const tags = extractTagsFromText(`${finalTitle} ${extractMindmapPlainText(data as unknown as Json)}`);
+    await supabase
+      .rpc("sync_object_tags", { p_kind: "mindmap", p_id: inserted.id, p_tag_names: tags })
+      .then(
+        () => {},
+        () => {}
+      );
+  });
+
+  const items = await listWorkspaceItems();
+
+  return {
+    id: inserted.id,
+    title: inserted.title,
+    seed: {
+      id: inserted.id,
+      title: inserted.title,
+      data: inserted.data,
+      initialYjsState: null,
       isPublic: false,
       canEdit: true,
       isOwner: true,

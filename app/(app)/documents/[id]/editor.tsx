@@ -417,6 +417,55 @@ export function DocumentEditor({
   );
 }
 
+// 툴바 라인 아이콘 — 이모지(🔗🖼🎬 등)는 OS/브라우저마다 색이 제각각이라
+// 무채색 다크 테마와 어울리지 않는다. 사이드바 아이콘(app/(app)/icons.tsx)과
+// 같은 스타일(currentColor 스트로크, 24x24 뷰박스)로 맞춘다.
+const iconProps = {
+  width: 15,
+  height: 15,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+function IconLink() {
+  return (
+    <svg {...iconProps}>
+      <path d="M9 15l6-6" />
+      <path d="M10.5 6.5l1-1a4 4 0 1 1 5.7 5.7l-1.7 1.7" />
+      <path d="M13.5 17.5l-1 1a4 4 0 1 1-5.7-5.7l1.7-1.7" />
+    </svg>
+  );
+}
+function IconImage() {
+  return (
+    <svg {...iconProps}>
+      <rect x="3" y="4" width="18" height="16" rx="1.5" />
+      <circle cx="8.5" cy="9.5" r="1.75" />
+      <path d="M21 16l-5.5-5.5a1.5 1.5 0 0 0-2.12 0L4 19" />
+    </svg>
+  );
+}
+function IconVideo() {
+  return (
+    <svg {...iconProps}>
+      <rect x="3" y="5" width="14" height="14" rx="1.5" />
+      <path d="M17 10l4-2.5v9L17 14" />
+    </svg>
+  );
+}
+function IconEraser() {
+  return (
+    <svg {...iconProps}>
+      <path d="M18 13.5L10.5 21H6l-3-3 10-10 6 6z" />
+      <path d="M9.5 5.5l9 9" />
+      <path d="M6 21h14" />
+    </svg>
+  );
+}
+
 function Toolbar({
   editor,
   onUploadMedia,
@@ -463,7 +512,7 @@ function Toolbar({
         <span className="tool-swatch" style={{ background: (editor.getAttributes("highlight").color as string) || "var(--warn)" }} />
         <input type="color" defaultValue="#c9922e" onChange={(e) => editor.chain().focus().toggleHighlight({ color: e.target.value }).run()} />
       </label>
-      <button className="tool" onClick={() => editor.chain().focus().unsetColor().unsetHighlight().run()} title="Clear color/highlight">⌫</button>
+      <button className="tool" onClick={() => editor.chain().focus().unsetColor().unsetHighlight().run()} title="Clear color/highlight"><IconEraser /></button>
 
       <span className="tool-sep" />
       <button className={btn(editor.isActive("bulletList"))} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list">•</button>
@@ -473,9 +522,9 @@ function Toolbar({
       <button className={btn(editor.isActive("codeBlock"))} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code block">{"{ }"}</button>
 
       <span className="tool-sep" />
-      <button className={btn(editor.isActive("link"))} onClick={setLink} title="Link">🔗</button>
-      <button className="tool" onClick={() => imgRef.current?.click()} title="Insert image">🖼</button>
-      <button className="tool" onClick={() => vidRef.current?.click()} title="Insert video">🎬</button>
+      <button className={btn(editor.isActive("link"))} onClick={setLink} title="Link"><IconLink /></button>
+      <button className="tool" onClick={() => imgRef.current?.click()} title="Insert image"><IconImage /></button>
+      <button className="tool" onClick={() => vidRef.current?.click()} title="Insert video"><IconVideo /></button>
       <button className="tool" onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider">―</button>
 
       <input ref={imgRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadMedia(f, "image"); e.target.value = ""; }} />

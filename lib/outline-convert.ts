@@ -56,6 +56,9 @@ function extractPlainText(node: LooseTiptapNode): string {
   return (node.content ?? []).map(extractPlainText).join("");
 }
 
+const LIST_CONTAINER_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
+const LIST_ITEM_TYPES = new Set(["listItem", "taskItem"]);
+
 export function documentJSONToMindmapData(
   doc: LooseTiptapNode,
   fallbackTitle: string
@@ -64,6 +67,36 @@ export function documentJSONToMindmapData(
   const stack: { level: number; node: NodeObj }[] = [{ level: 0, node: root }];
   let idCounter = 0;
   const nextId = () => `n${idCounter++}`;
+
+  // 리스트 항목 하나를 노드로 — 자기 텍스트는 topic 으로, 안에 중첩된
+  // bulletList/orderedList/taskList 가 있으면 재귀적으로 자식 노드로 붙여
+  // 실제 들여쓰기 구조를 그대로 트리 깊이에 반영한다.
+  const listItemToNode = (item: LooseTiptapNode): NodeObj => {
+    const texts: string[] = [];
+    const children: NodeObj[] = [];
+    for (const child of item.content ?? []) {
+      if (LIST_CONTAINER_TYPES.has(child.type ?? "")) {
+        children.push(...listToNodes(child));
+      } else {
+        const t = extractPlainText(child).trim();
+        if (t) texts.push(t);
+      }
+    }
+    const checked = (item as { attrs?: { checked?: boolean } }).attrs?.checked;
+    const prefix = typeof checked === "boolean" ? (checked ? "☑ " : "☐ ") : "";
+    const node: NodeObj = {
+      id: nextId(),
+      topic: prefix + (texts.join(" ").trim() || "Untitled"),
+      metadata: { kind: "note" },
+    };
+    if (children.length > 0) node.children = children;
+    return node;
+  };
+
+  const listToNodes = (list: LooseTiptapNode): NodeObj[] =>
+    (list.content ?? [])
+      .filter((item) => LIST_ITEM_TYPES.has(item.type ?? ""))
+      .map(listItemToNode);
 
   for (const block of doc.content ?? []) {
     if (block.type === "heading") {
@@ -74,6 +107,11 @@ export function documentJSONToMindmapData(
       const parent = stack[stack.length - 1].node;
       (parent.children ??= []).push(node);
       stack.push({ level, node });
+    } else if (LIST_CONTAINER_TYPES.has(block.type ?? "")) {
+      // 리스트는 항목별로 별도 자식 노드로 — 예전엔 항목 전부를 구분자 없이
+      // 이어붙여 한 노드로 뭉개버렸다("엉터리" 변환의 주된 원인).
+      const parent = stack[stack.length - 1].node;
+      (parent.children ??= []).push(...listToNodes(block));
     } else {
       const text = extractPlainText(block).trim();
       if (!text) continue;

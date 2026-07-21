@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createMindMapTab } from "./actions";
 import { MindMapList } from "./mindmap-list";
 import { NewItemButton } from "../workspace/new-item-button";
+import { ImportOutlineButton } from "./import-outline-button";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,10 @@ export default async function MindMapPage() {
           <div>
             <h1 className="page-h">Link Graph</h1>
           </div>
-          <NewItemButton kind="mindmap" label="New map" create={createMindMapTab} />
+          <div className="row" style={{ gap: 8 }}>
+            <ImportOutlineButton />
+            <NewItemButton kind="mindmap" label="New map" create={createMindMapTab} />
+          </div>
         </div>
 
         <MindMapList maps={maps ?? []} userId={userId} />
