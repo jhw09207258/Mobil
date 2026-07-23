@@ -56,13 +56,19 @@ html[data-desktop] .app-header {
   padding-top: 28px;
   -webkit-app-region: drag;
 }
-/* 크롬(헤더+사이드바+탭바)을 살짝 반투명하게 — macOS 유리 질감.
-   창 자체가 transparent + vibrancy 이므로 투과분만큼 흐린 배경이 비친다. */
+/* 크롬(헤더+사이드바+탭바)을 반투명하게 — macOS 유리 질감.
+   창(transparent) + underWindowBackground vibrancy 로 흐린 배경이 비친다.
+   중요: html/body 둘 다 투명해야 OS vibrancy 가 실제로 뒤에 드러난다
+   (globals.css 는 html·body 에 opaque --bg-0 를 준다 — 여기서 덮어쓴다). */
+html[data-desktop],
 html[data-desktop] body {
   background: transparent;
 }
 html[data-desktop] .app {
-  background: color-mix(in srgb, var(--bg-1) 86%, transparent);
+  /* 크롬은 60% 불투명 유리, 콘텐츠 아일랜드(.app-main)만 완전 불투명 */
+  background: color-mix(in srgb, var(--bg-1) 60%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6);
+  backdrop-filter: blur(30px) saturate(1.6);
 }
 html[data-desktop] .app-header a,
 html[data-desktop] .app-header button,
@@ -79,25 +85,34 @@ html[data-desktop] .app-header .hsearch {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 16px;
+  gap: 12px;
+  padding: 0 12px;
   /* 경계선 없음 — 크롬(헤더·사이드바)은 배경으로만 구분하고,
      테두리는 콘텐츠 아일랜드(.app-main)가 가진다. */
   background: transparent;
   z-index: 30;
 }
-.app-header .brand-logo,
+/* 좌/우 그룹이 폭을 균등하게 나눠 가져 검색창이 헤더 정중앙에 온다. */
+.header-side {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-side-right {
+  justify-content: flex-end;
+}
 .app-header .acct {
   flex: none;
 }
 
-/* ---- header search (바로 왼쪽에 프로필이 오도록 우측 정렬) ---- */
+/* ---- header search (헤더 정중앙) ---- */
 .hsearch {
   position: relative;
   flex: none;
-  margin-left: auto;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 /* 돋보기 아이콘 버튼 — 데스크톱/태블릿에서는 숨기고 모바일에서만 노출한다. */
 .hsearch-icon-btn {

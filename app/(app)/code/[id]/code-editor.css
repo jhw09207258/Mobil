@@ -106,3 +106,23 @@
     flex: none;
   }
 }
+
+/* 스플릿뷰 등 좁은 폭에서 상단바 액션 버튼이 겹치지 않고 좌우 스크롤되게 한다. */
+.code-bar {
+  flex-wrap: nowrap;
+}
+.code-bar > .row {
+  min-width: 0;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.code-bar > .row > * {
+  flex: none;
+}
+.code-bar-left {
+  flex: 1 1 90px;
+  min-width: 60px;
+}

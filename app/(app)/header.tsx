@@ -40,7 +40,10 @@ export function AppHeader({
   }, []);
 
   return (
-    <header className="app-header">
+    // data-tauri-drag-region: 데스크톱 앱에서 헤더 빈 영역을 잡아 창을 옮긴다
+    // (CSS -webkit-app-region 보다 신뢰성 높은 Tauri v2 네이티브 방식).
+    // 브라우저에서는 무의미한 속성이라 무시된다.
+    <header className="app-header" data-tauri-drag-region>
       <button
         type="button"
         className="hamburger-btn"
@@ -50,15 +53,15 @@ export function AppHeader({
       >
         <IconMenu size={20} />
       </button>
-      <Link href="/dashboard" className="brand-logo" onClick={hide}>
-        Mobil
-      </Link>
+      {/* 좌측 균형용 스페이서 — 검색창을 헤더 정중앙에 두기 위함 */}
+      <div className="header-side header-side-left" data-tauri-drag-region />
 
       <HeaderSearch />
 
-      <GlobalChat selfId={userId} selfName={name} />
+      <div className="header-side header-side-right">
+        <GlobalChat selfId={userId} selfName={name} />
 
-      <div className="acct" ref={ref}>
+        <div className="acct" ref={ref}>
         <button className="acct-btn" onClick={() => setOpen((v) => !v)}>
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -91,6 +94,7 @@ export function AppHeader({
             </form>
           </div>
         )}
+        </div>
       </div>
     </header>
   );
