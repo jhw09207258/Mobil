@@ -78,6 +78,52 @@
   width: 100%;
 }
 
+/* -------------------------------------------------------------------------
+   mind-elixir 기본 플로팅 콘솔 두 개(lt: 좌상단 레이아웃, rb: 우하단 줌)를
+   상단 중앙의 단일 콘솔로 합친다 — 둘 다 가로 배치로 바꾸고 나란히 붙여
+   경계를 공유하는 하나의 블랙 톤 바처럼 보이게 한다.
+   ------------------------------------------------------------------------- */
+.mm-fill .mind-elixir-toolbar {
+  top: 10px;
+  bottom: auto;
+  padding: 6px 10px;
+  background: #0d0d0dee;
+  color: #cccccc;
+  border: 1px solid #333333;
+  border-radius: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 6;
+}
+.mm-fill .mind-elixir-toolbar span {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.mm-fill .mind-elixir-toolbar span:hover {
+  color: #ffffff;
+}
+.mm-fill .mind-elixir-toolbar span + span {
+  margin: 0; /* 기본 세로/가로 마진 제거 — gap 으로 통일 */
+}
+/* lt(레이아웃 버튼들)를 중앙 기준 왼쪽 반쪽으로 */
+.mm-fill .mind-elixir-toolbar.lt {
+  font-size: 16px;
+  left: 50%;
+  right: auto;
+  transform: translateX(calc(-100% + 1px)); /* 오른쪽 반쪽과 경계선 공유 */
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+/* rb(줌/센터 버튼들)를 중앙 기준 오른쪽 반쪽으로 */
+.mm-fill .mind-elixir-toolbar.rb {
+  right: auto;
+  left: 50%;
+  border-radius: 0 4px 4px 0;
+}
+
 /* reference node side preview */
 .mm-preview {
   position: absolute;

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import * as Y from "yjs";
 import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import { RepositoryPicker } from "../../repositories/repository-picker";
 import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
 import { PresenceAvatars } from "@/components/presence-avatars";
@@ -261,6 +262,7 @@ export function CodeEditor({
         </div>
         <div className="row" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
+          <RepositoryPicker kind="code" itemId={fileId} canEdit={canEdit} />
           <ContributorBadges kind="code" id={fileId} refreshToken={saveState} />
           <span
             className={`save-state ${

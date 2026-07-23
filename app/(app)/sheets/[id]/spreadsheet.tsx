@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import * as Y from "yjs";
 import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import { RepositoryPicker } from "../../repositories/repository-picker";
 import { createMindmapFromSheet } from "../../convert-actions";
 import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
@@ -350,6 +351,7 @@ export function Spreadsheet({
         </div>
         <div className="row" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
+          <RepositoryPicker kind="sheet" itemId={sheetId} canEdit={canEdit} />
           <ContributorBadges kind="sheet" id={sheetId} refreshToken={saveState} />
           <span
             className={`save-state ${

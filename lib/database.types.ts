@@ -80,6 +80,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           yjs_state: string | null;
+          repository_id: string | null;
         };
         Insert: {
           id?: string;
@@ -94,6 +95,7 @@ export interface Database {
           content?: Json;
           is_public?: boolean;
           yjs_state?: string | null;
+          repository_id?: string | null;
         };
         Relationships: [];
       };
@@ -128,6 +130,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           yjs_state: string | null;
+          repository_id: string | null;
         };
         Insert: {
           id?: string;
@@ -144,6 +147,7 @@ export interface Database {
           content?: string;
           is_public?: boolean;
           yjs_state?: string | null;
+          repository_id?: string | null;
         };
         Relationships: [];
       };
@@ -177,6 +181,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           yjs_state: string | null;
+          repository_id: string | null;
         };
         Insert: {
           id?: string;
@@ -191,6 +196,7 @@ export interface Database {
           data?: Json;
           is_public?: boolean;
           yjs_state?: string | null;
+          repository_id?: string | null;
         };
         Relationships: [];
       };
@@ -224,6 +230,7 @@ export interface Database {
           created_at: string;
           updated_at: string;
           yjs_state: string | null;
+          repository_id: string | null;
         };
         Insert: {
           id?: string;
@@ -238,6 +245,7 @@ export interface Database {
           data?: Json;
           is_public?: boolean;
           yjs_state?: string | null;
+          repository_id?: string | null;
         };
         Relationships: [];
       };
@@ -271,6 +279,7 @@ export interface Database {
           size_bytes: number | null;
           is_public: boolean;
           created_at: string;
+          repository_id: string | null;
         };
         Insert: {
           id?: string;
@@ -284,6 +293,7 @@ export interface Database {
         Update: {
           file_name?: string;
           is_public?: boolean;
+          repository_id?: string | null;
         };
         Relationships: [];
       };
@@ -413,6 +423,23 @@ export interface Database {
           content: string;
         };
         Update: Record<string, never>;
+        Relationships: [];
+      };
+      repositories: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+        };
+        Update: {
+          name?: string;
+        };
         Relationships: [];
       };
       starred_items: {

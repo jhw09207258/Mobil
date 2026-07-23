@@ -19,7 +19,7 @@ export default async function SettingsPage() {
         <span className="topbar-title">Settings</span>
         <span className="crumb">ACCOUNT / SETTINGS</span>
       </div>
-      <div className="content" style={{ maxWidth: 640 }}>
+      <div className="content">
         <div className="page-head">
           <div>
             <h1 className="page-h">Settings</h1>

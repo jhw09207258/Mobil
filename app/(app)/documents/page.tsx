@@ -35,7 +35,7 @@ export default async function DocumentsPage() {
             <ImportItemButton
               kind="document"
               label="Import file"
-              accept=".txt,.docx,.hwp,.hwpx"
+              accept=".txt,.docx,.hwp,.hwpx,.pages"
               importAction={importDocument}
             />
             <NewItemButton kind="document" label="New document" create={createDocumentTab} />

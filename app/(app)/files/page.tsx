@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { FilesClient } from "./files-client";
 import { listStarredIds } from "../starred-actions";
+import { listRepositories } from "../repositories/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -9,11 +10,11 @@ export default async function FilesPage() {
   const { userId, profile } = await requireUser();
   const supabase = await createClient();
 
-  const [{ data: files }, { data: editPerms }, starredIds] = await Promise.all([
+  const [{ data: files }, { data: editPerms }, starredIds, repositories] = await Promise.all([
     supabase
       .from("files")
       .select(
-        "id, owner_id, storage_path, file_name, mime_type, size_bytes, is_public, created_at"
+        "id, owner_id, storage_path, file_name, mime_type, size_bytes, is_public, created_at, repository_id"
       )
       .order("created_at", { ascending: false }),
     supabase
@@ -22,6 +23,7 @@ export default async function FilesPage() {
       .eq("user_id", userId)
       .eq("permission", "edit"),
     listStarredIds("file"),
+    listRepositories(),
   ]);
 
   const isAdmin = profile.role === "admin";
@@ -42,6 +44,7 @@ export default async function FilesPage() {
           initialFiles={filesWithEdit}
           userId={userId}
           starredIds={starredIds}
+          repositories={repositories}
         />
       </div>
     </>

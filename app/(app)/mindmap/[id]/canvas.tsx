@@ -21,6 +21,7 @@ import {
 } from "../actions";
 import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import { RepositoryPicker } from "../../repositories/repository-picker";
 import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
 import { PresenceAvatars } from "@/components/presence-avatars";
@@ -248,8 +249,36 @@ function Inner({
       contextMenu: canEdit,
       toolBar: true,
       keypress: canEdit,
-      theme: MindElixir.DARK_THEME,
+      // 앱 테마(라이트/다크)에 맞춘 맵 색상.
+      theme:
+        document.documentElement.dataset.theme === "light"
+          ? MindElixir.THEME
+          : MindElixir.DARK_THEME,
     }) as MindElixirInstance;
+
+    // 대형 맵 이동 시 화면이 통째로 비는 버그의 근본 시정 — mind-elixir 는
+    // 패닝/줌마다 .map-canvas 에 translate3d 를 쓰는데, 3d 변환은 요소를 GPU
+    // 레이어로 승격시키고, max-content 로 커진 초대형 맵은 GPU 텍스처 한계
+    // (보통 16384px)를 넘겨 이동하는 동안 빈 타일만 보인다. translate3d 를
+    // 동일한 2d translate 로 강등하면 레이어 승격이 사라져 브라우저가 필요한
+    // 부분만 다시 그린다(스크롤 성능을 약간 내주고 가시성을 얻는 트레이드오프).
+    const mapCanvas = containerRef.current.querySelector(".map-canvas") as HTMLElement | null;
+    let demoting = false;
+    const demoteObserver = new MutationObserver(() => {
+      if (demoting || !mapCanvas) return;
+      const t = mapCanvas.style.transform;
+      if (t && t.includes("translate3d")) {
+        demoting = true;
+        mapCanvas.style.transform = t.replace(
+          /translate3d\(([^,]+),\s*([^,]+),\s*[^)]+\)/g,
+          "translate($1, $2)"
+        );
+        demoting = false;
+      }
+    });
+    if (mapCanvas) {
+      demoteObserver.observe(mapCanvas, { attributes: true, attributeFilter: ["style"] });
+    }
 
     // arrows/summaries 는 Yjs 로 동기화하지 않는다(노드 트리만 CRDT 대상 —
     // 저장할 때마다 통째로 반영되는 JSON 스냅샷(data 컬럼)에서 가져온다).
@@ -317,6 +346,7 @@ function Inner({
 
     return () => {
       containerRef.current?.removeEventListener("click", onClick);
+      demoteObserver.disconnect();
       me.destroy();
       meRef.current = null;
     };
@@ -573,6 +603,7 @@ function Inner({
         </div>
         <div className="row" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
+          <RepositoryPicker kind="mindmap" itemId={mapId} canEdit={canEdit} />
           <ContributorBadges kind="mindmap" id={mapId} refreshToken={saveState} />
           <span
             className={`save-state ${

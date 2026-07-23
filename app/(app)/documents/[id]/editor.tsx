@@ -39,6 +39,7 @@ import {
 import { downloadBase64File } from "@/lib/download-file";
 import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import { RepositoryPicker } from "../../repositories/repository-picker";
 import { createMindmapFromDocument } from "../../convert-actions";
 import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
@@ -350,6 +351,7 @@ export function DocumentEditor({
         />
         <div className="row" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
+          <RepositoryPicker kind="document" itemId={docId} canEdit={canEdit} />
           <ContributorBadges kind="document" id={docId} refreshToken={saveState} />
           <span
             className={`save-state ${

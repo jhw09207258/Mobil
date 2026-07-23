@@ -17,6 +17,14 @@ import {
   revokeFileShare,
   listFileShares,
 } from "./actions";
+import {
+  setItemRepository,
+  listRepositoryContents,
+  createRepository,
+  type Repository,
+  type RepositoryContents,
+} from "../repositories/actions";
+import { OpenItemButton } from "../workspace/open-item-button";
 
 type FileRow = {
   id: string;
@@ -27,6 +35,7 @@ type FileRow = {
   size_bytes: number | null;
   is_public: boolean;
   created_at: string;
+  repository_id: string | null;
   canEdit: boolean;
 };
 
@@ -36,10 +45,12 @@ export function FilesClient({
   initialFiles,
   userId,
   starredIds,
+  repositories,
 }: {
   initialFiles: FileRow[];
   userId: string;
   starredIds: string[];
+  repositories: Repository[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -53,6 +64,10 @@ export function FilesClient({
   const [starredOnly, setStarredOnly] = useState(false);
   const [starredSet, setStarredSet] = useState(() => new Set(starredIds));
   const [dragOver, setDragOver] = useState(false);
+  // 저장소 필터: "all" | "null"(Null Repository) | repo id
+  const [repoFilter, setRepoFilter] = useState<string>("all");
+  const [repoRows, setRepoRows] = useState(() => new Map(initialFiles.map((f) => [f.id, f.repository_id])));
+  const [repoContents, setRepoContents] = useState<RepositoryContents | null>(null);
   const dragDepth = useRef(0);
   const [pending, start] = useTransition();
 
@@ -85,6 +100,11 @@ export function FilesClient({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return categorized
+      .filter(({ file: f }) => {
+        if (repoFilter === "all") return true;
+        const rid = repoRows.get(f.id) ?? null;
+        return repoFilter === "null" ? rid === null : rid === repoFilter;
+      })
       .filter(({ category: c }) => category === "all" || c === category)
       .filter(({ file: f }) => !starredOnly || starredSet.has(f.id))
       .filter(
@@ -94,7 +114,39 @@ export function FilesClient({
           (f.mime_type ?? "").toLowerCase().includes(q)
       )
       .map(({ file }) => file);
-  }, [categorized, query, category, starredOnly, starredSet]);
+  }, [categorized, query, category, starredOnly, starredSet, repoFilter, repoRows]);
+
+  // 특정 저장소를 선택하면 그 저장소의 문서/코드/시트/마인드맵도 함께 보여준다.
+  const selectRepo = (value: string) => {
+    setRepoFilter(value);
+    if (value === "all") {
+      setRepoContents(null);
+      return;
+    }
+    listRepositoryContents(value === "null" ? null : value).then(setRepoContents);
+  };
+
+  const onNewRepo = async () => {
+    const name = prompt("New repository name");
+    if (!name?.trim()) return;
+    const res = await createRepository(name);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    router.refresh();
+  };
+
+  const moveFileRepo = async (fileId: string, value: string) => {
+    const next = value === "" ? null : value;
+    const prev = repoRows.get(fileId) ?? null;
+    setRepoRows((m) => new Map(m).set(fileId, next));
+    const res = await setItemRepository("file", fileId, next);
+    if ("error" in res) {
+      setRepoRows((m) => new Map(m).set(fileId, prev));
+      setError(res.error);
+    }
+  };
 
   const uploadFiles = async (fileList: FileList | File[] | null) => {
     const files = fileList ? Array.from(fileList) : [];
@@ -225,6 +277,78 @@ export function FilesClient({
       {error && <div className="notice notice-error">{error}</div>}
 
       <div className="category-tabs">
+        <span className="label" style={{ alignSelf: "center", marginRight: 4 }}>REPOSITORY</span>
+        <button
+          type="button"
+          className={`category-tab ${repoFilter === "all" ? "active" : ""}`}
+          onClick={() => selectRepo("all")}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          className={`category-tab ${repoFilter === "null" ? "active" : ""}`}
+          onClick={() => selectRepo("null")}
+        >
+          Null Repository
+        </button>
+        {repositories.map((r) => (
+          <button
+            type="button"
+            key={r.id}
+            className={`category-tab ${repoFilter === r.id ? "active" : ""}`}
+            onClick={() => selectRepo(r.id)}
+          >
+            {r.name}
+          </button>
+        ))}
+        <button type="button" className="category-tab" onClick={onNewRepo}>
+          + New
+        </button>
+      </div>
+
+      {repoContents && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <div className="panel-header">
+            <span className="label">
+              ITEMS IN {repoFilter === "null" ? "NULL REPOSITORY" : repositories.find((r) => r.id === repoFilter)?.name?.toUpperCase()}
+            </span>
+          </div>
+          <div className="panel-body repo-contents">
+            {(["documents", "code", "sheets", "mindmaps"] as const).map((group) => {
+              const rows =
+                group === "documents" ? repoContents.documents.map((d) => ({ id: d.id, label: d.title, kind: "document" as const }))
+                : group === "code" ? repoContents.code.map((c) => ({ id: c.id, label: c.name, kind: "code" as const }))
+                : group === "sheets" ? repoContents.sheets.map((sh) => ({ id: sh.id, label: sh.title, kind: "sheet" as const }))
+                : repoContents.mindmaps.map((m) => ({ id: m.id, label: m.title, kind: "mindmap" as const }));
+              if (rows.length === 0) return null;
+              return (
+                <div key={group} className="repo-group">
+                  <span className="label">{group.toUpperCase()}</span>
+                  <div className="repo-items">
+                    {rows.map((item) => (
+                      <OpenItemButton
+                        key={item.id}
+                        kind={item.kind}
+                        id={item.id}
+                        title={item.label}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        {item.label}
+                      </OpenItemButton>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {repoContents.documents.length + repoContents.code.length + repoContents.sheets.length + repoContents.mindmaps.length === 0 && (
+              <span className="muted" style={{ fontSize: 12.5 }}>No docs, code, tables or link graphs in this repository yet — assign them from each editor's repository selector.</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="category-tabs">
         <button
           type="button"
           className={`category-tab ${category === "all" ? "active" : ""}`}
@@ -320,6 +444,20 @@ export function FilesClient({
                     </td>
                     <td>
                       <div className="row row-actions" style={{ gap: 4 }}>
+                        {owned && (
+                          <select
+                            className="select repo-picker"
+                            value={repoRows.get(f.id) ?? ""}
+                            onChange={(e) => moveFileRepo(f.id, e.target.value)}
+                            title="Repository"
+                            aria-label="Repository"
+                          >
+                            <option value="">Null Repository</option>
+                            {repositories.map((r) => (
+                              <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                          </select>
+                        )}
                         <button
                           className="btn btn-ghost btn-sm"
                           onClick={() => download(f.id)}

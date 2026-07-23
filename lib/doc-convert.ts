@@ -444,6 +444,12 @@ export async function importFileToTiptapDoc(
     return { title, content: markdownToTiptapDoc(markdown) };
   }
 
+  if (ext === "pages") {
+    const { extractPagesText } = await import("@/lib/pages-convert");
+    const text = await extractPagesText(bytes);
+    return { title, content: plainTextToTiptapDoc(text) };
+  }
+
   throw new Error(`Unsupported file type: .${ext}`);
 }
 
