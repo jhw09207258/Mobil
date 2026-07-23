@@ -38,7 +38,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-0);
+  background: var(--bg-1);
   /* AppLayout 이 새로 마운트될 때(콜드 진입 · Reconnecting 화면 다음)만
      재생된다 — (app) 세그먼트 내부 탭 이동은 이 레이아웃을 리마운트하지
      않으므로 평소 화면 전환에서는 반복되지 않는다. */
@@ -46,13 +46,23 @@
 }
 
 /* ---- 데스크톱(Tauri) 전용 — macOS 신호등 오버레이 대응 ----
-   커스텀 userAgent 로 감지된 데스크톱에서만: 헤더 좌측에 신호등 버튼 자리
-   (~76px)를 비우고, 헤더 빈 영역을 드래그하면 창이 움직이게 한다. 내부의
-   상호작용 요소는 전부 no-drag. 일반 브라우저에서는 무시된다. */
+   Teams 스타일: 신호등이 차지하는 상단 띠(28px)를 헤더 위쪽 여백으로 비우고,
+   Mobil 로고·검색창·채팅·프로필은 그 "아래" 줄에 일직선으로 내려온다.
+   헤더 빈 영역 드래그로 창 이동, 내부 컨트롤은 no-drag. 브라우저에선 무시. */
+html[data-desktop] {
+  --header-h: 76px;
+}
 html[data-desktop] .app-header {
-  /* 신호등(x:16 시작, 폭 ~54px)과 Mobil 로고가 겹치지 않게 넉넉히 비운다. */
-  padding-left: 96px;
+  padding-top: 28px;
   -webkit-app-region: drag;
+}
+/* 크롬(헤더+사이드바+탭바)을 살짝 반투명하게 — macOS 유리 질감.
+   창 자체가 transparent + vibrancy 이므로 투과분만큼 흐린 배경이 비친다. */
+html[data-desktop] body {
+  background: transparent;
+}
+html[data-desktop] .app {
+  background: color-mix(in srgb, var(--bg-1) 86%, transparent);
 }
 html[data-desktop] .app-header a,
 html[data-desktop] .app-header button,
@@ -71,8 +81,9 @@ html[data-desktop] .app-header .hsearch {
   align-items: center;
   gap: 16px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--border-0);
-  background: var(--bg-1);
+  /* 경계선 없음 — 크롬(헤더·사이드바)은 배경으로만 구분하고,
+     테두리는 콘텐츠 아일랜드(.app-main)가 가진다. */
+  background: transparent;
   z-index: 30;
 }
 .app-header .brand-logo,
@@ -390,8 +401,7 @@ html[data-desktop] .app-header .hsearch {
 .rail {
   width: var(--rail-w);
   flex: none;
-  background: var(--bg-1);
-  border-right: 1px solid var(--border-0);
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -448,6 +458,13 @@ html[data-desktop] .app-header .hsearch {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* Teams 스타일 콘텐츠 아일랜드 — 탭바+작업 화면을 하나의 카드로 감싼다 */
+  margin: 0 10px 10px 0;
+  background: var(--bg-0);
+  border: 1px solid var(--border-0);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 .topbar {
   display: flex;
@@ -751,6 +768,7 @@ html[data-desktop] .app-header .hsearch {
     top: var(--header-h);
     left: 0;
     bottom: 0;
+    background: var(--bg-1);
     width: var(--rail-w-mobile);
     max-width: 82vw;
     flex-direction: column;
@@ -794,9 +812,12 @@ html[data-desktop] .app-header .hsearch {
     display: none;
   }
 
-  .topbar {
-    padding: 0 14px;
-    height: 42px;
+  .app-main {
+    margin: 0;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
   }
   .crumb {
     display: none;

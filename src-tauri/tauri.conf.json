@@ -17,7 +17,9 @@
         "fullscreen": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 16, "y": 16 },
+        "trafficLightPosition": { "x": 16, "y": 14 },
+        "transparent": true,
+        "windowEffects": { "effects": ["underWindowBackground"], "state": "active" },
         "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) MobilDesktop/1.0"
       }
     ],

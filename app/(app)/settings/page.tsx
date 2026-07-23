@@ -15,10 +15,6 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Settings</span>
-        <span className="crumb">ACCOUNT / SETTINGS</span>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

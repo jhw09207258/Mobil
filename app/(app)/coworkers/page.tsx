@@ -11,10 +11,6 @@ export default async function CoworkersPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Co-workers</span>
-        <span className="crumb">WORKSPACE / CO-WORKERS</span>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

@@ -289,6 +289,7 @@ export interface Database {
           mime_type?: string | null;
           size_bytes?: number | null;
           is_public?: boolean;
+          repository_id?: string | null;
         };
         Update: {
           file_name?: string;

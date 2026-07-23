@@ -23,10 +23,6 @@ export default async function CodePage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Code</span>
-        <span className="crumb">WORKSPACE / CODE</span>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

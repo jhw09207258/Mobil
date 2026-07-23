@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
@@ -36,15 +35,6 @@ export default async function SheetEditorPage({
 
   return (
     <>
-      <div className="topbar">
-        <div className="row" style={{ gap: 12 }}>
-          <Link href="/sheets" className="btn btn-ghost btn-sm">
-            ← Table
-          </Link>
-          <span className="crumb">WORKSPACE / TABLE / {sheet.id.slice(0, 8)}</span>
-        </div>
-        <span className="crumb">{canEdit ? "READ · WRITE" : "READ ONLY"}</span>
-      </div>
       <SpreadsheetLoader
         sheetId={sheet.id}
         initialTitle={sheet.title}

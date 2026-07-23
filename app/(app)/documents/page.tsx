@@ -22,10 +22,6 @@ export default async function DocumentsPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Docs +</span>
-        <span className="crumb">WORKSPACE / DOCS +</span>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

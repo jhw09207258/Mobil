@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { IconChat } from "../icons";
 import { UserAvatar } from "@/components/user-avatar";
 import { ChatShell } from "./chat-shell";
 import {
@@ -180,13 +179,13 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
       {open && (
         <div className={`chat-float-panel ${expanded ? "expanded" : ""}`}>
           <div className="chat-float-head">
-            <span className="label">COMMS</span>
+            <span className="label">CHAT</span>
             <div className="row" style={{ gap: 2 }}>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => {
                   setOpen(false);
-                  openTab("chat", "comms", "Comms");
+                  openTab("chat", "comms", "Chat");
                 }}
                 title="Open as workspace tab (split view)"
                 aria-label="Open chat as a workspace tab"
@@ -235,9 +234,9 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
         className={`chat-header-btn ${open ? "active" : ""}`}
         onClick={() => (open ? setOpen(false) : openPanel())}
         aria-label={`${open ? "Close" : "Open"} chat${unread > 0 ? ` (${unread} unread)` : ""}`}
-        title="Comms"
+        title="Chat"
       >
-        <IconChat size={18} />
+        Chat
         {unread > 0 && (
           <span className="chat-unread chat-bubble-badge">
             {unread > 99 ? "99+" : unread}

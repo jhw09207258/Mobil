@@ -22,10 +22,6 @@ export default async function SheetsPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Table</span>
-        <span className="crumb">WORKSPACE / TABLE</span>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

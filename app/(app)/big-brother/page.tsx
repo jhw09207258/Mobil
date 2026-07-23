@@ -10,10 +10,6 @@ export default async function BigBrotherPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Big Brother</span>
-        <span className="crumb">INTELLIGENCE / BIG BROTHER</span>
-      </div>
       <BigBrotherShell initialConversations={conversations} />
     </>
   );

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
@@ -39,15 +38,6 @@ export default async function MindMapEditorPage({
 
   return (
     <>
-      <div className="topbar">
-        <div className="row" style={{ gap: 12 }}>
-          <Link href="/mindmap" className="btn btn-ghost btn-sm">
-            ← Link Graph
-          </Link>
-          <span className="crumb">WORKSPACE / LINK GRAPH / {map.id.slice(0, 8)}</span>
-        </div>
-        <span className="crumb">{canEdit ? "READ · WRITE" : "READ ONLY"}</span>
-      </div>
       <MindMapCanvasLoader
         mapId={map.id}
         initialTitle={map.title}

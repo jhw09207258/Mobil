@@ -7,17 +7,17 @@
    ========================================================================= */
 
 :root {
-  /* 배경 계층 (순수 블랙 → 중립 다크그레이, R=G=B — 색조 없음) */
-  --bg-0: #050505; /* 최하단 캔버스 */
-  --bg-1: #0d0d0d; /* 앱 셸 */
-  --bg-2: #161616; /* 패널/카드 */
-  --bg-3: #1e1e1e; /* 상승된 요소 (헤더, 입력) */
-  --bg-4: #2a2a2a; /* hover / 강조 표면 */
+  /* 배경 계층 — 순수 블랙 대신 Teams 계열의 다크그레이/그레이 기반 */
+  --bg-0: #17181a; /* 최하단 캔버스 */
+  --bg-1: #1e2022; /* 앱 셸(크롬) */
+  --bg-2: #242628; /* 패널/카드 */
+  --bg-3: #2c2e31; /* 상승된 요소 (헤더, 입력) */
+  --bg-4: #383b3f; /* hover / 강조 표면 */
 
   /* 경계선 */
-  --border-0: #262626;
-  --border-1: #333333;
-  --border-2: #454545; /* 강조 경계 */
+  --border-0: #34373b;
+  --border-1: #41454a;
+  --border-2: #55595f; /* 강조 경계 */
 
   /* 텍스트 */
   --text-0: #e8e8e8; /* 제목 */
@@ -75,12 +75,12 @@
    텍스트/배경 대비는 다크와 동일한 위계(0~4 단계)로 유지한다.
    ========================================================================= */
 html[data-theme="light"] {
-  /* 옅은 회색 캔버스 + 순백 카드 — 배경과 콘텐츠의 레이어 분리 */
-  --bg-0: #f3f4f6;
-  --bg-1: #f9fafb;
-  --bg-2: #ffffff;
-  --bg-3: #f3f4f6;
-  --bg-4: #e5e7eb;
+  /* 순백 대신 흰색+회색 혼합 — 눈이 편한 밝은 그레이 레이어 */
+  --bg-0: #e8eaed;
+  --bg-1: #f0f1f3;
+  --bg-2: #fafafb;
+  --bg-3: #eef0f2;
+  --bg-4: #e0e3e7;
 
   --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 16px rgba(16, 24, 40, 0.08);
   --shadow-pop: 0 8px 20px rgba(16, 24, 40, 0.12), 0 20px 48px rgba(16, 24, 40, 0.14);
@@ -580,6 +580,72 @@ html[data-theme="light"] .btn {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+.repo-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.repo-item-remove {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: var(--text-3);
+  font-size: 10px;
+  cursor: pointer;
+}
+.repo-item-remove:hover {
+  background: var(--accent-ghost);
+  color: var(--accent-hover);
+}
+
+/* 저장소 랜딩 카드 그리드 */
+.repo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.repo-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-0);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+}
+.repo-card:hover {
+  border-color: var(--create);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
+}
+.repo-card-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 56px;
+}
+.repo-card-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.repo-card-del {
+  position: absolute;
+  top: 10px;
+  right: 10px;
 }
 
 /* 아이콘 인터랙션 — 부드러운 색/스케일 전환으로 살아있는 느낌을 준다. */

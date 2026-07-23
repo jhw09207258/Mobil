@@ -37,10 +37,6 @@ export default async function AdminConsolePage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Admin Console</span>
-        <span className="crumb">ADMIN / CONSOLE</span>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

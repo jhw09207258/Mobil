@@ -18,10 +18,6 @@ export default async function MindMapPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Link Graph</span>
-        <span className="crumb">WORKSPACE / LINK GRAPH</span>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

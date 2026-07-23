@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
@@ -38,17 +37,6 @@ export default async function CodeFilePage({
 
   return (
     <>
-      <div className="topbar">
-        <div className="row" style={{ gap: 12 }}>
-          <Link href="/code" className="btn btn-ghost btn-sm">
-            ← Code
-          </Link>
-          <span className="crumb">
-            WORKSPACE / CODE / {file.id.slice(0, 8)}
-          </span>
-        </div>
-        <span className="crumb">{canEdit ? "READ · WRITE" : "READ ONLY"}</span>
-      </div>
       <CodeEditor
         fileId={file.id}
         initialName={file.name}

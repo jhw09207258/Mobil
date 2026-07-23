@@ -8,10 +8,6 @@ export default async function RedeemPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Redeem Admin Code</span>
-        <span className="crumb">ADMIN / REDEEM</span>
-      </div>
       <div className="content" style={{ maxWidth: 560 }}>
         <div className="page-head">
           <div>

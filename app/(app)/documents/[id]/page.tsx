@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
@@ -39,17 +38,6 @@ export default async function DocumentPage({
 
   return (
     <>
-      <div className="topbar">
-        <div className="row" style={{ gap: 12 }}>
-          <Link href="/documents" className="btn btn-ghost btn-sm">
-            ← Docs +
-          </Link>
-          <span className="crumb">
-            WORKSPACE / DOCS + / {doc.id.slice(0, 8)}
-          </span>
-        </div>
-        <span className="crumb">{canEdit ? "READ · WRITE" : "READ ONLY"}</span>
-      </div>
       <DocumentEditorLoader
         docId={doc.id}
         initialTitle={doc.title}

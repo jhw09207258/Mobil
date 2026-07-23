@@ -14,7 +14,6 @@
   flex: none;
   padding: 5px 10px;
   background: var(--bg-1);
-  border-bottom: 1px solid var(--border-0);
   gap: 6px;
   /* 탭 줄은 좌우 스크롤만 허용한다. overflow-x 만 auto 로 두면 CSS 명세상
      나머지 축(visible)이 auto 로 승격되어 세로 스크롤까지 생기므로, overflow-y
@@ -46,10 +45,9 @@
   color: var(--text-2);
   font-size: 12.5px;
   white-space: nowrap;
-  /* Safari 처럼 가용 폭을 나눠 가진다(넘치면 스크롤) */
-  flex: 1 1 120px;
-  min-width: 96px;
-  max-width: 220px;
+  /* 제목 길이에 맞는 컴팩트한 폭(넘치면 말줄임) */
+  flex: none;
+  max-width: 180px;
   cursor: pointer;
   transition: background 0.12s, color 0.12s, box-shadow 0.12s;
 }

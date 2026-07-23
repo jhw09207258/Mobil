@@ -49,11 +49,6 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Operational View</span>
-        <span className="crumb">HOME / OPERATIONAL VIEW</span>
-      </div>
-
       <div className="content dash-content">
         <div className="dash-welcome">
           Welcome, <b>{profile.display_name || profile.email.split("@")[0]}</b>

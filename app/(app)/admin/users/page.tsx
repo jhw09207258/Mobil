@@ -21,14 +21,6 @@ export default async function AdminUsersPage() {
 
   return (
     <>
-      <div className="topbar">
-        <div className="row" style={{ gap: 12 }}>
-          <Link href="/admin" className="btn btn-ghost btn-sm">
-            ← Admin
-          </Link>
-          <span className="crumb">ADMIN / USERS</span>
-        </div>
-      </div>
       <div className="content">
         <div className="page-head">
           <div>

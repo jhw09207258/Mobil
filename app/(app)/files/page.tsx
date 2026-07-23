@@ -35,10 +35,6 @@ export default async function FilesPage() {
 
   return (
     <>
-      <div className="topbar">
-        <span className="topbar-title">Repository</span>
-        <span className="crumb">WORKSPACE / REPOSITORY</span>
-      </div>
       <div className="content">
         <FilesClient
           initialFiles={filesWithEdit}
