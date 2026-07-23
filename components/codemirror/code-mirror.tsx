@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { EditorState, Compartment, type Extension } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection, crosshairCursor } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, undo as cmUndo, redo as cmRedo } from "@codemirror/commands";
 import {
   indentOnInput,
   bracketMatching,
@@ -24,12 +24,21 @@ import { mobilTheme } from "./theme";
  * 편집가능 여부는 Compartment 로 동적 재구성한다. value 는 초기 콘텐츠로만
  * 사용하며(비제어), 변경 사항은 onChange 로 상위에 전달한다.
  */
+export type CodeMirrorApi = { undo: () => void; redo: () => void };
+
+// y-codemirror.next 는 undo/redo 함수를 직접 export 하지 않고 keymap 으로만
+// 노출한다 — 툴바 버튼용으로 keymap 항목에서 run 함수를 꺼내 쓴다.
+const yUndoRun = yUndoManagerKeymap.find((k) => k.key === "Mod-z")?.run;
+const yRedoRun =
+  yUndoManagerKeymap.find((k) => k.key === "Mod-y" || k.key === "Mod-Shift-z")?.run;
+
 export function CodeMirror({
   value,
   language,
   editable,
   onChange,
   ytext,
+  onReady,
 }: {
   value: string;
   language: LangKey;
@@ -38,16 +47,22 @@ export function CodeMirror({
   /** 실시간 동시편집용 Yjs 공유 텍스트. 주어지면 CodeMirror 자체 history 대신
    * Yjs 의 undo manager 로 동작하고, value 는 최초 마운트에만 참고된다. */
   ytext?: Y.Text;
+  /** 마운트 후 undo/redo 명령 핸들을 넘겨준다(툴바 버튼용). */
+  onReady?: (api: CodeMirrorApi) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langComp = useRef(new Compartment());
   const editComp = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
+  const onReadyRef = useRef(onReady);
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   // 최초 1회 EditorView 생성
   useEffect(() => {
@@ -101,6 +116,19 @@ export function CodeMirror({
       parent: hostRef.current,
     });
     viewRef.current = view;
+
+    onReadyRef.current?.({
+      undo: () => {
+        if (ytext) yUndoRun?.(view);
+        else cmUndo(view);
+        view.focus();
+      },
+      redo: () => {
+        if (ytext) yRedoRun?.(view);
+        else cmRedo(view);
+        view.focus();
+      },
+    });
 
     return () => {
       view.destroy();

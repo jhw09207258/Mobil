@@ -8,7 +8,6 @@ import { WorkspaceProvider } from "./workspace/workspace-context";
 import { WorkspaceShell } from "./workspace/workspace-shell";
 import { MobileNavProvider } from "./mobile-nav-context";
 import { ReconnectTracker } from "./reconnect-tracker";
-import { GlobalChat } from "./chat/global-chat";
 import { NoZoom } from "./no-zoom";
 
 export default async function AppLayout({
@@ -34,6 +33,7 @@ export default async function AppLayout({
           <NoZoom />
           <ReconnectTracker />
           <AppHeader
+            userId={userId}
             displayName={profile.display_name ?? ""}
             email={email}
             avatarUrl={profile.avatar_url}
@@ -45,10 +45,6 @@ export default async function AppLayout({
             </main>
           </div>
           <Shortcuts />
-          <GlobalChat
-            selfId={userId}
-            selfName={profile.display_name || email}
-          />
         </div>
       </WorkspaceProvider>
     </MobileNavProvider>

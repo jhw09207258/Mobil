@@ -18,10 +18,34 @@ export default async function AppLoading() {
 
   if (!stale) return null;
 
+  // 투박한 텍스트 화면 대신 앱 셸 모양의 스켈레톤 — 로딩이 "화면이 곧 나올
+  // 준비 과정"으로 느껴지게 한다(데스크톱 앱 첫 진입 포함).
   return (
     <div className="reconnect-screen">
+      <div className="skel-shell" aria-hidden="true">
+        <div className="skel-header">
+          <span className="skel skel-logo" />
+          <span className="skel skel-pill" style={{ marginLeft: "auto" }} />
+          <span className="skel skel-avatar" />
+        </div>
+        <div className="skel-body">
+          <div className="skel-rail">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <span key={i} className="skel skel-railitem" />
+            ))}
+          </div>
+          <div className="skel-main">
+            <span className="skel skel-title" />
+            <div className="skel-cards">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <span key={i} className="skel skel-card" />
+              ))}
+            </div>
+            <span className="skel skel-block" />
+          </div>
+        </div>
+      </div>
       <span className="reconnect-spinner" aria-hidden="true" />
-      <span className="reconnect-text">Reconnecting…</span>
     </div>
   );
 }

@@ -661,62 +661,72 @@
   color: var(--text-0);
 }
 
-/* ---- 플로팅 채팅 (버블 + 패널) ---- */
-.chat-float-bubble {
-  position: fixed;
-  right: 14px;
-  bottom: 14px;
-  z-index: 85;
-  width: 40px;
-  height: 40px;
+/* ---- 헤더 채팅 트리거 (프로필 옆) ---- */
+.chat-header-btn {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-3);
+  background: transparent;
   color: var(--text-1);
-  border: 1px solid var(--border-2);
-  border-radius: 50%;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   cursor: pointer;
-  /* 콘텐츠 위 버튼들과 덜 경쟁하도록 평소엔 살짝 물러나 있는다. */
-  opacity: 0.72;
-  transition: opacity 0.12s, border-color 0.12s;
 }
-.chat-float-bubble:hover,
-.chat-float-bubble:focus-visible {
-  opacity: 1;
-  background: var(--bg-4);
-  border-color: var(--create);
+.chat-header-btn:hover,
+.chat-header-btn.active {
+  background: var(--bg-3);
+  border-color: var(--border-1);
   color: var(--text-0);
 }
 .chat-bubble-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -3px;
+  right: -3px;
 }
-/* 안 읽은 메시지가 있으면 물러나 있지 않고 또렷하게. */
-.chat-float-bubble:has(.chat-bubble-badge) {
-  opacity: 1;
+
+/* ---- 우측 슬라이드 오버 패널 (글래스모피즘) ---- */
+@keyframes chat-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 .chat-float-panel {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  top: var(--header-h);
+  right: 0;
+  bottom: 0;
   z-index: 85;
-  width: min(380px, calc(100vw - 24px));
-  height: min(540px, calc(100dvh - var(--header-h) - 32px));
+  width: min(420px, 100vw);
   display: flex;
   flex-direction: column;
-  background: var(--bg-1);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  /* 반투명 + 블러 — 뒤 레이어가 은은히 비치는 유리 패널 */
+  background: color-mix(in srgb, var(--bg-1) 72%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-left: 1px solid var(--border-1);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.35), -32px 0 80px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  animation: chat-toast-in 0.15s ease-out;
+  animation: chat-slide-in 0.25s cubic-bezier(0.32, 0.72, 0.25, 1);
+  transition: width 0.25s cubic-bezier(0.32, 0.72, 0.25, 1);
 }
 .chat-float-panel.expanded {
-  width: min(720px, calc(100vw - 24px));
-  height: min(80vh, calc(100dvh - var(--header-h) - 32px));
+  width: min(720px, 100vw);
+}
+/* 유리 위에서도 목록/입력이 읽히도록 내부 표면은 살짝만 비치게 */
+.chat-float-panel .chat-list,
+.chat-float-panel .chat-input-bar,
+.chat-float-panel .chat-composer,
+.chat-float-panel .chat-thread-head,
+.chat-float-panel .chat-float-head {
+  background: color-mix(in srgb, var(--bg-1) 55%, transparent);
 }
 .chat-float-head {
   flex: none;

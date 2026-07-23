@@ -228,8 +228,17 @@ export function FilesClient({
   const download = (id: string) =>
     start(async () => {
       const res = await getSignedUrl(id);
-      if ("url" in res) window.location.href = res.url;
-      else setError(res.error);
+      if ("url" in res) {
+        // window.location.href 는 하드 네비게이션 — 데스크톱(Tauri 웹뷰)에서는
+        // 앱 화면 자체가 서명 URL 로 이동해버린다. 앵커 클릭으로 다운로드만
+        // 트리거한다(웹/데스크톱 동일 동작).
+        const a = document.createElement("a");
+        a.href = res.url;
+        a.download = "";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } else setError(res.error);
     });
 
   const rename = (row: FileRow) =>

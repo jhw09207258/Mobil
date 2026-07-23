@@ -525,6 +525,11 @@ function Toolbar({
 
   return (
     <div className="toolbar">
+      {/* Undo/Redo — Yjs Collaboration 의 undo manager 를 사용(Cmd/Ctrl+Z,
+          Shift+Cmd/Ctrl+Z 단축키는 Collaboration 확장이 이미 바인딩). */}
+      <button className={btn(false)} onClick={() => editor.chain().focus().undo().run()} title="Undo (⌘Z)">↩</button>
+      <button className={btn(false)} onClick={() => editor.chain().focus().redo().run()} title="Redo (⇧⌘Z)">↪</button>
+      <span className="tool-sep" />
       <button className={btn(editor.isActive("heading", { level: 1 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1">H1</button>
       <button className={btn(editor.isActive("heading", { level: 2 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">H2</button>
       <button className={btn(editor.isActive("heading", { level: 3 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Heading 3">H3</button>

@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans } from "next/font/google";
+import { Noto_Sans_KR } from "next/font/google";
 import "./globals.css";
+import { DesktopChrome } from "./desktop-chrome";
 
-// 라틴 자소는 Noto Sans 를 self-host(빌드시 번들)로 로드하고,
-// 한글은 시스템 한글 폰트로 폴백한다(대형 CJK 웹폰트 미전송 → 최적화).
-const notoSans = Noto_Sans({
+// 전체 UI 폰트 — Noto Sans KR(한글+라틴 모두 커버). 볼드(700)는 싣지 않는다
+// — 굵은 강조는 500(medium)까지만 사용한다.
+const notoSans = Noto_Sans_KR({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["300", "400", "500"],
   variable: "--font-noto",
   display: "swap",
 });
@@ -60,7 +61,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <DesktopChrome />
+        {children}
+      </body>
     </html>
   );
 }

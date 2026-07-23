@@ -141,6 +141,8 @@ function Inner({
   // 오류가 난다 — 원격 반영을 보류했다가 상호작용이 끝나면 적용한다.
   const interactingRef = useRef(false);
   const pendingRemoteRef = useRef(false);
+  // undo/redo 후 Yjs 동기화 함수(마운트 이펙트의 onOperation) — 버튼에서 호출.
+  const syncHistoryRef = useRef<(() => void) | null>(null);
 
   const applyRemoteTree = useCallback(() => {
     const me = meRef.current;
@@ -324,6 +326,19 @@ function Inner({
       if (canEdit) markDirty();
     };
     me.bus.addListener("operation", onOperation);
+    // mind-elixir 의 undo/redo 는 내부적으로 refresh() 만 호출하고 "operation"
+    // 이벤트를 발생시키지 않는다 — 그대로 두면 되돌리기가 Yjs 로 전파되지도,
+    // 자동저장되지도 않는다(협업자에게 안 보이는 유령 되돌리기). 히스토리
+    // 조작 직후 diff 동기화를 명시적으로 실행한다(툴바 버튼 + Ctrl/Cmd+Z 계열
+    // 키보드 경로 모두). diff 기반이라 변화가 없으면 no-op 이다.
+    syncHistoryRef.current = onOperation;
+    const onHistoryKey = (ev: KeyboardEvent) => {
+      const k = ev.key.toLowerCase();
+      if ((ev.metaKey || ev.ctrlKey) && (k === "z" || k === "y")) {
+        setTimeout(onOperation, 0);
+      }
+    };
+    containerRef.current.addEventListener("keydown", onHistoryKey);
 
     // 더블클릭은 mind-elixir 자체의 "노드 이름 바꾸기" 제스처와 겹친다 —
     // editable 일 때 mind-elixir 는 더블클릭/더블탭을 자체 포인터 타이머로
@@ -346,6 +361,8 @@ function Inner({
 
     return () => {
       containerRef.current?.removeEventListener("click", onClick);
+      containerRef.current?.removeEventListener("keydown", onHistoryKey);
+      syncHistoryRef.current = null;
       demoteObserver.disconnect();
       me.destroy();
       meRef.current = null;
@@ -586,6 +603,30 @@ function Inner({
               <button className="btn btn-sm" onClick={addReference} disabled={!pick}>
                 Add
               </button>
+              {canEdit && (
+                <>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => {
+                      (meRef.current as unknown as { undo?: () => void } | null)?.undo?.();
+                      syncHistoryRef.current?.();
+                    }}
+                    title="Undo (⌘Z)"
+                  >
+                    ↩
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => {
+                      (meRef.current as unknown as { redo?: () => void } | null)?.redo?.();
+                      syncHistoryRef.current?.();
+                    }}
+                    title="Redo (⇧⌘Z)"
+                  >
+                    ↪
+                  </button>
+                </>
+              )}
               <button className="btn btn-sm" onClick={fitView} title="Fit the map to the screen">
                 Fit view
               </button>

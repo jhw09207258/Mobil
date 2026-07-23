@@ -145,10 +145,9 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
     setTimeout(() => requestOpenConversation(t.conversationId), 50);
   };
 
-  // /chat 전체 페이지에서는 위젯 UI(버블·패널·토스트)를 전부 숨긴다 —
-  // 채팅 화면이 이미 열려 있어 중복이고, 하단 버튼들과 겹친다. 훅(개인
-  // topic 구독)은 그대로 살아 있어 페이지 목록 갱신(emitMessageNotify)은
-  // 계속 동작한다.
+  // /chat 전체 페이지에서는 위젯 UI(트리거·패널·토스트)를 전부 숨긴다 —
+  // 채팅 화면이 이미 열려 있어 중복이다. 훅(개인 topic 구독)은 그대로 살아
+  // 있어 페이지 목록 갱신(emitMessageNotify)은 계속 동작한다.
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return null;
 
   return (
@@ -177,7 +176,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
         ))}
       </div>
 
-      {/* -------------------------------------------------- 플로팅 채팅 패널 */}
+      {/* --------------------------------- 우측 슬라이드 오버 채팅 패널 */}
       {open && (
         <div className={`chat-float-panel ${expanded ? "expanded" : ""}`}>
           <div className="chat-float-head">
@@ -231,22 +230,20 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
         </div>
       )}
 
-      {/* ------------------------------------------------------- 런처 버블 */}
-      {!open && (
-        <button
-          className="chat-float-bubble"
-          onClick={openPanel}
-          aria-label={`Open chat${unread > 0 ? ` (${unread} unread)` : ""}`}
-          title="Comms"
-        >
-          <IconChat size={22} />
-          {unread > 0 && (
-            <span className="chat-unread chat-bubble-badge">
-              {unread > 99 ? "99+" : unread}
-            </span>
-          )}
-        </button>
-      )}
+      {/* ------------------------------------ 헤더 트리거(프로필 옆 아이콘) */}
+      <button
+        className={`chat-header-btn ${open ? "active" : ""}`}
+        onClick={() => (open ? setOpen(false) : openPanel())}
+        aria-label={`${open ? "Close" : "Open"} chat${unread > 0 ? ` (${unread} unread)` : ""}`}
+        title="Comms"
+      >
+        <IconChat size={18} />
+        {unread > 0 && (
+          <span className="chat-unread chat-bubble-badge">
+            {unread > 99 ? "99+" : unread}
+          </span>
+        )}
+      </button>
     </>
   );
 }

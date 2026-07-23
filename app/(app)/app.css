@@ -45,6 +45,23 @@
   animation: mobil-fade-in 0.4s ease both;
 }
 
+/* ---- 데스크톱(Tauri) 전용 — macOS 신호등 오버레이 대응 ----
+   커스텀 userAgent 로 감지된 데스크톱에서만: 헤더 좌측에 신호등 버튼 자리
+   (~76px)를 비우고, 헤더 빈 영역을 드래그하면 창이 움직이게 한다. 내부의
+   상호작용 요소는 전부 no-drag. 일반 브라우저에서는 무시된다. */
+html[data-desktop] .app-header {
+  padding-left: 84px;
+  -webkit-app-region: drag;
+}
+html[data-desktop] .app-header a,
+html[data-desktop] .app-header button,
+html[data-desktop] .app-header input,
+html[data-desktop] .app-header select,
+html[data-desktop] .app-header .acct,
+html[data-desktop] .app-header .hsearch {
+  -webkit-app-region: no-drag;
+}
+
 /* ---- fixed header ---- */
 .app-header {
   height: var(--header-h);

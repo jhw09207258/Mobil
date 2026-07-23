@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.mobil.app",
   "build": {
-    "frontendDist": "https://mobil.vercel.app",
+    "frontendDist": "https://mobil-three.vercel.app",
     "devUrl": "http://localhost:3000"
   },
   "app": {
@@ -14,7 +14,10 @@
         "width": 1280,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) MobilDesktop/1.0"
       }
     ],
     "security": {

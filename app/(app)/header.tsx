@@ -6,12 +6,15 @@ import { IconMenu } from "./icons";
 import { useWorkspace } from "./workspace/workspace-context";
 import { useMobileNav } from "./mobile-nav-context";
 import { HeaderSearch } from "./header-search";
+import { GlobalChat } from "./chat/global-chat";
 
 export function AppHeader({
+  userId,
   displayName,
   email,
   avatarUrl,
 }: {
+  userId: string;
   displayName: string;
   email: string;
   avatarUrl: string | null;
@@ -52,6 +55,8 @@ export function AppHeader({
       </Link>
 
       <HeaderSearch />
+
+      <GlobalChat selfId={userId} selfName={name} />
 
       <div className="acct" ref={ref}>
         <button className="acct-btn" onClick={() => setOpen((v) => !v)}>

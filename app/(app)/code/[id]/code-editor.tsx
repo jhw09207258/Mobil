@@ -83,6 +83,7 @@ export function CodeEditor({
   const [error, setError] = useState<string | null>(null);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cmApiRef = useRef<{ undo: () => void; redo: () => void } | null>(null);
   const nameRef = useRef(name);
   const langRef = useRef(language);
   const contentRef = useRef(initialContent);
@@ -261,6 +262,16 @@ export function CodeEditor({
           </select>
         </div>
         <div className="row" style={{ gap: 10 }}>
+          {canEdit && (
+            <>
+              <button className="btn btn-sm" onClick={() => cmApiRef.current?.undo()} title="Undo (⌘Z)">
+                ↩
+              </button>
+              <button className="btn btn-sm" onClick={() => cmApiRef.current?.redo()} title="Redo (⇧⌘Z)">
+                ↪
+              </button>
+            </>
+          )}
           <PresenceAvatars users={presenceUsers} />
           <RepositoryPicker kind="code" itemId={fileId} canEdit={canEdit} />
           <ContributorBadges kind="code" id={fileId} refreshToken={saveState} />
@@ -318,6 +329,9 @@ export function CodeEditor({
           editable={canEdit}
           onChange={onContentChange}
           ytext={ytext}
+          onReady={(api) => {
+            cmApiRef.current = api;
+          }}
         />
       </div>
 
