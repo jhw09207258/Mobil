@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { IconChat } from "../icons";
+import { UserAvatar } from "@/components/user-avatar";
 import { ChatShell } from "./chat-shell";
 import {
   listChatConversations,
@@ -16,12 +17,14 @@ import {
   getActiveConversation,
   requestOpenConversation,
 } from "./chat-bus";
+import { useWorkspace } from "../workspace/workspace-context";
 import "./chat.css";
 
 type Toast = {
   id: string;
   conversationId: string;
   senderName: string;
+  senderAvatarUrl: string | null;
   preview: string;
 };
 
@@ -30,6 +33,7 @@ type FanoutPayload = {
   message_id?: string;
   sender_id?: string;
   sender_name?: string;
+  sender_avatar_url?: string | null;
   preview?: string;
 };
 
@@ -44,6 +48,7 @@ const MAX_TOASTS = 3;
  */
 export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: string }) {
   const pathname = usePathname();
+  const { openTab } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -85,6 +90,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
               id: p.message_id!,
               conversationId: p.conversation_id!,
               senderName: p.sender_name ?? "New message",
+              senderAvatarUrl: p.sender_avatar_url ?? null,
               preview: p.preview ?? "",
             },
             ...prev,
@@ -140,7 +146,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
       <div className="chat-toasts" aria-live="polite">
         {toasts.map((t) => (
           <button key={t.id} className="chat-toast" onClick={() => onToastClick(t)}>
-            <span className="chat-conv-avatar">{t.senderName.charAt(0).toUpperCase()}</span>
+            <UserAvatar url={t.senderAvatarUrl} name={t.senderName} size={34} />
             <span className="chat-toast-body">
               <span className="chat-toast-sender">{t.senderName}</span>
               <span className="chat-toast-preview">{t.preview || "New message"}</span>
@@ -166,6 +172,17 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
           <div className="chat-float-head">
             <span className="label">COMMS</span>
             <div className="row" style={{ gap: 2 }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setOpen(false);
+                  openTab("chat", "comms", "Comms");
+                }}
+                title="Open as workspace tab (split view)"
+                aria-label="Open chat as a workspace tab"
+              >
+                ⿻
+              </button>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => setExpanded((v) => !v)}

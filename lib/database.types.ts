@@ -620,6 +620,7 @@ export interface Database {
           id: string;
           kind: "dm" | "group";
           title: string;
+          avatar_url: string | null;
           member_count: number;
           last_message: string | null;
           last_message_at: string | null;

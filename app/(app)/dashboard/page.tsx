@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { Copyable } from "@/components/copyable";
 import { StorageBreakdownChart, StorageShareBar } from "./storage-chart";
 import { OpenItemButton } from "../workspace/open-item-button";
+import { NetMonitor } from "./net-monitor";
+import "./dashboard.css";
 
 export default async function DashboardPage() {
   const { userId, profile } = await requireUser();
@@ -28,7 +30,7 @@ export default async function DashboardPage() {
       .from("documents")
       .select("id, title, updated_at, owner_id")
       .order("updated_at", { ascending: false })
-      .limit(5),
+      .limit(8),
     supabase.rpc("my_content_breakdown"),
     supabase.rpc("platform_content_breakdown"),
   ]);
@@ -52,13 +54,15 @@ export default async function DashboardPage() {
         <span className="crumb">HOME / OPERATIONAL VIEW</span>
       </div>
 
-      <div className="content">
-        <div className="page-head">
-          <div>
-            <h1 className="page-h">
-              Welcome, {profile.display_name || profile.email.split("@")[0]}
-            </h1>
-          </div>
+      <div className="content dash-content">
+        <div className="dash-welcome">
+          Welcome, <b>{profile.display_name || profile.email.split("@")[0]}</b>
+          {profile.role === "admin" && (
+            <>
+              {" · "}
+              <Link href="/admin/users">Manage all Mobil users →</Link>
+            </>
+          )}
         </div>
 
         <div className="stat-grid">
@@ -88,7 +92,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="stg-grid">
+        <div className="dash-mid">
           <div className="panel">
             <div className="panel-header">
               <span className="label">MY STORAGE USAGE</span>
@@ -105,41 +109,27 @@ export default async function DashboardPage() {
               <StorageShareBar myBytes={myBytes} platformBytes={platformBytes} />
             </div>
           </div>
-        </div>
-
-        <div className="panel" style={{ marginBottom: 24 }}>
-          <div className="panel-header">
-            <span className="label">My Share ID</span>
-          </div>
-          <div className="panel-body">
-            <p className="page-sub" style={{ margin: "0 0 12px" }}>
-              To let someone share a file, document, sheet or map with you, give
-              them this ID — they paste it into the <strong>Share</strong> dialog
-              on their item. To share <em>your</em> items, open any list (Docs,
-              Code, Repository, Table, Link Graph) and use the{" "}
-              <strong>Share</strong> button on the row (or the Share button inside
-              the editor), then enter the recipient&rsquo;s Share ID.
-            </p>
-            <Copyable value={userId} />
-          </div>
-        </div>
-
-        {profile.role === "admin" && (
-          <Link href="/admin/users" className="panel admin-cta" style={{ marginBottom: 24 }}>
-            <div className="panel-body admin-cta-body">
-              <div>
-                <span className="label">ADMIN</span>
-                <div className="admin-cta-title">Manage all Mobil users</div>
-                <p className="page-sub" style={{ margin: "6px 0 0" }}>
-                  View every account&rsquo;s role, storage usage and content counts.
-                </p>
-              </div>
-              <span className="btn btn-primary btn-sm">Open</span>
+          <div className="panel">
+            <div className="panel-header">
+              <span className="label">LIVE DATA THROUGHPUT</span>
             </div>
-          </Link>
-        )}
+            <div className="panel-body">
+              <NetMonitor />
+            </div>
+          </div>
+          <div className="panel">
+            <div className="panel-header">
+              <span className="label" title="Others paste this ID into their Share dialog to share items with you.">
+                MY SHARE ID
+              </span>
+            </div>
+            <div className="panel-body">
+              <Copyable value={userId} />
+            </div>
+          </div>
+        </div>
 
-        <div className="panel">
+        <div className="panel dash-recent">
           <div className="panel-header">
             <span className="label">RECENT DOCS +</span>
             <Link href="/documents" className="btn btn-ghost btn-sm">
@@ -148,49 +138,50 @@ export default async function DashboardPage() {
           </div>
           {recentDocs.length === 0 ? (
             <div className="empty">
-              No docs yet.{" "}
-              <Link href="/documents">Create your first document.</Link>
+              No docs yet. <Link href="/documents">Create your first document.</Link>
             </div>
           ) : (
             <div className="table-scroll">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th style={{ width: 180 }} className="col-hide-mobile">Updated</th>
-                  <th style={{ width: 90 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentDocs.map((d) => (
-                  <tr key={d.id}>
-                    <td>
-                      <OpenItemButton
-                        kind="document"
-                        id={d.id}
-                        title={d.title || "Untitled"}
-                        className="link-btn"
-                      >
-                        {d.title || "Untitled"}
-                      </OpenItemButton>
-                    </td>
-                    <td className="mono muted col-hide-mobile">
-                      {new Date(d.updated_at).toLocaleString("en-US")}
-                    </td>
-                    <td>
-                      <OpenItemButton
-                        kind="document"
-                        id={d.id}
-                        title={d.title || "Untitled"}
-                        className="btn btn-ghost btn-sm"
-                      >
-                        Open
-                      </OpenItemButton>
-                    </td>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th style={{ width: 180 }} className="col-hide-mobile">
+                      Updated
+                    </th>
+                    <th style={{ width: 90 }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentDocs.map((d) => (
+                    <tr key={d.id}>
+                      <td>
+                        <OpenItemButton
+                          kind="document"
+                          id={d.id}
+                          title={d.title || "Untitled"}
+                          className="link-btn"
+                        >
+                          {d.title || "Untitled"}
+                        </OpenItemButton>
+                      </td>
+                      <td className="mono muted col-hide-mobile">
+                        {new Date(d.updated_at).toLocaleString("en-US")}
+                      </td>
+                      <td>
+                        <OpenItemButton
+                          kind="document"
+                          id={d.id}
+                          title={d.title || "Untitled"}
+                          className="btn btn-ghost btn-sm"
+                        >
+                          Open
+                        </OpenItemButton>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

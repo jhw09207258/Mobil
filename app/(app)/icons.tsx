@@ -122,6 +122,37 @@ export function IconChat({ size }: P) {
     </svg>
   );
 }
+export function IconPlus({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+export function IconClip({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M21 12.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8L13 4.9a3.7 3.7 0 0 1 5.2 5.2l-8.2 8.2a1.8 1.8 0 0 1-2.6-2.6l7.6-7.6" />
+    </svg>
+  );
+}
+export function IconSmile({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 14.5c.9 1.2 2.1 1.9 3.5 1.9s2.6-.7 3.5-1.9" />
+      <path d="M9 9.5h.01M15 9.5h.01" strokeWidth={2.4} />
+    </svg>
+  );
+}
+export function IconLink({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M10 14a4.5 4.5 0 0 0 6.4.4l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.7 1.7" />
+      <path d="M14 10a4.5 4.5 0 0 0-6.4-.4l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.7-1.7" />
+    </svg>
+  );
+}
 export function IconSearch({ size }: P) {
   return (
     <svg {...base(size)}>

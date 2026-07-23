@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
+import { UserAvatar } from "@/components/user-avatar";
+import { IconPlus, IconClip, IconSmile, IconLink } from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import {
   addMembers,
@@ -151,6 +153,33 @@ function MessageBody({
   );
 }
 
+// 긴 메시지는 접어두고 "Show more" 로 펼친다.
+const COLLAPSE_CHARS = 700;
+const COLLAPSE_LINES = 12;
+
+function CollapsibleBody({
+  content,
+  onOpenRef,
+}: {
+  content: string;
+  onOpenRef: (ref: RefToken) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong =
+    content.length > COLLAPSE_CHARS || content.split("\n").length > COLLAPSE_LINES;
+  if (!isLong) return <MessageBody content={content} onOpenRef={onOpenRef} />;
+  return (
+    <>
+      <div className={`chat-msg-clip ${expanded ? "" : "clipped"}`}>
+        <MessageBody content={content} onOpenRef={onOpenRef} />
+      </div>
+      <button className="chat-expand-btn" onClick={() => setExpanded((v) => !v)}>
+        {expanded ? "Show less ▲" : "Show more ▼"}
+      </button>
+    </>
+  );
+}
+
 // 자주 쓰는 이모지 — 시스템 이모지 입력기의 빠른 대체재.
 const EMOJIS = [
   "😀", "😂", "😊", "😍", "🤔", "😮", "😢", "😴",
@@ -209,13 +238,31 @@ export function ChatShell({
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"new" | "add-members" | null>(null);
   const [fmtOpen, setFmtOpen] = useState(false);
-  const [menu, setMenu] = useState<"emoji" | "mention" | null>(null);
-  const [attachOpen, setAttachOpen] = useState(false);
+  // 컴포저 옵션은 전부 + 버튼 하나 뒤의 계층 메뉴로 모은다(공간 절약).
+  const [menu, setMenu] = useState<"root" | "attach" | "emoji" | "mention" | null>(null);
   const [attachables, setAttachables] = useState<AttachableItem[] | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const plusRef = useRef<HTMLDivElement>(null);
   const lastTypingSentRef = useRef(0);
+
+  // + 메뉴: 바깥 클릭/Escape 로 닫기(이전 버전의 "메뉴가 안 닫히는" 버그 시정).
+  useEffect(() => {
+    if (!menu) return;
+    const onDown = (e: MouseEvent) => {
+      if (plusRef.current && !plusRef.current.contains(e.target as Node)) setMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenu(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
@@ -401,6 +448,7 @@ export function ChatShell({
   const openConversation = (id: string) => {
     setActiveId(id);
     setError(null);
+    setMenu(null); // 대화 전환 시 열려 있던 메뉴가 남지 않게.
   };
 
   const onStarted = (id: string) => {
@@ -424,13 +472,13 @@ export function ChatShell({
     });
   };
 
-  const toggleAttach = () => {
-    setAttachOpen((v) => !v);
+  const openAttachMenu = () => {
+    setMenu("attach");
     if (!attachables) listAttachableItems().then(setAttachables);
   };
 
   const insertAttachment = (item: AttachableItem) => {
-    setAttachOpen(false);
+    setMenu(null);
     setInput((v) => `${v}${v && !v.endsWith(" ") ? " " : ""}[[${item.kind}:${item.id}|${item.title.replaceAll("]", "")}]] `);
     inputRef.current?.focus();
   };
@@ -531,9 +579,11 @@ export function ChatShell({
                 className={`chat-conv-item ${c.id === activeId ? "active" : ""}`}
                 onClick={() => openConversation(c.id)}
               >
-                <div className="chat-conv-avatar">
-                  {c.kind === "group" ? "⌗" : c.title.charAt(0).toUpperCase()}
-                </div>
+                {c.kind === "group" ? (
+                  <div className="chat-conv-avatar">⌗</div>
+                ) : (
+                  <UserAvatar url={c.avatar_url} name={c.title} size={34} />
+                )}
                 <div className="chat-conv-body">
                   <div className="chat-conv-top">
                     <span className="chat-conv-title">{c.title}</span>
@@ -624,12 +674,15 @@ export function ChatShell({
                   <div key={m.id} className={`chat-msg-row ${mine ? "mine" : ""}`}>
                     {showHead && (
                       <div className="chat-msg-head">
+                        {!mine && (
+                          <UserAvatar url={m.sender_avatar_url} name={m.sender_name} size={20} />
+                        )}
                         {!mine && <span className="chat-msg-sender">{m.sender_name}</span>}
                         <span className="chat-msg-time">{fmtTime(m.created_at)}</span>
                       </div>
                     )}
                     <div className={`chat-msg ${mine ? "mine" : "theirs"}`}>
-                      <MessageBody content={m.content} onOpenRef={openRef} />
+                      <CollapsibleBody content={m.content} onOpenRef={openRef} />
                     </div>
                     {mine && readReceipt && lastMine?.id === m.id && (
                       <span className={`chat-receipt ${readReceipt.startsWith("Read") ? "read" : ""}`}>
@@ -672,7 +725,7 @@ export function ChatShell({
                   </button>
                   <span className="chat-fmt-sep" />
                   <button className="chat-fmt-btn" title="Insert link" onClick={onLinkButton}>
-                    🔗
+                    <IconLink size={13} />
                   </button>
                   <span className="chat-fmt-sep" />
                   <button
@@ -702,17 +755,50 @@ export function ChatShell({
                 </div>
               )}
               <div className="chat-input-bar">
-                <div className="chat-attach">
+                <div className="chat-plus" ref={plusRef}>
                   <button
-                    className="btn"
-                    onClick={toggleAttach}
-                    title="Attach a workspace item"
-                    aria-label="Attach a workspace item"
+                    className={`btn chat-plus-btn ${menu ? "chat-tool-active" : ""}`}
+                    onClick={() => setMenu((m) => (m ? null : "root"))}
+                    title="More options"
+                    aria-label="More options"
+                    aria-expanded={!!menu}
                   >
-                    ⛓
+                    <IconPlus size={16} />
                   </button>
-                  {attachOpen && (
-                    <div className="chat-attach-menu">
+                  {menu === "root" && (
+                    <div className="chat-attach-menu chat-plus-menu">
+                      <button className="chat-attach-item" onClick={openAttachMenu}>
+                        <span className="chat-menu-icon"><IconClip size={15} /></span>
+                        Attach workspace item
+                      </button>
+                      <button
+                        className="chat-attach-item"
+                        onClick={() => {
+                          setFmtOpen((v) => !v);
+                          setMenu(null);
+                        }}
+                      >
+                        <span className="chat-menu-icon chat-menu-glyph">Aa</span>
+                        Text formatting
+                        <span className={`chat-menu-state ${fmtOpen ? "on" : ""}`}>
+                          {fmtOpen ? "ON" : "OFF"}
+                        </span>
+                      </button>
+                      <button className="chat-attach-item" onClick={() => setMenu("emoji")}>
+                        <span className="chat-menu-icon"><IconSmile size={15} /></span>
+                        Emoji
+                      </button>
+                      <button className="chat-attach-item" onClick={() => setMenu("mention")}>
+                        <span className="chat-menu-icon chat-menu-glyph">@</span>
+                        Mention
+                      </button>
+                    </div>
+                  )}
+                  {menu === "attach" && (
+                    <div className="chat-attach-menu chat-plus-menu">
+                      <button className="chat-attach-item chat-menu-back" onClick={() => setMenu("root")}>
+                        ‹ Back
+                      </button>
                       <div className="chat-attach-head label">ATTACH WORKSPACE ITEM</div>
                       {!attachables && <div className="chat-empty" style={{ padding: 14 }}>Loading…</div>}
                       {attachables?.length === 0 && (
@@ -730,28 +816,11 @@ export function ChatShell({
                       ))}
                     </div>
                   )}
-                </div>
-                <div className="chat-attach">
-                  <button
-                    className={`btn ${fmtOpen ? "chat-tool-active" : ""}`}
-                    onClick={() => setFmtOpen((v) => !v)}
-                    title="Show/hide text formatting"
-                    aria-label="Show or hide text formatting"
-                  >
-                    Aa
-                  </button>
-                </div>
-                <div className="chat-attach">
-                  <button
-                    className="btn"
-                    onClick={() => setMenu((m) => (m === "emoji" ? null : "emoji"))}
-                    title="Emoji"
-                    aria-label="Insert emoji"
-                  >
-                    😊
-                  </button>
                   {menu === "emoji" && (
-                    <div className="chat-attach-menu chat-emoji-menu">
+                    <div className="chat-attach-menu chat-plus-menu chat-emoji-menu">
+                      <button className="chat-attach-item chat-menu-back" onClick={() => setMenu("root")}>
+                        ‹ Back
+                      </button>
                       <div className="chat-emoji-grid">
                         {EMOJIS.map((e) => (
                           <button
@@ -768,18 +837,11 @@ export function ChatShell({
                       </div>
                     </div>
                   )}
-                </div>
-                <div className="chat-attach">
-                  <button
-                    className="btn"
-                    onClick={() => setMenu((m) => (m === "mention" ? null : "mention"))}
-                    title="Mention a member"
-                    aria-label="Mention a member"
-                  >
-                    @
-                  </button>
                   {menu === "mention" && (
-                    <div className="chat-attach-menu">
+                    <div className="chat-attach-menu chat-plus-menu">
+                      <button className="chat-attach-item chat-menu-back" onClick={() => setMenu("root")}>
+                        ‹ Back
+                      </button>
                       <div className="chat-attach-head label">MENTION</div>
                       {members
                         .filter((m) => m.user_id !== selfId)
@@ -792,9 +854,7 @@ export function ChatShell({
                               insertAtCursor(`@${m.name} `);
                             }}
                           >
-                            <span className="chat-conv-avatar" style={{ width: 24, height: 24, fontSize: 11 }}>
-                              {m.name.charAt(0).toUpperCase()}
-                            </span>
+                            <UserAvatar url={m.avatar_url} name={m.name} size={24} />
                             <span className="chat-attach-title">{m.name}</span>
                           </button>
                         ))}
@@ -957,7 +1017,7 @@ function NewChatDialog({
             onClick={() => (mode === "dm" ? onPickDm(c) : toggle(c.id))}
             disabled={busy}
           >
-            <span className="chat-conv-avatar">{contactName(c).charAt(0).toUpperCase()}</span>
+            <UserAvatar url={c.avatar_url} name={contactName(c)} size={30} />
             <span className="chat-contact-body">
               <span className="chat-contact-name">{contactName(c)}</span>
               <span className="chat-contact-email">{c.email}</span>
@@ -1033,7 +1093,7 @@ function AddMembersDialog({
             onClick={() => toggle(c.id)}
             disabled={busy}
           >
-            <span className="chat-conv-avatar">{contactName(c).charAt(0).toUpperCase()}</span>
+            <UserAvatar url={c.avatar_url} name={contactName(c)} size={30} />
             <span className="chat-contact-body">
               <span className="chat-contact-name">{contactName(c)}</span>
               <span className="chat-contact-email">{c.email}</span>

@@ -1,0 +1,122 @@
+/* ==========================================================================
+   Operational View — 한 화면(one-screen) 대시보드.
+   데스크톱에서는 세로 스크롤 없이 모든 카드가 뷰포트에 들어오도록 행을
+   압축하고, 남는 공간은 Recent 목록이 흡수한다(내부 스크롤).
+   모바일/태블릿(≤1024px)은 공간이 부족하므로 평소처럼 세로 스크롤로 복귀.
+   ========================================================================== */
+.dash-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 16px;
+  overflow: hidden; /* one-screen — 페이지 스크롤 금지 */
+  min-height: 0;
+}
+
+.dash-welcome {
+  font-size: 13px;
+  color: var(--text-2);
+  flex: none;
+}
+.dash-welcome b {
+  color: var(--text-0);
+  font-weight: 500;
+}
+
+/* 통계 타일 — 기본보다 훨씬 촘촘하게 */
+.dash-content .stat-grid {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 0;
+  flex: none;
+}
+.dash-content .stat {
+  padding: 10px 12px;
+}
+.dash-content .stat-val {
+  font-size: 18px;
+}
+.dash-content .stat-label {
+  margin-top: 4px;
+}
+
+/* 중간 카드 행 */
+.dash-mid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  flex: none;
+  min-height: 0;
+}
+.dash-mid .panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dash-mid .panel-header {
+  padding: 8px 12px;
+}
+.dash-mid .panel-body {
+  padding: 10px 12px;
+  overflow: auto;
+  max-height: 190px;
+}
+
+/* 네트워크 모니터 */
+.netmon {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.netmon-rate {
+  font-size: 20px;
+  color: var(--text-0);
+  line-height: 1;
+}
+.netmon-spark {
+  display: block;
+}
+.netmon-meta {
+  font-size: 9.5px;
+}
+
+/* Recent 패널 — 남는 세로 공간을 모두 차지, 넘치면 내부 스크롤 */
+.dash-recent {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-recent .table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.dash-recent .panel-header {
+  flex: none;
+  padding: 8px 12px;
+}
+
+/* 좁은 화면 — one-screen 을 포기하고 스크롤 복귀 */
+@media (max-width: 1024px) {
+  .dash-content {
+    overflow-y: auto;
+  }
+  .dash-content .stat-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .dash-mid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-recent {
+    flex: none;
+  }
+  .dash-recent .table-scroll {
+    max-height: 300px;
+  }
+}
+@media (max-width: 640px) {
+  .dash-mid {
+    grid-template-columns: 1fr;
+  }
+}

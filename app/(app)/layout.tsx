@@ -9,6 +9,7 @@ import { WorkspaceShell } from "./workspace/workspace-shell";
 import { MobileNavProvider } from "./mobile-nav-context";
 import { ReconnectTracker } from "./reconnect-tracker";
 import { GlobalChat } from "./chat/global-chat";
+import { NoZoom } from "./no-zoom";
 
 export default async function AppLayout({
   children,
@@ -30,6 +31,7 @@ export default async function AppLayout({
           provider 를 통째로 리마운트해 이전 사용자의 탭 상태가 남지 않게 한다. */}
       <WorkspaceProvider key={userId} userId={userId}>
         <div className="app">
+          <NoZoom />
           <ReconnectTracker />
           <AppHeader
             displayName={profile.display_name ?? ""}

@@ -10,6 +10,7 @@ import { DocumentEditorLoader } from "../documents/[id]/editor-loader";
 import { CodeEditor } from "../code/[id]/code-editor";
 import { SpreadsheetLoader } from "../sheets/[id]/spreadsheet-loader";
 import { MindMapCanvasLoader } from "../mindmap/[id]/canvas-loader";
+import { ChatTab } from "../chat/chat-tab";
 
 export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) {
   const { consumeSeed } = useWorkspace();
@@ -22,6 +23,9 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
 
   useEffect(() => {
     let cancelled = false;
+
+    // 채팅 탭은 자체적으로 데이터를 불러온다(아래 ChatTab) — 이 로더는 무시.
+    if (kind === "chat") return;
 
     // 방금 만든 항목이면(NewItemButton 이 openTab 에 시드를 실어 보냄) 이미
     // 전체 데이터를 알고 있으므로 서버 재조회를 건너뛴다 — auth 확인 + 본문
@@ -62,6 +66,10 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
       cancelled = true;
     };
   }, [kind, itemId, consumeSeed]);
+
+  if (kind === "chat") {
+    return <ChatTab />;
+  }
 
   if (state.status === "loading") {
     return <div className="wk-loading">Loading…</div>;

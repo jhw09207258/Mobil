@@ -7,6 +7,7 @@ export type ChatConversation = {
   id: string;
   kind: "dm" | "group";
   title: string;
+  avatar_url: string | null;
   member_count: number;
   last_message: string | null;
   last_message_at: string | null;
@@ -161,6 +162,26 @@ export async function deleteConversation(
     .eq("id", conversationId);
   if (error) return { error: "Only the creator can delete a conversation." };
   return { ok: true };
+}
+
+/** 워크스페이스 탭(스플릿 뷰)에서 채팅을 열 때 필요한 초기 데이터 한 번에. */
+export async function getChatBootstrap(): Promise<{
+  selfId: string;
+  selfName: string;
+  conversations: ChatConversation[];
+  contacts: ChatContact[];
+}> {
+  const { userId, email, profile } = await requireUser();
+  const [conversations, contacts] = await Promise.all([
+    listChatConversations(),
+    listChatContacts(),
+  ]);
+  return {
+    selfId: userId,
+    selfName: profile.display_name || email,
+    conversations,
+    contacts,
+  };
 }
 
 export async function listChatContacts(): Promise<ChatContact[]> {

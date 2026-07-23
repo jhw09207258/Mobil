@@ -10,7 +10,9 @@ import {
   useState,
 } from "react";
 
-export type TabKind = "document" | "code" | "sheet" | "mindmap";
+// "chat" 은 콘텐츠 항목이 아닌 싱글턴 탭(itemId 고정 "comms") — 스플릿 뷰
+// 한쪽에 채팅을 두고 다른 쪽에서 문서/코드를 편집하는 용도.
+export type TabKind = "document" | "code" | "sheet" | "mindmap" | "chat";
 export type Pane = "left" | "right";
 
 export type Tab = {

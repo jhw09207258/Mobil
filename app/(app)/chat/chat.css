@@ -339,10 +339,15 @@
 .chat-textarea:focus {
   border-color: var(--steel);
 }
-.chat-attach {
+/* + 버튼 하나에 모든 컴포저 옵션(첨부/서식/이모지/멘션)을 계층 메뉴로 수납 */
+.chat-plus {
   position: relative;
   flex: none;
   align-self: flex-end;
+}
+.chat-plus-btn {
+  width: 34px;
+  padding: 0;
 }
 .chat-attach-menu {
   position: absolute;
@@ -356,6 +361,36 @@
   border-radius: var(--radius-lg);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   z-index: 20;
+}
+.chat-plus-menu {
+  width: 260px;
+}
+.chat-menu-icon {
+  flex: none;
+  width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+}
+.chat-menu-glyph {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.chat-menu-state {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+.chat-menu-state.on {
+  color: var(--create);
+}
+.chat-menu-back {
+  color: var(--text-2);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-0);
 }
 .chat-attach-head {
   padding: 10px 12px;
@@ -389,9 +424,32 @@
   white-space: nowrap;
 }
 
+/* ---- 긴 메시지 접기/펼치기 ---- */
+.chat-msg-clip.clipped {
+  max-height: 220px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 72%, transparent);
+  mask-image: linear-gradient(#000 72%, transparent);
+}
+.chat-expand-btn {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--steel-hover);
+  cursor: pointer;
+}
+.chat-expand-btn:hover {
+  text-decoration: underline;
+}
+
 /* ---- 이모지 메뉴 ---- */
 .chat-emoji-menu {
-  width: 232px;
+  width: 260px;
 }
 .chat-emoji-grid {
   display: grid;

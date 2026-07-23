@@ -1,6 +1,6 @@
 "use client";
 
-import { IconDocuments, IconCode, IconSheet, IconMindmap } from "../icons";
+import { IconDocuments, IconCode, IconSheet, IconMindmap, IconChat } from "../icons";
 import { useWorkspace, type Tab } from "./workspace-context";
 import { useIsMobile } from "@/lib/use-media-query";
 
@@ -9,6 +9,7 @@ const KIND_ICON = {
   code: IconCode,
   sheet: IconSheet,
   mindmap: IconMindmap,
+  chat: IconChat,
 };
 
 function TabChip({ tab }: { tab: Tab }) {
