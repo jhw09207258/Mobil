@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
@@ -65,6 +66,7 @@
     "yjs": "^13.6.31"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^20.14.10",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.0.0",
