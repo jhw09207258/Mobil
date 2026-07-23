@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { OpenItemButton } from "../workspace/open-item-button";
 import { StarButton } from "../star-button";
+import { ShareDialog } from "@/components/share-dialog";
+import { shareSheet, revokeSheetShare, listSheetShares } from "./actions";
 
 type SheetRow = {
   id: string;
@@ -25,6 +27,7 @@ export function SheetList({
   const [query, setQuery] = useState("");
   const [starredOnly, setStarredOnly] = useState(false);
   const [starredSet, setStarredSet] = useState(() => new Set(starredIds));
+  const [shareTarget, setShareTarget] = useState<SheetRow | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -43,6 +46,7 @@ export function SheetList({
   };
 
   return (
+    <>
     <div className="panel">
       <div className="panel-header">
         <span className="label">
@@ -83,7 +87,7 @@ export function SheetList({
               <th style={{ width: 90 }}>Visibility</th>
               <th style={{ width: 60 }}>Owner</th>
               <th style={{ width: 180 }}>Updated</th>
-              <th style={{ width: 80 }}></th>
+              <th style={{ width: 150 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -116,9 +120,20 @@ export function SheetList({
                   {formatDate(s.updated_at)}
                 </td>
                 <td>
-                  <OpenItemButton kind="sheet" id={s.id} title={s.title || "Untitled sheet"} className="btn btn-ghost btn-sm">
-                    Open
-                  </OpenItemButton>
+                  <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
+                    {s.owner_id === userId && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShareTarget(s)}
+                      >
+                        Share
+                      </button>
+                    )}
+                    <OpenItemButton kind="sheet" id={s.id} title={s.title || "Untitled sheet"} className="btn btn-ghost btn-sm">
+                      Open
+                    </OpenItemButton>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -127,5 +142,17 @@ export function SheetList({
         </div>
       )}
     </div>
+
+    {shareTarget && (
+      <ShareDialog
+        targetLabel={shareTarget.title || "Untitled sheet"}
+        myShareId={userId}
+        loadShares={() => listSheetShares(shareTarget.id)}
+        onShare={(rid, perm) => shareSheet(shareTarget.id, rid, perm)}
+        onRevoke={(pid) => revokeSheetShare(pid)}
+        onClose={() => setShareTarget(null)}
+      />
+    )}
+    </>
   );
 }

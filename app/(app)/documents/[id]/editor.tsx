@@ -37,9 +37,13 @@ import {
   type DocExportFormat,
 } from "../actions";
 import { downloadBase64File } from "@/lib/download-file";
-import { useWorkspace } from "../../workspace/workspace-context";
+import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
 import { createMindmapFromDocument } from "../../convert-actions";
+import { usePresence } from "@/lib/use-presence";
+import { colorForUserId } from "@/lib/presence-color";
+import { PresenceAvatars } from "@/components/presence-avatars";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
 type SaveState = "saved" | "dirty" | "saving";
 const AUTOSAVE_MS = 1200;
@@ -84,6 +88,8 @@ export function DocumentEditor({
   isOwner,
   isPublic,
   myShareId,
+  myName,
+  myAvatarUrl,
 }: {
   docId: string;
   initialTitle: string;
@@ -93,14 +99,23 @@ export function DocumentEditor({
   isOwner: boolean;
   isPublic: boolean;
   myShareId: string;
+  myName: string;
+  myAvatarUrl: string | null;
 }) {
   const router = useRouter();
-  const { renameTab, openTab } = useWorkspace();
+  const { renameTab, openTab, closeTab } = useWorkspace();
   const supabase = createClient();
   const [title, setTitle] = useState(initialTitle);
+  const presenceUsers = usePresence(`doc:${docId}`, {
+    id: myShareId,
+    name: myName,
+    avatarUrl: myAvatarUrl,
+    color: colorForUserId(myShareId),
+  });
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [pub, setPub] = useState(isPublic);
   const [showShare, setShowShare] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -272,11 +287,13 @@ export function DocumentEditor({
     }
   };
 
-  const onDelete = async () => {
-    if (!confirm("Delete this document? This cannot be undone.")) return;
-    const res = await deleteDocument(docId);
-    if (res.ok) router.push("/documents");
-    else setError(res.error);
+  // 삭제 완료 후: 열려 있던 탭을 닫고(워크스페이스 오버레이에 그대로 남는 것
+  // 방지), 목록 라우트로 이동하면서 서버 컴포넌트 캐시를 무효화한다 — 이렇게
+  // 해야 새로고침 없이도 목록에서 즉시 사라진다.
+  const afterDelete = () => {
+    closeTab(tabId("document", docId));
+    router.push("/documents");
+    router.refresh();
   };
 
   // 미디어(이미지/동영상) 업로드 → 공개 media 버킷 → URL 삽입
@@ -327,6 +344,7 @@ export function DocumentEditor({
           disabled={!canEdit}
         />
         <div className="row" style={{ gap: 10 }}>
+          <PresenceAvatars users={presenceUsers} />
           <ContributorBadges kind="document" id={docId} refreshToken={saveState} />
           <span
             className={`save-state ${
@@ -343,7 +361,7 @@ export function DocumentEditor({
               <button className="btn btn-sm" onClick={() => setShowShare(true)}>
                 Share
               </button>
-              <button className="btn btn-sm btn-danger" onClick={onDelete}>
+              <button className="btn btn-sm btn-danger" onClick={() => setShowDelete(true)}>
                 Delete
               </button>
             </>
@@ -411,6 +429,16 @@ export function DocumentEditor({
           onShare={(rid, perm) => shareDocument(docId, rid, perm)}
           onRevoke={(pid) => revokeDocumentShare(pid)}
           onClose={() => setShowShare(false)}
+        />
+      )}
+
+      {showDelete && (
+        <DeleteConfirmDialog
+          itemKind="document"
+          itemLabel={title || "Untitled"}
+          onConfirm={() => deleteDocument(docId)}
+          onDeleted={afterDelete}
+          onClose={() => setShowDelete(false)}
         />
       )}
     </div>

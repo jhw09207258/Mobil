@@ -4,8 +4,12 @@ import "./code-editor.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Y from "yjs";
-import { useWorkspace } from "../../workspace/workspace-context";
+import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import { usePresence } from "@/lib/use-presence";
+import { colorForUserId } from "@/lib/presence-color";
+import { PresenceAvatars } from "@/components/presence-avatars";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import dynamic from "next/dynamic";
 import { LANGUAGES, isLangKey, detectLanguage, type LangKey } from "@/lib/languages";
 import { ShareDialog } from "@/components/share-dialog";
@@ -44,6 +48,8 @@ export function CodeEditor({
   isOwner,
   isPublic,
   myShareId,
+  myName,
+  myAvatarUrl,
 }: {
   fileId: string;
   initialName: string;
@@ -54,9 +60,17 @@ export function CodeEditor({
   isOwner: boolean;
   isPublic: boolean;
   myShareId: string;
+  myName: string;
+  myAvatarUrl: string | null;
 }) {
   const router = useRouter();
-  const { renameTab } = useWorkspace();
+  const { renameTab, closeTab } = useWorkspace();
+  const presenceUsers = usePresence(`code:${fileId}`, {
+    id: myShareId,
+    name: myName,
+    avatarUrl: myAvatarUrl,
+    color: colorForUserId(myShareId),
+  });
   const [name, setName] = useState(initialName);
   const [language, setLanguage] = useState<LangKey>(
     isLangKey(initialLanguage) ? initialLanguage : "plaintext"
@@ -64,6 +78,7 @@ export function CodeEditor({
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [pub, setPub] = useState(isPublic);
   const [showShare, setShowShare] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -190,11 +205,10 @@ export function CodeEditor({
     }
   };
 
-  const onDelete = async () => {
-    if (!confirm("Delete this code file? This cannot be undone.")) return;
-    const res = await deleteCodeFile(fileId);
-    if (res.ok) router.push("/code");
-    else setError(res.error);
+  const afterDelete = () => {
+    closeTab(tabId("code", fileId));
+    router.push("/code");
+    router.refresh();
   };
 
   // 로컬 파일로 내보내기 (브라우저 다운로드, 네트워크 불필요)
@@ -245,6 +259,7 @@ export function CodeEditor({
           </select>
         </div>
         <div className="row" style={{ gap: 10 }}>
+          <PresenceAvatars users={presenceUsers} />
           <ContributorBadges kind="code" id={fileId} refreshToken={saveState} />
           <span
             className={`save-state ${
@@ -268,7 +283,7 @@ export function CodeEditor({
               <button className="btn btn-sm" onClick={() => setShowShare(true)}>
                 Share
               </button>
-              <button className="btn btn-sm btn-danger" onClick={onDelete}>
+              <button className="btn btn-sm btn-danger" onClick={() => setShowDelete(true)}>
                 Delete
               </button>
             </>
@@ -311,6 +326,16 @@ export function CodeEditor({
           onShare={(rid, perm) => shareCodeFile(fileId, rid, perm)}
           onRevoke={(pid) => revokeCodeFileShare(pid)}
           onClose={() => setShowShare(false)}
+        />
+      )}
+
+      {showDelete && (
+        <DeleteConfirmDialog
+          itemKind="code file"
+          itemLabel={name || "untitled"}
+          onConfirm={() => deleteCodeFile(fileId)}
+          onDeleted={afterDelete}
+          onClose={() => setShowDelete(false)}
         />
       )}
     </div>

@@ -19,8 +19,12 @@ import {
   listMindMapShares,
   getReferencePreview,
 } from "../actions";
-import { useWorkspace } from "../../workspace/workspace-context";
+import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import { usePresence } from "@/lib/use-presence";
+import { colorForUserId } from "@/lib/presence-color";
+import { PresenceAvatars } from "@/components/presence-avatars";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { formatBytes } from "@/lib/format";
 import { createDocumentFromMindmap, createSheetFromMindmap } from "../../convert-actions";
 import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate } from "@/lib/yjs-transport";
@@ -40,6 +44,8 @@ function Inner({
   isOwner,
   isPublic,
   myShareId,
+  myName,
+  myAvatarUrl,
   items,
 }: {
   mapId: string;
@@ -50,16 +56,25 @@ function Inner({
   isOwner: boolean;
   isPublic: boolean;
   myShareId: string;
+  myName: string;
+  myAvatarUrl: string | null;
   items: WorkspaceItem[];
 }) {
   const router = useRouter();
-  const { openTab, renameTab } = useWorkspace();
+  const { openTab, renameTab, closeTab } = useWorkspace();
+  const presenceUsers = usePresence(`mindmap:${mapId}`, {
+    id: myShareId,
+    name: myName,
+    avatarUrl: myAvatarUrl,
+    color: colorForUserId(myShareId),
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const meRef = useRef<MindElixirInstance | null>(null);
   const [title, setTitle] = useState(initialTitle);
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [pub, setPub] = useState(isPublic);
   const [showShare, setShowShare] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
   const [pick, setPick] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [showConvert, setShowConvert] = useState(false);
@@ -412,11 +427,10 @@ function Inner({
     }
   };
 
-  const onDelete = async () => {
-    if (!confirm("Delete this map? This cannot be undone.")) return;
-    const res = await deleteMindMap(mapId);
-    if (res.ok) router.push("/mindmap");
-    else setError(res.error);
+  const afterDelete = () => {
+    closeTab(tabId("mindmap", mapId));
+    router.push("/mindmap");
+    router.refresh();
   };
 
   const stateLabel =
@@ -486,6 +500,7 @@ function Inner({
           )}
         </div>
         <div className="row" style={{ gap: 10 }}>
+          <PresenceAvatars users={presenceUsers} />
           <ContributorBadges kind="mindmap" id={mapId} refreshToken={saveState} />
           <span
             className={`save-state ${
@@ -521,7 +536,7 @@ function Inner({
               <button className="btn btn-sm" onClick={() => setShowShare(true)}>
                 Share
               </button>
-              <button className="btn btn-sm btn-danger" onClick={onDelete}>
+              <button className="btn btn-sm btn-danger" onClick={() => setShowDelete(true)}>
                 Delete
               </button>
             </>
@@ -607,6 +622,16 @@ function Inner({
           onShare={(rid, perm) => shareMindMap(mapId, rid, perm)}
           onRevoke={(pid) => revokeMindMapShare(pid)}
           onClose={() => setShowShare(false)}
+        />
+      )}
+
+      {showDelete && (
+        <DeleteConfirmDialog
+          itemKind="mind map"
+          itemLabel={title || "Untitled map"}
+          onConfirm={() => deleteMindMap(mapId)}
+          onDeleted={afterDelete}
+          onClose={() => setShowDelete(false)}
         />
       )}
     </div>

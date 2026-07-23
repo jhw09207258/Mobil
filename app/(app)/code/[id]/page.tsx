@@ -23,7 +23,7 @@ export default async function CodeFilePage({
 
   if (!file) notFound();
 
-  let canEdit = file.owner_id === userId || profile.role === "admin";
+  let canEdit = file.owner_id === userId || profile.role === "admin" || file.is_public;
   if (!canEdit) {
     const { data: perm } = await supabase
       .from("code_file_permissions")
@@ -59,6 +59,8 @@ export default async function CodeFilePage({
         isOwner={isOwner}
         isPublic={file.is_public}
         myShareId={userId}
+        myName={profile.display_name || profile.email}
+        myAvatarUrl={profile.avatar_url}
       />
     </>
   );

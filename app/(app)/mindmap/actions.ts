@@ -46,6 +46,8 @@ export async function createMindMapTab(): Promise<{
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
       items,
     },
   };
@@ -96,6 +98,8 @@ export async function createMindMapFromOutline(
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
       items,
     },
   };
@@ -114,7 +118,7 @@ export async function getMindMapForTab(id: string) {
 
   if (!map) return null;
 
-  let canEdit = map.owner_id === userId || profile.role === "admin";
+  let canEdit = map.owner_id === userId || profile.role === "admin" || map.is_public;
   if (!canEdit) {
     const { data: perm } = await supabase
       .from("mind_map_permissions")
@@ -136,6 +140,8 @@ export async function getMindMapForTab(id: string) {
     canEdit,
     isOwner: map.owner_id === userId,
     myShareId: userId,
+    myName: profile.display_name || profile.email,
+    myAvatarUrl: profile.avatar_url,
     items,
   };
 }

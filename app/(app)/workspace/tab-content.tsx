@@ -88,6 +88,8 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
         isOwner={d.isOwner}
         isPublic={d.isPublic}
         myShareId={d.myShareId}
+        myName={d.myName}
+        myAvatarUrl={d.myAvatarUrl}
       />
     );
   }
@@ -103,6 +105,8 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
         isOwner={d.isOwner}
         isPublic={d.isPublic}
         myShareId={d.myShareId}
+        myName={d.myName}
+        myAvatarUrl={d.myAvatarUrl}
       />
     );
   }
@@ -112,10 +116,13 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
         sheetId={d.id}
         initialTitle={d.title}
         initialData={d.data}
+        initialYjsState={d.initialYjsState}
         canEdit={d.canEdit}
         isOwner={d.isOwner}
         isPublic={d.isPublic}
         myShareId={d.myShareId}
+        myName={d.myName}
+        myAvatarUrl={d.myAvatarUrl}
       />
     );
   }
@@ -130,6 +137,8 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
         isOwner={d.isOwner}
         isPublic={d.isPublic}
         myShareId={d.myShareId}
+        myName={d.myName}
+        myAvatarUrl={d.myAvatarUrl}
         items={d.items}
       />
     );

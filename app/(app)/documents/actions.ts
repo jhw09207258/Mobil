@@ -76,6 +76,8 @@ export async function importDocument(
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -166,6 +168,8 @@ export async function createDocumentTab(): Promise<{
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -183,7 +187,7 @@ export async function getDocumentForTab(id: string) {
 
   if (!doc) return null;
 
-  let canEdit = doc.owner_id === userId || profile.role === "admin";
+  let canEdit = doc.owner_id === userId || profile.role === "admin" || doc.is_public;
   if (!canEdit) {
     const { data: perm } = await supabase
       .from("document_permissions")
@@ -203,6 +207,8 @@ export async function getDocumentForTab(id: string) {
     canEdit,
     isOwner: doc.owner_id === userId,
     myShareId: userId,
+    myName: profile.display_name || profile.email,
+    myAvatarUrl: profile.avatar_url,
   };
 }
 

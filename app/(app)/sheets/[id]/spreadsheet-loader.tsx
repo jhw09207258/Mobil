@@ -20,10 +20,13 @@ export function SpreadsheetLoader(props: {
   sheetId: string;
   initialTitle: string;
   initialData: Json;
+  initialYjsState: string | null;
   canEdit: boolean;
   isOwner: boolean;
   isPublic: boolean;
   myShareId: string;
+  myName: string;
+  myAvatarUrl: string | null;
 }) {
   return <Spreadsheet {...props} />;
 }

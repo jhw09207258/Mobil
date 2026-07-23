@@ -50,6 +50,8 @@ export async function createCodeFileTab(): Promise<{
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -67,7 +69,7 @@ export async function getCodeFileForTab(id: string) {
 
   if (!file) return null;
 
-  let canEdit = file.owner_id === userId || profile.role === "admin";
+  let canEdit = file.owner_id === userId || profile.role === "admin" || file.is_public;
   if (!canEdit) {
     const { data: perm } = await supabase
       .from("code_file_permissions")
@@ -88,6 +90,8 @@ export async function getCodeFileForTab(id: string) {
     canEdit,
     isOwner: file.owner_id === userId,
     myShareId: userId,
+    myName: profile.display_name || profile.email,
+    myAvatarUrl: profile.avatar_url,
   };
 }
 

@@ -7,6 +7,7 @@ import { formatBytes, formatDate } from "@/lib/format";
 import { getFileCategory, FILE_CATEGORY_LABEL, type FileCategory } from "@/lib/file-category";
 import { extractTagsFromText } from "@/lib/tags";
 import { ShareDialog } from "@/components/share-dialog";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { StarButton } from "../star-button";
 import {
   deleteFile,
@@ -26,6 +27,7 @@ type FileRow = {
   size_bytes: number | null;
   is_public: boolean;
   created_at: string;
+  canEdit: boolean;
 };
 
 const BUCKET = "files";
@@ -45,6 +47,7 @@ export function FilesClient({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<FileRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FileRow | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<FileCategory | "all">("all");
   const [starredOnly, setStarredOnly] = useState(false);
@@ -186,14 +189,8 @@ export function FilesClient({
       else router.refresh();
     });
 
-  const remove = (row: FileRow) =>
-    start(async () => {
-      if (!confirm(`Delete "${row.file_name}"? This cannot be undone.`))
-        return;
-      const res = await deleteFile(row.id);
-      if (!res.ok) setError(res.error);
-      else router.refresh();
-    });
+  // 삭제는 GitHub 처럼 파일 이름을 직접 입력해야 확정된다(DeleteConfirmDialog).
+  // 목록은 삭제 성공 후 router.refresh() 로 즉시 갱신한다.
 
   return (
     <div
@@ -330,7 +327,7 @@ export function FilesClient({
                         >
                           Download
                         </button>
-                        {owned && (
+                        {f.canEdit && (
                           <>
                             <button
                               className="btn btn-ghost btn-sm"
@@ -339,15 +336,17 @@ export function FilesClient({
                             >
                               Rename
                             </button>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => setShareTarget(f)}
-                            >
-                              Share
-                            </button>
+                            {owned && (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setShareTarget(f)}
+                              >
+                                Share
+                              </button>
+                            )}
                             <button
                               className="btn btn-ghost btn-sm btn-danger"
-                              onClick={() => remove(f)}
+                              onClick={() => setDeleteTarget(f)}
                               disabled={pending}
                             >
                               Delete
@@ -382,6 +381,16 @@ export function FilesClient({
           onShare={(rid, perm) => shareFile(shareTarget.id, rid, perm)}
           onRevoke={(pid) => revokeFileShare(pid)}
           onClose={() => setShareTarget(null)}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmDialog
+          itemKind="file"
+          itemLabel={deleteTarget.file_name}
+          onConfirm={() => deleteFile(deleteTarget.id)}
+          onDeleted={() => router.refresh()}
+          onClose={() => setDeleteTarget(null)}
         />
       )}
 

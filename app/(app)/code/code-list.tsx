@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { OpenItemButton } from "../workspace/open-item-button";
 import { StarButton } from "../star-button";
+import { ShareDialog } from "@/components/share-dialog";
+import { shareCodeFile, revokeCodeFileShare, listCodeFileShares } from "./actions";
 
 type CodeRow = {
   id: string;
@@ -26,6 +28,7 @@ export function CodeList({
   const [query, setQuery] = useState("");
   const [starredOnly, setStarredOnly] = useState(false);
   const [starredSet, setStarredSet] = useState(() => new Set(starredIds));
+  const [shareTarget, setShareTarget] = useState<CodeRow | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -49,6 +52,7 @@ export function CodeList({
   };
 
   return (
+    <>
     <div className="panel">
       <div className="panel-header">
         <span className="label">
@@ -90,7 +94,7 @@ export function CodeList({
               <th style={{ width: 90 }}>Visibility</th>
               <th style={{ width: 60 }}>Owner</th>
               <th style={{ width: 180 }}>Updated</th>
-              <th style={{ width: 80 }}></th>
+              <th style={{ width: 150 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -128,9 +132,20 @@ export function CodeList({
                   {formatDate(c.updated_at)}
                 </td>
                 <td>
-                  <OpenItemButton kind="code" id={c.id} title={c.name} className="btn btn-ghost btn-sm">
-                    Open
-                  </OpenItemButton>
+                  <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
+                    {c.owner_id === userId && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShareTarget(c)}
+                      >
+                        Share
+                      </button>
+                    )}
+                    <OpenItemButton kind="code" id={c.id} title={c.name} className="btn btn-ghost btn-sm">
+                      Open
+                    </OpenItemButton>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -139,5 +154,17 @@ export function CodeList({
         </div>
       )}
     </div>
+
+    {shareTarget && (
+      <ShareDialog
+        targetLabel={shareTarget.name}
+        myShareId={userId}
+        loadShares={() => listCodeFileShares(shareTarget.id)}
+        onShare={(rid, perm) => shareCodeFile(shareTarget.id, rid, perm)}
+        onRevoke={(pid) => revokeCodeFileShare(pid)}
+        onClose={() => setShareTarget(null)}
+      />
+    )}
+    </>
   );
 }

@@ -499,6 +499,37 @@
   color: var(--text-1);
 }
 
+/* 실시간 프레즌스("현재 접속자") — 구글독스 스타일 겹친 아바타. contributor-*
+ * 클래스를 그대로 재사용하고, 접속 중임을 나타내는 점과 사용자별 색 테두리만
+ * 추가한다. */
+.presence-row {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+.presence-badge {
+  position: relative;
+  display: flex;
+  margin-left: -6px;
+}
+.presence-badge:first-child {
+  margin-left: 0;
+}
+.presence-badge .contributor-avatar {
+  border-width: 2px;
+  border-style: solid;
+}
+.presence-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3ecf6b;
+  border: 2px solid var(--bg-1);
+}
+
 /* 동료(co-worker) 디렉터리 */
 .coworker-grid {
   display: grid;

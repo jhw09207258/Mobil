@@ -17,13 +17,13 @@ export default async function SheetEditorPage({
 
   const { data: sheet } = await supabase
     .from("sheets")
-    .select("id, owner_id, title, data, is_public, updated_at")
+    .select("id, owner_id, title, data, is_public, updated_at, yjs_state")
     .eq("id", id)
     .single();
 
   if (!sheet) notFound();
 
-  let canEdit = sheet.owner_id === userId || profile.role === "admin";
+  let canEdit = sheet.owner_id === userId || profile.role === "admin" || sheet.is_public;
   if (!canEdit) {
     const { data: perm } = await supabase
       .from("sheet_permissions")
@@ -49,10 +49,13 @@ export default async function SheetEditorPage({
         sheetId={sheet.id}
         initialTitle={sheet.title}
         initialData={sheet.data}
+        initialYjsState={sheet.yjs_state}
         canEdit={canEdit}
         isOwner={sheet.owner_id === userId}
         isPublic={sheet.is_public}
         myShareId={userId}
+        myName={profile.display_name || profile.email}
+        myAvatarUrl={profile.avatar_url}
       />
     </>
   );

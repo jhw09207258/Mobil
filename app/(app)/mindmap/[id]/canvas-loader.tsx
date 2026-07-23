@@ -26,6 +26,8 @@ export function MindMapCanvasLoader(props: {
   isOwner: boolean;
   isPublic: boolean;
   myShareId: string;
+  myName: string;
+  myAvatarUrl: string | null;
   items: WorkspaceItem[];
 }) {
   return <MindMapCanvas {...props} />;

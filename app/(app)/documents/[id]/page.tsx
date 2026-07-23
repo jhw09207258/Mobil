@@ -23,8 +23,8 @@ export default async function DocumentPage({
 
   if (!doc) notFound();
 
-  // 편집 권한 판정: 소유자 / edit 권한 / 관리자
-  let canEdit = doc.owner_id === userId || profile.role === "admin";
+  // 편집 권한 판정: 소유자 / 공개 문서 / edit 권한 / 관리자
+  let canEdit = doc.owner_id === userId || profile.role === "admin" || doc.is_public;
   if (!canEdit) {
     const { data: perm } = await supabase
       .from("document_permissions")
@@ -59,6 +59,8 @@ export default async function DocumentPage({
         isOwner={isOwner}
         isPublic={doc.is_public}
         myShareId={userId}
+        myName={profile.display_name || profile.email}
+        myAvatarUrl={profile.avatar_url}
       />
     </>
   );

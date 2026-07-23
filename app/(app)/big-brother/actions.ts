@@ -58,8 +58,18 @@ function reconstructAbstract(invertedIndex: Record<string, number[]> | undefined
 // (이 검색을 도구로 쓰는) Sophia 응답까지 같이 멈추지 않게 한다.
 const SEARCH_TIMEOUT_MS = 8000;
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function searchOpenAlex(query: string): Promise<PaperResult[]> {
-  const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per_page=8`;
+  // mailto 없이 요청하면 레이트리밋이 더 빡빡한 공용 풀로 처리된다 — 연락처
+  // 이메일을 설정해두면(선택) OpenAlex 가 권장하는 "polite pool"을 타서 훨씬
+  // 안정적으로 응답한다. 미설정 시 지금과 동일하게 동작(하드 요구사항 아님).
+  const mailto = process.env.OPENALEX_CONTACT_EMAIL;
+  const url =
+    `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per_page=8` +
+    (mailto ? `&mailto=${encodeURIComponent(mailto)}` : "");
   const res = await fetch(url, {
     headers: { Accept: "application/json" },
     signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
@@ -90,11 +100,22 @@ async function searchSemanticScholar(query: string): Promise<PaperResult[]> {
   const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(
     query
   )}&limit=8&fields=title,abstract,year,authors,url`;
-  const res = await fetch(url, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-  });
-  if (!res.ok) throw new Error(`Semantic Scholar returned ${res.status}`);
+  // 비인증 공개 API 는 5분당 100요청으로 매우 낮게 제한돼 있어 429 가 흔하다
+  // — 있으면 x-api-key 로 더 넉넉한 한도를 쓰고(선택, 없어도 동작), 그래도
+  // 429 를 받으면 짧게 기다렸다 한 번만 재시도한다.
+  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (apiKey) headers["x-api-key"] = apiKey;
+
+  let res = await fetch(url, { headers, signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS) });
+  if (res.status === 429) {
+    await sleep(1200);
+    res = await fetch(url, { headers, signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS) });
+  }
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("Rate limited — try again shortly.");
+    throw new Error(`Semantic Scholar returned ${res.status}`);
+  }
   const json = await res.json();
   const results = Array.isArray(json?.data) ? json.data : [];
   return results.map(
@@ -121,7 +142,16 @@ async function searchGitHubCode(query: string, token: string): Promise<CodeResul
   });
   if (!res.ok) throw new Error(`GitHub code search returned ${res.status}`);
   const json = await res.json();
-  const items = Array.isArray(json?.items) ? json.items : [];
+  const rawItems = Array.isArray(json?.items) ? json.items : [];
+  // GITHUB_TOKEN 이 실제로는 비공개/제한 저장소까지 접근 가능한 경우(설정
+  // 실수 등), 그 결과가 검색에 섞여 나오면 토큰 없이 그냥 클릭하는 일반
+  // 사용자에게는 GitHub 가 404("Not Found")를 띄운다 — 클릭한 링크가
+  // 죽어있는 것처럼 보이는 가장 흔한 원인이라, 비공개 저장소 결과는 애초에
+  // 걸러낸다(.env.example 은 public_repo 전용 토큰을 권장하지만, 토큰 스코프
+  // 설정 실수에 대한 안전망으로도 필요하다).
+  const items = rawItems.filter(
+    (it: { repository?: { private?: boolean } }) => it.repository?.private !== true
+  );
   return items.map(
     (it: {
       path?: string;
@@ -245,6 +275,8 @@ export async function addPaperToDocument(
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -338,6 +370,8 @@ export async function addGithubResultToCode(
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }

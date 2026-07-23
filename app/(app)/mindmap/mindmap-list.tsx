@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { OpenItemButton } from "../workspace/open-item-button";
+import { ShareDialog } from "@/components/share-dialog";
+import { shareMindMap, revokeMindMapShare, listMindMapShares } from "./actions";
 
 type MapRow = {
   id: string;
@@ -14,6 +16,7 @@ type MapRow = {
 
 export function MindMapList({ maps, userId }: { maps: MapRow[]; userId: string }) {
   const [query, setQuery] = useState("");
+  const [shareTarget, setShareTarget] = useState<MapRow | null>(null);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return maps;
@@ -21,6 +24,7 @@ export function MindMapList({ maps, userId }: { maps: MapRow[]; userId: string }
   }, [maps, query]);
 
   return (
+    <>
     <div className="panel">
       <div className="panel-header">
         <span className="label">
@@ -48,7 +52,7 @@ export function MindMapList({ maps, userId }: { maps: MapRow[]; userId: string }
               <th style={{ width: 90 }}>Visibility</th>
               <th style={{ width: 60 }}>Owner</th>
               <th style={{ width: 180 }}>Updated</th>
-              <th style={{ width: 80 }}></th>
+              <th style={{ width: 150 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -73,9 +77,20 @@ export function MindMapList({ maps, userId }: { maps: MapRow[]; userId: string }
                   {formatDate(m.updated_at)}
                 </td>
                 <td>
-                  <OpenItemButton kind="mindmap" id={m.id} title={m.title || "Untitled map"} className="btn btn-ghost btn-sm">
-                    Open
-                  </OpenItemButton>
+                  <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
+                    {m.owner_id === userId && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShareTarget(m)}
+                      >
+                        Share
+                      </button>
+                    )}
+                    <OpenItemButton kind="mindmap" id={m.id} title={m.title || "Untitled map"} className="btn btn-ghost btn-sm">
+                      Open
+                    </OpenItemButton>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -84,5 +99,17 @@ export function MindMapList({ maps, userId }: { maps: MapRow[]; userId: string }
         </div>
       )}
     </div>
+
+    {shareTarget && (
+      <ShareDialog
+        targetLabel={shareTarget.title || "Untitled map"}
+        myShareId={userId}
+        loadShares={() => listMindMapShares(shareTarget.id)}
+        onShare={(rid, perm) => shareMindMap(shareTarget.id, rid, perm)}
+        onRevoke={(pid) => revokeMindMapShare(pid)}
+        onClose={() => setShareTarget(null)}
+      />
+    )}
+    </>
   );
 }

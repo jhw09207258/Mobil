@@ -6,18 +6,30 @@ import { listStarredIds } from "../starred-actions";
 export const dynamic = "force-dynamic";
 
 export default async function FilesPage() {
-  const { userId } = await requireUser();
+  const { userId, profile } = await requireUser();
   const supabase = await createClient();
 
-  const [{ data: files }, starredIds] = await Promise.all([
+  const [{ data: files }, { data: editPerms }, starredIds] = await Promise.all([
     supabase
       .from("files")
       .select(
         "id, owner_id, storage_path, file_name, mime_type, size_bytes, is_public, created_at"
       )
       .order("created_at", { ascending: false }),
+    supabase
+      .from("file_permissions")
+      .select("file_id")
+      .eq("user_id", userId)
+      .eq("permission", "edit"),
     listStarredIds("file"),
   ]);
+
+  const isAdmin = profile.role === "admin";
+  const editableIds = new Set((editPerms ?? []).map((p) => p.file_id));
+  const filesWithEdit = (files ?? []).map((f) => ({
+    ...f,
+    canEdit: f.owner_id === userId || isAdmin || f.is_public || editableIds.has(f.id),
+  }));
 
   return (
     <>
@@ -27,7 +39,7 @@ export default async function FilesPage() {
       </div>
       <div className="content">
         <FilesClient
-          initialFiles={files ?? []}
+          initialFiles={filesWithEdit}
           userId={userId}
           starredIds={starredIds}
         />

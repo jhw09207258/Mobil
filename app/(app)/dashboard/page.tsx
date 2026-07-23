@@ -113,7 +113,12 @@ export default async function DashboardPage() {
           </div>
           <div className="panel-body">
             <p className="page-sub" style={{ margin: "0 0 12px" }}>
-              Others need this ID to share files or documents with you.
+              To let someone share a file, document, sheet or map with you, give
+              them this ID — they paste it into the <strong>Share</strong> dialog
+              on their item. To share <em>your</em> items, open any list (Docs,
+              Code, Repository, Table, Link Graph) and use the{" "}
+              <strong>Share</strong> button on the row (or the Share button inside
+              the editor), then enter the recipient&rsquo;s Share ID.
             </p>
             <Copyable value={userId} />
           </div>

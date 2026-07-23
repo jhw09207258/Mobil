@@ -61,10 +61,13 @@ export async function importSheet(
       id: data.id,
       title: data.title,
       data: data.data,
+      initialYjsState: null,
       isPublic: false,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -134,10 +137,13 @@ export async function createSheetTab(): Promise<{
       id: data.id,
       title: data.title,
       data: data.data,
+      initialYjsState: null,
       isPublic: false,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -149,13 +155,13 @@ export async function getSheetForTab(id: string) {
 
   const { data: sheet } = await supabase
     .from("sheets")
-    .select("id, owner_id, title, data, is_public, updated_at")
+    .select("id, owner_id, title, data, is_public, updated_at, yjs_state")
     .eq("id", id)
     .single();
 
   if (!sheet) return null;
 
-  let canEdit = sheet.owner_id === userId || profile.role === "admin";
+  let canEdit = sheet.owner_id === userId || profile.role === "admin" || sheet.is_public;
   if (!canEdit) {
     const { data: perm } = await supabase
       .from("sheet_permissions")
@@ -170,23 +176,31 @@ export async function getSheetForTab(id: string) {
     id: sheet.id,
     title: sheet.title,
     data: sheet.data,
+    initialYjsState: sheet.yjs_state,
     isPublic: sheet.is_public,
     canEdit,
     isOwner: sheet.owner_id === userId,
     myShareId: userId,
+    myName: profile.display_name || profile.email,
+    myAvatarUrl: profile.avatar_url,
   };
 }
 
 export async function saveSheet(
   id: string,
   title: string,
-  data: Json
+  data: Json,
+  yjsState?: string | null
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const finalTitle = title.trim() || "Untitled sheet";
   const { error } = await supabase
     .from("sheets")
-    .update({ title: finalTitle, data })
+    .update({
+      title: finalTitle,
+      data,
+      ...(yjsState !== undefined ? { yjs_state: yjsState } : {}),
+    })
     .eq("id", id);
   if (error) return { ok: false, error: "Save failed." };
 

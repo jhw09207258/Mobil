@@ -25,6 +25,8 @@ export function DocumentEditorLoader(props: {
   isOwner: boolean;
   isPublic: boolean;
   myShareId: string;
+  myName: string;
+  myAvatarUrl: string | null;
 }) {
   return <DocumentEditor {...props} />;
 }

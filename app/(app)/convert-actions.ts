@@ -72,6 +72,8 @@ export async function createDocumentFromMindmap(mapId: string): Promise<TabResul
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -128,10 +130,13 @@ export async function createSheetFromMindmap(mapId: string): Promise<TabResult> 
       id: data.id,
       title: data.title,
       data: data.data,
+      initialYjsState: null,
       isPublic: false,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
     },
   };
 }
@@ -181,6 +186,8 @@ export async function createMindmapFromDocument(docId: string): Promise<TabResul
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
       items,
     },
   };
@@ -232,6 +239,8 @@ export async function createMindmapFromSheet(sheetId: string): Promise<TabResult
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
+      myName: user.email ?? "",
+      myAvatarUrl: null,
       items,
     },
   };

@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { OpenItemButton } from "../workspace/open-item-button";
 import { StarButton } from "../star-button";
+import { ShareDialog } from "@/components/share-dialog";
+import { shareDocument, revokeDocumentShare, listDocumentShares } from "./actions";
 
 type DocRow = {
   id: string;
@@ -25,6 +27,7 @@ export function DocumentsList({
   const [query, setQuery] = useState("");
   const [starredOnly, setStarredOnly] = useState(false);
   const [starredSet, setStarredSet] = useState(() => new Set(starredIds));
+  const [shareTarget, setShareTarget] = useState<DocRow | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -43,6 +46,7 @@ export function DocumentsList({
   };
 
   return (
+    <>
     <div className="panel">
       <div className="panel-header">
         <span className="label">
@@ -83,7 +87,7 @@ export function DocumentsList({
               <th style={{ width: 90 }}>Visibility</th>
               <th style={{ width: 60 }}>Owner</th>
               <th style={{ width: 180 }}>Updated</th>
-              <th style={{ width: 80 }}></th>
+              <th style={{ width: 150 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -118,9 +122,20 @@ export function DocumentsList({
                   {formatDate(d.updated_at)}
                 </td>
                 <td>
-                  <OpenItemButton kind="document" id={d.id} title={d.title || "Untitled"} className="btn btn-ghost btn-sm">
-                    Open
-                  </OpenItemButton>
+                  <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
+                    {d.owner_id === userId && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShareTarget(d)}
+                      >
+                        Share
+                      </button>
+                    )}
+                    <OpenItemButton kind="document" id={d.id} title={d.title || "Untitled"} className="btn btn-ghost btn-sm">
+                      Open
+                    </OpenItemButton>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -129,5 +144,17 @@ export function DocumentsList({
         </div>
       )}
     </div>
+
+    {shareTarget && (
+      <ShareDialog
+        targetLabel={shareTarget.title || "Untitled"}
+        myShareId={userId}
+        loadShares={() => listDocumentShares(shareTarget.id)}
+        onShare={(rid, perm) => shareDocument(shareTarget.id, rid, perm)}
+        onRevoke={(pid) => revokeDocumentShare(pid)}
+        onClose={() => setShareTarget(null)}
+      />
+    )}
+    </>
   );
 }
