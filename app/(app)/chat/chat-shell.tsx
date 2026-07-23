@@ -27,46 +27,136 @@ import {
   onOpenConversation,
   setActiveConversation,
 } from "./chat-bus";
+import { parseMessage, UUID_PATTERN, type InlineToken } from "./markdown-parse";
 import "./chat.css";
 
 // ---------------------------------------------------------------------------
-// 메시지 본문 파싱 — 첨부 토큰([[kind:uuid|Title]])과 내부 경로
-// (/documents/<uuid> 등)를 워크스페이스 탭으로 열리는 칩으로 렌더링한다.
+// 메시지 본문 — 경량 마크다운(markdown-parse.ts) 블록/인라인 토큰을 렌더링.
+// 첨부 토큰([[kind:uuid|Title]])/내부 경로는 워크스페이스 탭 칩으로.
 // ---------------------------------------------------------------------------
-const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-const SEGMENT_RE = new RegExp(
-  `\\[\\[(document|code|sheet|mindmap):(${UUID})\\|([^\\]]{1,160})\\]\\]` +
-    `|(?:https?://[^\\s]*)?/(documents|code|sheets|mindmap)/(${UUID})`,
+type RefToken = { kind: TabKind; id: string; title: string };
+
+// 대화 목록 미리보기에서 첨부 토큰을 "⛓ attachment" 로 치환.
+const PREVIEW_ATTACH_RE = new RegExp(
+  `\\[\\[(?:document|code|sheet|mindmap):${UUID_PATTERN}\\|[^\\]]{1,160}\\]\\]` +
+    `|(?:https?://[^\\s]*)?/(?:documents|code|sheets|mindmap)/${UUID_PATTERN}`,
   "gi"
 );
-const ROUTE_TO_KIND: Record<string, TabKind> = {
-  documents: "document",
-  code: "code",
-  sheets: "sheet",
-  mindmap: "mindmap",
-};
-
-type Segment =
-  | { type: "text"; text: string }
-  | { type: "ref"; kind: TabKind; id: string; title: string };
-
-function parseSegments(content: string): Segment[] {
-  const out: Segment[] = [];
-  let last = 0;
-  for (const m of content.matchAll(SEGMENT_RE)) {
-    const idx = m.index ?? 0;
-    if (idx > last) out.push({ type: "text", text: content.slice(last, idx) });
-    if (m[1]) {
-      out.push({ type: "ref", kind: m[1].toLowerCase() as TabKind, id: m[2].toLowerCase(), title: m[3] });
-    } else {
-      const kind = ROUTE_TO_KIND[m[4].toLowerCase()];
-      out.push({ type: "ref", kind, id: m[5].toLowerCase(), title: kind });
-    }
-    last = idx + m[0].length;
-  }
-  if (last < content.length) out.push({ type: "text", text: content.slice(last) });
-  return out;
+function previewText(raw: string): string {
+  return raw.replace(PREVIEW_ATTACH_RE, "⛓ attachment").replace(/```/g, "").replace(/\n+/g, " ");
 }
+
+function InlineTokens({
+  tokens,
+  onOpenRef,
+}: {
+  tokens: InlineToken[];
+  onOpenRef: (ref: RefToken) => void;
+}) {
+  return (
+    <>
+      {tokens.map((tok, i) => {
+        switch (tok.t) {
+          case "bold":
+            return <strong key={i}>{tok.text}</strong>;
+          case "italic":
+            return <em key={i}>{tok.text}</em>;
+          case "underline":
+            return <u key={i}>{tok.text}</u>;
+          case "strike":
+            return <s key={i}>{tok.text}</s>;
+          case "code":
+            return (
+              <code key={i} className="chat-inline-code">
+                {tok.text}
+              </code>
+            );
+          case "mention":
+            return (
+              <span key={i} className="chat-mention">
+                {tok.text}
+              </span>
+            );
+          case "link":
+            return (
+              <a key={i} href={tok.href} target="_blank" rel="noopener noreferrer">
+                {tok.text}
+              </a>
+            );
+          case "ref":
+            return (
+              <button
+                key={i}
+                className="chat-ref-chip"
+                onClick={() => onOpenRef(tok as RefToken)}
+                title={`Open ${tok.kind} in workspace`}
+              >
+                <span className="chat-ref-kind">{tok.kind}</span>
+                {tok.title === tok.kind ? "open ↗" : tok.title}
+              </button>
+            );
+          default:
+            return <span key={i}>{tok.text}</span>;
+        }
+      })}
+    </>
+  );
+}
+
+function MessageBody({
+  content,
+  onOpenRef,
+}: {
+  content: string;
+  onOpenRef: (ref: RefToken) => void;
+}) {
+  const blocks = useMemo(() => parseMessage(content), [content]);
+  return (
+    <>
+      {blocks.map((b, i) => {
+        if (b.t === "codeblock") {
+          return (
+            <pre key={i} className="chat-codeblock">
+              {b.text}
+            </pre>
+          );
+        }
+        if (b.t === "list") {
+          return (
+            <div key={i} className="chat-list-block">
+              {b.items.map((item, j) => (
+                <div key={j} className="chat-li" style={{ paddingLeft: item.indent * 14 }}>
+                  <span className="chat-li-marker">
+                    {item.marker === "-" || item.marker === "*" ? "•" : item.marker}
+                  </span>
+                  <span className="chat-li-body">
+                    <InlineTokens tokens={item.tokens} onOpenRef={onOpenRef} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        }
+        return (
+          <div key={i} className="chat-para">
+            {b.lines.map((line, j) => (
+              <div key={j} className="chat-para-line">
+                {line.length === 0 ? " " : <InlineTokens tokens={line} onOpenRef={onOpenRef} />}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// 자주 쓰는 이모지 — 시스템 이모지 입력기의 빠른 대체재.
+const EMOJIS = [
+  "😀", "😂", "😊", "😍", "🤔", "😮", "😢", "😴",
+  "👍", "👎", "🙏", "🤝", "👀", "💪", "🔥", "❤️",
+  "🎉", "💯", "🚀", "✅", "❌", "⭐", "💡", "📌",
+];
 
 function fmtTime(iso: string): string {
   const d = new Date(iso);
@@ -118,6 +208,8 @@ export function ChatShell({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"new" | "add-members" | null>(null);
+  const [fmtOpen, setFmtOpen] = useState(false);
+  const [menu, setMenu] = useState<"emoji" | "mention" | null>(null);
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachables, setAttachables] = useState<AttachableItem[] | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -347,6 +439,52 @@ export function ChatShell({
     openTab(seg.kind, seg.id, seg.title === seg.kind ? "Loading…" : seg.title);
   };
 
+  // ---- 서식 도구: textarea 선택 영역을 마크다운 문법으로 감싸거나 접두사를 붙인다 ----
+  const applyWrap = (before: string, after = before, placeholder = "text") => {
+    const el = inputRef.current;
+    const s = el?.selectionStart ?? input.length;
+    const e = el?.selectionEnd ?? input.length;
+    const sel = input.slice(s, e) || placeholder;
+    setInput(input.slice(0, s) + before + sel + after + input.slice(e));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(s + before.length, s + before.length + sel.length);
+    });
+  };
+
+  const applyLinePrefix = (prefix: (lineIndex: number) => string) => {
+    const el = inputRef.current;
+    const s = el?.selectionStart ?? 0;
+    const e = el?.selectionEnd ?? input.length;
+    const start = input.lastIndexOf("\n", Math.max(0, s - 1)) + 1;
+    const endIdx = input.indexOf("\n", e);
+    const end = endIdx === -1 ? input.length : endIdx;
+    const next = input
+      .slice(start, end)
+      .split("\n")
+      .map((line, i) => prefix(i) + line)
+      .join("\n");
+    setInput(input.slice(0, start) + next + input.slice(end));
+    requestAnimationFrame(() => el?.focus());
+  };
+
+  const insertAtCursor = (text: string) => {
+    const el = inputRef.current;
+    const s = el?.selectionStart ?? input.length;
+    const e = el?.selectionEnd ?? input.length;
+    setInput(input.slice(0, s) + text + input.slice(e));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(s + text.length, s + text.length);
+    });
+  };
+
+  const onLinkButton = () => {
+    const url = prompt("Link URL (https://…)");
+    if (!url || !/^https?:\/\//.test(url)) return;
+    applyWrap("[", `](${url})`, "link text");
+  };
+
   // 읽음 표시 — 내가 보낸 "마지막" 메시지 하나에만 붙인다(Insta/카톡 스타일).
   const lastMine = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -406,7 +544,7 @@ export function ChatShell({
                   <div className="chat-conv-bottom">
                     <span className="chat-conv-preview">
                       {c.last_message
-                        ? c.last_message.replace(SEGMENT_RE, "⛓ attachment")
+                        ? previewText(c.last_message)
                         : c.kind === "group"
                           ? `${c.member_count} members`
                           : "No messages yet"}
@@ -491,21 +629,7 @@ export function ChatShell({
                       </div>
                     )}
                     <div className={`chat-msg ${mine ? "mine" : "theirs"}`}>
-                      {parseSegments(m.content).map((seg, j) =>
-                        seg.type === "text" ? (
-                          <span key={j}>{seg.text}</span>
-                        ) : (
-                          <button
-                            key={j}
-                            className="chat-ref-chip"
-                            onClick={() => openRef(seg)}
-                            title={`Open ${seg.kind} in workspace`}
-                          >
-                            <span className="chat-ref-kind">{seg.kind}</span>
-                            {seg.title === seg.kind ? "open ↗" : seg.title}
-                          </button>
-                        )
-                      )}
+                      <MessageBody content={m.content} onOpenRef={openRef} />
                     </div>
                     {mine && readReceipt && lastMine?.id === m.id && (
                       <span className={`chat-receipt ${readReceipt.startsWith("Read") ? "read" : ""}`}>
@@ -531,52 +655,172 @@ export function ChatShell({
           </div>
 
           {activeId && (
-            <div className="chat-input-bar">
-              <div className="chat-attach">
+            <div className="chat-composer">
+              {fmtOpen && (
+                <div className="chat-fmt-bar">
+                  <button className="chat-fmt-btn" title="Bold (**text**)" onClick={() => applyWrap("**")}>
+                    <b>B</b>
+                  </button>
+                  <button className="chat-fmt-btn" title="Italic (*text*)" onClick={() => applyWrap("*")}>
+                    <i>I</i>
+                  </button>
+                  <button className="chat-fmt-btn" title="Underline (__text__)" onClick={() => applyWrap("__")}>
+                    <u>U</u>
+                  </button>
+                  <button className="chat-fmt-btn" title="Strikethrough (~~text~~)" onClick={() => applyWrap("~~")}>
+                    <s>S</s>
+                  </button>
+                  <span className="chat-fmt-sep" />
+                  <button className="chat-fmt-btn" title="Insert link" onClick={onLinkButton}>
+                    🔗
+                  </button>
+                  <span className="chat-fmt-sep" />
+                  <button
+                    className="chat-fmt-btn"
+                    title="Numbered list"
+                    onClick={() => applyLinePrefix((i) => `${i + 1}. `)}
+                  >
+                    1.
+                  </button>
+                  <button className="chat-fmt-btn" title="Bulleted list" onClick={() => applyLinePrefix(() => "• ")}>
+                    •
+                  </button>
+                  <button className="chat-fmt-btn" title="Indent" onClick={() => applyLinePrefix(() => "    ")}>
+                    ⇥
+                  </button>
+                  <span className="chat-fmt-sep" />
+                  <button className="chat-fmt-btn mono" title="Inline code (`code`)" onClick={() => applyWrap("`", "`", "code")}>
+                    {"</>"}
+                  </button>
+                  <button
+                    className="chat-fmt-btn mono"
+                    title="Code block"
+                    onClick={() => applyWrap("\n```\n", "\n```\n", "code")}
+                  >
+                    ▢
+                  </button>
+                </div>
+              )}
+              <div className="chat-input-bar">
+                <div className="chat-attach">
+                  <button
+                    className="btn"
+                    onClick={toggleAttach}
+                    title="Attach a workspace item"
+                    aria-label="Attach a workspace item"
+                  >
+                    ⛓
+                  </button>
+                  {attachOpen && (
+                    <div className="chat-attach-menu">
+                      <div className="chat-attach-head label">ATTACH WORKSPACE ITEM</div>
+                      {!attachables && <div className="chat-empty" style={{ padding: 14 }}>Loading…</div>}
+                      {attachables?.length === 0 && (
+                        <div className="chat-empty" style={{ padding: 14 }}>Nothing to attach yet.</div>
+                      )}
+                      {attachables?.map((item) => (
+                        <button
+                          key={`${item.kind}:${item.id}`}
+                          className="chat-attach-item"
+                          onClick={() => insertAttachment(item)}
+                        >
+                          <span className="chat-ref-kind">{item.kind}</span>
+                          <span className="chat-attach-title">{item.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="chat-attach">
+                  <button
+                    className={`btn ${fmtOpen ? "chat-tool-active" : ""}`}
+                    onClick={() => setFmtOpen((v) => !v)}
+                    title="Show/hide text formatting"
+                    aria-label="Show or hide text formatting"
+                  >
+                    Aa
+                  </button>
+                </div>
+                <div className="chat-attach">
+                  <button
+                    className="btn"
+                    onClick={() => setMenu((m) => (m === "emoji" ? null : "emoji"))}
+                    title="Emoji"
+                    aria-label="Insert emoji"
+                  >
+                    😊
+                  </button>
+                  {menu === "emoji" && (
+                    <div className="chat-attach-menu chat-emoji-menu">
+                      <div className="chat-emoji-grid">
+                        {EMOJIS.map((e) => (
+                          <button
+                            key={e}
+                            className="chat-emoji-btn"
+                            onClick={() => {
+                              setMenu(null);
+                              insertAtCursor(e);
+                            }}
+                          >
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="chat-attach">
+                  <button
+                    className="btn"
+                    onClick={() => setMenu((m) => (m === "mention" ? null : "mention"))}
+                    title="Mention a member"
+                    aria-label="Mention a member"
+                  >
+                    @
+                  </button>
+                  {menu === "mention" && (
+                    <div className="chat-attach-menu">
+                      <div className="chat-attach-head label">MENTION</div>
+                      {members
+                        .filter((m) => m.user_id !== selfId)
+                        .map((m) => (
+                          <button
+                            key={m.user_id}
+                            className="chat-attach-item"
+                            onClick={() => {
+                              setMenu(null);
+                              insertAtCursor(`@${m.name} `);
+                            }}
+                          >
+                            <span className="chat-conv-avatar" style={{ width: 24, height: 24, fontSize: 11 }}>
+                              {m.name.charAt(0).toUpperCase()}
+                            </span>
+                            <span className="chat-attach-title">{m.name}</span>
+                          </button>
+                        ))}
+                      {members.filter((m) => m.user_id !== selfId).length === 0 && (
+                        <div className="chat-empty" style={{ padding: 14 }}>No other members.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <textarea
+                  ref={inputRef}
+                  className="chat-textarea"
+                  placeholder="Message… (Enter to send, Shift+Enter for a new line)"
+                  value={input}
+                  onChange={(e) => onInputChange(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  disabled={sending}
+                />
                 <button
-                  className="btn"
-                  onClick={toggleAttach}
-                  title="Attach a workspace item"
-                  aria-label="Attach a workspace item"
+                  className="btn btn-primary"
+                  onClick={onSend}
+                  disabled={sending || !input.trim()}
                 >
-                  ⛓
+                  {sending ? "Sending…" : "Send"}
                 </button>
-                {attachOpen && (
-                  <div className="chat-attach-menu">
-                    <div className="chat-attach-head label">ATTACH WORKSPACE ITEM</div>
-                    {!attachables && <div className="chat-empty" style={{ padding: 14 }}>Loading…</div>}
-                    {attachables?.length === 0 && (
-                      <div className="chat-empty" style={{ padding: 14 }}>Nothing to attach yet.</div>
-                    )}
-                    {attachables?.map((item) => (
-                      <button
-                        key={`${item.kind}:${item.id}`}
-                        className="chat-attach-item"
-                        onClick={() => insertAttachment(item)}
-                      >
-                        <span className="chat-ref-kind">{item.kind}</span>
-                        <span className="chat-attach-title">{item.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
-              <textarea
-                ref={inputRef}
-                className="chat-textarea"
-                placeholder="Message… (Enter to send, Shift+Enter for a new line)"
-                value={input}
-                onChange={(e) => onInputChange(e.target.value)}
-                onKeyDown={onKeyDown}
-                disabled={sending}
-              />
-              <button
-                className="btn btn-primary"
-                onClick={onSend}
-                disabled={sending || !input.trim()}
-              >
-                {sending ? "Sending…" : "Send"}
-              </button>
             </div>
           )}
         </div>

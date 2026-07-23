@@ -181,8 +181,55 @@
   border-radius: var(--radius-lg);
   font-size: 13.5px;
   line-height: 1.55;
+  /* 마크다운 블록 렌더러가 줄/문단을 직접 그리므로 pre-wrap 은 쓰지 않는다. */
+  word-break: break-word;
+}
+
+/* ---- 메시지 내 마크다운 ---- */
+.chat-inline-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 1px 5px;
+  background: var(--bg-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  color: #e8c07d;
+}
+.chat-codeblock {
+  margin: 4px 0;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  background: var(--bg-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  color: var(--text-1);
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-x: auto;
+}
+.chat-mention {
+  color: var(--steel-hover);
+  background: rgba(79, 124, 172, 0.15);
+  border-radius: var(--radius);
+  padding: 0 3px;
+  font-weight: 500;
+}
+.chat-li {
+  display: flex;
+  gap: 6px;
+}
+.chat-li-marker {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-2);
+  min-width: 16px;
+  text-align: right;
+}
+.chat-li-body {
+  min-width: 0;
 }
 .chat-msg.mine {
   background: var(--create-ghost);
@@ -226,14 +273,54 @@
   color: var(--text-3);
 }
 
-/* ---- 입력 바 + 첨부 메뉴 ---- */
-.chat-input-bar {
+/* ---- 입력 바 + 서식/첨부 메뉴 ---- */
+.chat-composer {
   flex: none;
   display: flex;
-  gap: 10px;
-  padding: 14px 20px;
+  flex-direction: column;
   border-top: 1px solid var(--border-0);
   background: var(--bg-1);
+}
+.chat-fmt-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 20px 0;
+  flex-wrap: wrap;
+}
+.chat-fmt-btn {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chat-fmt-btn:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+  border-color: var(--border-1);
+}
+.chat-fmt-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-1);
+  margin: 0 4px;
+}
+.chat-tool-active {
+  border-color: var(--steel) !important;
+  color: var(--text-0);
+}
+.chat-input-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 20px 14px;
 }
 .chat-textarea {
   flex: 1;
@@ -300,6 +387,31 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---- 이모지 메뉴 ---- */
+.chat-emoji-menu {
+  width: 232px;
+}
+.chat-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  padding: 8px;
+}
+.chat-emoji-btn {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 15px;
+  cursor: pointer;
+}
+.chat-emoji-btn:hover {
+  background: var(--bg-4);
 }
 
 /* ---- 새 대화 다이얼로그 ---- */
@@ -484,29 +596,39 @@
 /* ---- 플로팅 채팅 (버블 + 패널) ---- */
 .chat-float-bubble {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: 14px;
+  bottom: 14px;
   z-index: 85;
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg-3);
-  color: var(--text-0);
+  color: var(--text-1);
   border: 1px solid var(--border-2);
   border-radius: 50%;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   cursor: pointer;
+  /* 콘텐츠 위 버튼들과 덜 경쟁하도록 평소엔 살짝 물러나 있는다. */
+  opacity: 0.72;
+  transition: opacity 0.12s, border-color 0.12s;
 }
-.chat-float-bubble:hover {
+.chat-float-bubble:hover,
+.chat-float-bubble:focus-visible {
+  opacity: 1;
   background: var(--bg-4);
   border-color: var(--create);
+  color: var(--text-0);
 }
 .chat-bubble-badge {
   position: absolute;
   top: -4px;
   right: -4px;
+}
+/* 안 읽은 메시지가 있으면 물러나 있지 않고 또렷하게. */
+.chat-float-bubble:has(.chat-bubble-badge) {
+  opacity: 1;
 }
 .chat-float-panel {
   position: fixed;
@@ -550,7 +672,10 @@
   padding: 14px 16px;
 }
 .chat-shell.float .chat-input-bar {
-  padding: 10px 12px;
+  padding: 8px 12px 10px;
+}
+.chat-shell.float .chat-fmt-bar {
+  padding: 6px 12px 0;
 }
 .chat-shell.float .chat-thread-head {
   padding: 8px 12px;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { IconChat } from "../icons";
 import { ChatShell } from "./chat-shell";
@@ -42,6 +43,7 @@ const MAX_TOASTS = 3;
  * 지금 보고 있는 대화의 메시지는 토스트를 띄우지 않는다(스레드가 이미 표시).
  */
 export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: string }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -125,6 +127,12 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
     // 패널이 처음 열리는 경우 ChatShell 마운트 후에 열어야 하므로 다음 틱에.
     setTimeout(() => requestOpenConversation(t.conversationId), 50);
   };
+
+  // /chat 전체 페이지에서는 위젯 UI(버블·패널·토스트)를 전부 숨긴다 —
+  // 채팅 화면이 이미 열려 있어 중복이고, 하단 버튼들과 겹친다. 훅(개인
+  // topic 구독)은 그대로 살아 있어 페이지 목록 갱신(emitMessageNotify)은
+  // 계속 동작한다.
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) return null;
 
   return (
     <>
