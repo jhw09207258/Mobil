@@ -359,6 +359,203 @@
   color: var(--create);
 }
 
+/* ---- 타이핑 표시 ---- */
+.chat-typing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 2px 2px 0;
+}
+.chat-typing-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.chat-typing-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: chat-typing-bounce 1.2s infinite ease-in-out;
+}
+.chat-typing-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.chat-typing-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes chat-typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+/* ---- 읽음 표시 ---- */
+.chat-receipt {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 2px 4px 0;
+}
+.chat-receipt.read {
+  color: var(--create);
+}
+
+/* ---- 전역 알림 토스트 (인스타풍) ---- */
+.chat-toasts {
+  position: fixed;
+  top: calc(var(--header-h) + 10px);
+  right: 12px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(340px, calc(100vw - 24px));
+}
+.chat-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-left: 2px solid var(--create);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  text-align: left;
+  animation: chat-toast-in 0.18s ease-out;
+}
+.chat-toast:hover {
+  background: var(--bg-3);
+}
+@keyframes chat-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.chat-toast-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-toast-sender {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.chat-toast-preview {
+  font-size: 12px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-toast-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius);
+  color: var(--text-3);
+  font-size: 11px;
+}
+.chat-toast-close:hover {
+  background: var(--bg-4);
+  color: var(--text-0);
+}
+
+/* ---- 플로팅 채팅 (버블 + 패널) ---- */
+.chat-float-bubble {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 85;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-3);
+  color: var(--text-0);
+  border: 1px solid var(--border-2);
+  border-radius: 50%;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.chat-float-bubble:hover {
+  background: var(--bg-4);
+  border-color: var(--create);
+}
+.chat-bubble-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+.chat-float-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 85;
+  width: min(380px, calc(100vw - 24px));
+  height: min(540px, calc(100dvh - var(--header-h) - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: chat-toast-in 0.15s ease-out;
+}
+.chat-float-panel.expanded {
+  width: min(720px, calc(100vw - 24px));
+  height: min(80vh, calc(100dvh - var(--header-h) - 32px));
+}
+.chat-float-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-0);
+  background: var(--bg-2);
+}
+
+/* 플로팅 variant — 목록/스레드가 한 칸을 번갈아 쓴다 */
+.chat-shell.float {
+  min-height: 0;
+}
+.chat-shell.float .chat-list {
+  width: 100%;
+  border-right: none;
+}
+.chat-shell.float .chat-messages {
+  padding: 14px 16px;
+}
+.chat-shell.float .chat-input-bar {
+  padding: 10px 12px;
+}
+.chat-shell.float .chat-thread-head {
+  padding: 8px 12px;
+}
+
 /* ---- 모바일 ---- */
 @media (max-width: 640px) {
   .chat-shell {

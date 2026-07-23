@@ -642,6 +642,15 @@ export interface Database {
         Args: { p_conversation: string };
         Returns: undefined;
       };
+      get_chat_members: {
+        Args: { p_conversation: string };
+        Returns: {
+          user_id: string;
+          name: string;
+          avatar_url: string | null;
+          last_read_at: string;
+        }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

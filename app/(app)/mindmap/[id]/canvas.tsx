@@ -189,7 +189,16 @@ function Inner({
 
     const me = new MindElixir({
       el: containerRef.current,
+      // SIDE + alignment "root": 루트를 중심으로 가지를 양쪽에 방사형으로
+      // 균형 배치 — 전체 구조를 한눈에 훑기 좋은 원형(circle-type) 레이아웃.
       direction: MindElixir.SIDE,
+      alignment: "root",
+      // compact: 세로 간격을 압축해 큰 맵도 화면 안에 더 많이 들어온다.
+      compact: true,
+      // 가지 드래그 재배치(다른 부모로 이동·순서 변경). 드롭 시 mind-elixir 가
+      // moveNode* operation 을 발생시키므로 기존 onOperation → Yjs 동기화 +
+      // 자동저장 경로를 그대로 타서 저장까지 이어진다.
+      draggable: canEdit,
       editable: canEdit,
       contextMenu: canEdit,
       toolBar: true,
@@ -215,6 +224,8 @@ function Inner({
     }
     me.init(initTree);
     meRef.current = me;
+    // 처음 열 때 전체 맵이 뷰포트에 들어오도록 맞춘다("한눈에 보기").
+    requestAnimationFrame(() => me.scaleFit());
 
     const onOperation = () => {
       const flat = flattenTree(me.getData().nodeData);

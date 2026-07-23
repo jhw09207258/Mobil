@@ -8,6 +8,7 @@ import { WorkspaceProvider } from "./workspace/workspace-context";
 import { WorkspaceShell } from "./workspace/workspace-shell";
 import { MobileNavProvider } from "./mobile-nav-context";
 import { ReconnectTracker } from "./reconnect-tracker";
+import { GlobalChat } from "./chat/global-chat";
 
 export default async function AppLayout({
   children,
@@ -42,6 +43,10 @@ export default async function AppLayout({
             </main>
           </div>
           <Shortcuts />
+          <GlobalChat
+            selfId={userId}
+            selfName={profile.display_name || email}
+          />
         </div>
       </WorkspaceProvider>
     </MobileNavProvider>

@@ -5,7 +5,7 @@ import { ChatShell } from "./chat-shell";
 export const dynamic = "force-dynamic";
 
 export default async function ChatPage() {
-  const { userId } = await requireUser();
+  const { userId, email, profile } = await requireUser();
   const [conversations, contacts] = await Promise.all([
     listChatConversations(),
     listChatContacts(),
@@ -19,6 +19,7 @@ export default async function ChatPage() {
       </div>
       <ChatShell
         selfId={userId}
+        selfName={profile.display_name || email}
         initialConversations={conversations}
         contacts={contacts}
       />

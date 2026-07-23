@@ -115,6 +115,22 @@ export async function addMembers(
   return { ok: true };
 }
 
+export type ChatMemberInfo = {
+  user_id: string;
+  name: string;
+  avatar_url: string | null;
+  last_read_at: string;
+};
+
+/** 멤버 목록 + 각자의 last_read_at — 읽음 표시(read receipt) 계산용. */
+export async function getChatMembers(conversationId: string): Promise<ChatMemberInfo[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("get_chat_members", {
+    p_conversation: conversationId,
+  });
+  return data ?? [];
+}
+
 export async function markChatRead(conversationId: string): Promise<void> {
   const supabase = await createClient();
   await supabase.rpc("mark_chat_read", { p_conversation: conversationId });
