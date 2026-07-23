@@ -27,7 +27,7 @@ import { PresenceAvatars } from "@/components/presence-avatars";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { formatBytes } from "@/lib/format";
 import { createDocumentFromMindmap, createSheetFromMindmap } from "../../convert-actions";
-import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate } from "@/lib/yjs-transport";
+import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate, seedDeterministically } from "@/lib/yjs-transport";
 import { parseInitialData, type RefKind, type NodeMeta } from "@/lib/mindmap-legacy";
 import { countReferenceNodes } from "@/lib/outline-convert";
 import { flattenTree, syncFlatToYMap, readFlatFromYMap, reconstructTree, type FlatNode } from "@/lib/mindmap-yjs";
@@ -135,21 +135,69 @@ function Inner({
   // 트레이드오프: 노드 텍스트를 한창 편집하던 중 원격 갱신이 오면 그 편집
   // 화면이 refresh 로 끊길 수 있다(알려진 한계 — Enter/포커스아웃으로 자주
   // 커밋하면 창이 줄어든다).
+  // 드래그(pointerdown~up)나 노드 텍스트 편집(#input-box) 중에 refresh 로
+  // DOM 을 갈아끼우면 mind-elixir 의 진행 중 제스처가 분리된 요소를 참조해
+  // 오류가 난다 — 원격 반영을 보류했다가 상호작용이 끝나면 적용한다.
+  const interactingRef = useRef(false);
+  const pendingRemoteRef = useRef(false);
+
+  const applyRemoteTree = useCallback(() => {
+    const me = meRef.current;
+    if (!me) return;
+    const container = containerRef.current;
+    const editing = !!container?.querySelector("#input-box");
+    if (interactingRef.current || editing) {
+      pendingRemoteRef.current = true;
+      return;
+    }
+    pendingRemoteRef.current = false;
+    const flat = readFlatFromYMap(yNodes);
+    const rebuilt = reconstructTree(flat);
+    if (!rebuilt) return;
+    const current = me.getData();
+    // 실제로 달라졌을 때만 refresh — 중복 전달/무의미 업데이트로 선택 상태와
+    // 뷰가 툭툭 끊기는 것을 막는다.
+    if (JSON.stringify(current.nodeData) === JSON.stringify(rebuilt)) {
+      lastSyncedRef.current = flat;
+      return;
+    }
+    me.refresh({ ...current, nodeData: rebuilt });
+    lastSyncedRef.current = flat;
+  }, [yNodes]);
+
   useEffect(() => {
     const onDeepChange = () => {
       if (!isApplyingRemoteRef.current) return;
-      const me = meRef.current;
-      if (!me) return;
-      const flat = readFlatFromYMap(yNodes);
-      const rebuilt = reconstructTree(flat);
-      if (!rebuilt) return;
-      const current = me.getData();
-      me.refresh({ ...current, nodeData: rebuilt });
-      lastSyncedRef.current = flat;
+      applyRemoteTree();
     };
     yNodes.observeDeep(onDeepChange);
     return () => yNodes.unobserveDeep(onDeepChange);
-  }, [yNodes]);
+  }, [yNodes, applyRemoteTree]);
+
+  // 상호작용 추적 + 보류된 원격 반영 flush.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onDown = () => {
+      interactingRef.current = true;
+    };
+    const onUp = () => {
+      interactingRef.current = false;
+      if (pendingRemoteRef.current) applyRemoteTree();
+    };
+    container.addEventListener("pointerdown", onDown);
+    window.addEventListener("pointerup", onUp);
+    // 노드 편집(#input-box)이 끝나는 시점은 이벤트로 못 잡으므로 짧은 주기로
+    // 보류분만 재시도한다(보류가 없으면 아무 일도 안 함).
+    const t = setInterval(() => {
+      if (pendingRemoteRef.current) applyRemoteTree();
+    }, 500);
+    return () => {
+      container.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointerup", onUp);
+      clearInterval(t);
+    };
+  }, [applyRemoteTree]);
 
   const persist = useCallback(async () => {
     const me = meRef.current;
@@ -215,16 +263,29 @@ function Inner({
       lastSyncedRef.current = existingFlat;
     } else {
       const seedFlat = flattenTree(legacy.nodeData);
-      ydoc.transact(() => syncFlatToYMap(yNodes, new Map(), seedFlat));
+      // 결정적 시드(고정 clientID) — 두 클라이언트가 스냅샷 없는 맵을 동시에
+      // 열어도 시드가 같은 오퍼레이션으로 병합된다(문서/코드 에디터와 동일).
+      seedDeterministically(ydoc, () =>
+        ydoc.transact(() => syncFlatToYMap(yNodes, new Map(), seedFlat))
+      );
       initTree = legacy;
       lastSyncedRef.current = seedFlat;
     }
     me.init(initTree);
     meRef.current = me;
     // 처음 열 때 전체 맵이 뷰포트에 들어오도록 맞춘다("한눈에 보기").
-    // RAF 시점에 이미 언마운트되어 destroy() 된 인스턴스면 건드리지 않는다.
+    // 컨테이너가 아직 0 크기면 scaleFit 이 0/0 → scaleVal 이 NaN/0 으로
+    // 오염되고, 이후 모든 확대/축소가 NaN 변환을 만들어 맵이 통째로 깨진다
+    // — 크기가 잡힌 뒤에만 실행하고, 결과가 비정상이면 scale 1 로 복구한다.
     requestAnimationFrame(() => {
-      if (meRef.current === me) me.scaleFit();
+      if (meRef.current !== me) return; // 이미 언마운트/destroy 됨
+      const el = containerRef.current;
+      if (el && el.offsetWidth > 0 && el.offsetHeight > 0) {
+        me.scaleFit();
+      }
+      if (!Number.isFinite(me.scaleVal) || me.scaleVal <= 0) {
+        me.scale(1);
+      }
     });
 
     const onOperation = () => {

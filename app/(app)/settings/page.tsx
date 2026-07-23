@@ -3,6 +3,7 @@ import { Copyable } from "@/components/copyable";
 import { SettingsForm } from "./settings-form";
 import { AvatarUpload } from "./avatar-upload";
 import { PasswordForm } from "./password-form";
+import { ThemePicker } from "./theme-picker";
 import { ConnectedSystems } from "../dashboard/connected-systems";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,8 @@ export default async function SettingsPage() {
             />
           </div>
         </div>
+
+        <ThemePicker />
 
         <div className="panel" style={{ marginBottom: 24 }}>
           <div className="panel-header">

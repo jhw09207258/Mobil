@@ -40,6 +40,17 @@ type FanoutPayload = {
 const TOAST_TTL_MS = 6000;
 const MAX_TOASTS = 3;
 
+// fanout preview 는 원문 앞 140자 — 토스트에는 마크다운/토큰을 걷어내고 보여준다.
+function cleanPreview(raw: string): string {
+  return raw
+    .replace(/!\[[^\]\n]*\]\([^)\s]*\)?/g, "🖼 photo")
+    .replace(/\[\[[^\]]*\]?\]?/g, "⛓ attachment")
+    .replace(/```/g, "")
+    .replace(/[*_~`]/g, "")
+    .replace(/\n+/g, " ")
+    .trim();
+}
+
 /**
  * 앱 어디서나 떠 있는 채팅 — 우하단 버블(안 읽음 배지) ↔ 플로팅 패널
  * (compact/expanded 크기 전환, 최소화). 개인 topic(`user:<id>`, DB 트리거가
@@ -149,7 +160,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
             <UserAvatar url={t.senderAvatarUrl} name={t.senderName} size={34} />
             <span className="chat-toast-body">
               <span className="chat-toast-sender">{t.senderName}</span>
-              <span className="chat-toast-preview">{t.preview || "New message"}</span>
+              <span className="chat-toast-preview">{cleanPreview(t.preview) || "New message"}</span>
             </span>
             <span
               className="chat-toast-close"

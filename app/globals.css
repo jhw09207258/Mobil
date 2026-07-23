@@ -36,6 +36,9 @@
   --create-hover: #49ad66;
   --create-dim: #2c6c40;
   --create-ghost: rgba(63, 157, 91, 0.14);
+  /* 액센트 배경 위 글자색 — 사용자 테마(lib/theme.ts)가 액센트 명도에 따라
+     흑/백으로 덮어쓴다(시인성 유지). */
+  --on-create: #eafaef;
 
   /* 보조 인터랙션 (스틸 블루) */
   --steel: #4f7cac;
@@ -217,7 +220,7 @@ a:hover {
 .btn-primary {
   background: var(--create);
   border-color: var(--create-dim);
-  color: #eafaef;
+  color: var(--on-create);
   font-weight: 500;
 }
 .btn-primary:hover {
@@ -484,6 +487,45 @@ button:focus-visible {
 }
 .btn-primary {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 테마 색상 선택(설정) */
+.theme-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.theme-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--border-2);
+  cursor: pointer;
+  padding: 0;
+}
+.theme-swatch:hover {
+  border-color: var(--text-2);
+}
+.theme-swatch.active {
+  border-color: var(--text-0);
+  box-shadow: 0 0 0 2px var(--create);
+}
+.theme-custom {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+.theme-custom input[type="color"] {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 2px solid var(--border-2);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
 }
 
 /* 유틸 */

@@ -14,7 +14,7 @@ import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
 import { PresenceAvatars } from "@/components/presence-avatars";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
-import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate } from "@/lib/yjs-transport";
+import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate, seedDeterministically } from "@/lib/yjs-transport";
 import {
   flattenSheets,
   syncFlatToYDoc,
@@ -22,7 +22,7 @@ import {
   reconstructSheets,
   type FlatSheets,
 } from "@/lib/sheet-yjs";
-import { Workbook } from "@fortune-sheet/react";
+import { Workbook, type WorkbookInstance } from "@fortune-sheet/react";
 import type { Sheet } from "@fortune-sheet/core";
 import type { Json } from "@/lib/database.types";
 import { ShareDialog } from "@/components/share-dialog";
@@ -127,7 +127,11 @@ export function Spreadsheet({
       lastSyncedRef.current = existingFlat;
     } else {
       const seedFlat = flattenSheets(sheetsRef.current);
-      syncFlatToYDoc(doc, { order: [], metas: new Map(), cells: new Map() }, seedFlat);
+      // 결정적 시드 — 두 클라이언트가 스냅샷 없는 시트를 동시에 열어도 시드가
+      // 같은 오퍼레이션으로 병합된다(문서/코드/마인드맵과 동일).
+      seedDeterministically(doc, () =>
+        syncFlatToYDoc(doc, { order: [], metas: new Map(), cells: new Map() }, seedFlat)
+      );
       lastSyncedRef.current = seedFlat;
     }
     ydocRef.current = doc;
@@ -146,31 +150,88 @@ export function Spreadsheet({
 
   // 원격에서 온 셀/메타/순서 변경(다른 클라이언트의 로컬 diff 가 Yjs 에 쓴
   // 내용)을 반영한다. isApplyingRemoteRef 로 우리 자신의 로컬 쓰기가 되돌아와
-  // 다시 트리거되는 걸 걸러낸다. 항상(로컬에 저장 안 된 편집이 있어도)
-  // 반영한다 — Yjs 문서 자체가 이미 병합된 상태의 원천이므로, 반영을 미루면
-  // diff 기준선(lastSyncedRef)이 실제 Yjs 상태와 어긋나 다음 로컬 저장 때
-  // 방금 merge 된 원격 변경을 도로 지워버릴 수 있다(마인드맵 에디터와 동일한
-  // 이유).
+  // 다시 트리거되는 걸 걸러낸다.
+  //
+  // 반영 방식이 중요하다 — 예전에는 어떤 원격 변경이든 Workbook 을 통째로
+  // 리마운트(key 교체)했는데, 상대가 타이핑할 때마다 내 셀 선택·수식 입력·
+  // 스크롤이 전부 초기화되어 "실시간 작업이 사실상 불가능"했다. 이제:
+  //   · 셀 값만 바뀐 경우(대부분): WorkbookInstance API 로 해당 셀만 갱신
+  //     (clearCell 후 setCellValue — 기존 셀에 setCellValue 만 하면 스타일
+  //     필드가 병합되지 않아 원격 서식 변경이 유실된다). 내 편집 상태 유지.
+  //   · 시트 추가/삭제/순서/메타(서식·병합 등) 변경: 구조가 바뀌므로 기존
+  //     리마운트 경로를 유지한다(드문 조작이라 체감 비용이 낮다).
+  // 한 트랜잭션의 여러 observer 호출은 마이크로태스크로 모아 한 번에 처리한다.
+  const wbRef = useRef<WorkbookInstance>(null);
   useEffect(() => {
     const yOrder = ydoc.getArray<string>("order");
     const yMetas = ydoc.getMap<Record<string, unknown>>("metas");
     const yCells = ydoc.getMap<unknown>("cells");
 
-    const onRemoteChange = () => {
-      if (!isApplyingRemoteRef.current) return;
+    let pendingCellKeys = new Set<string>();
+    let pendingStructural = false;
+    let flushQueued = false;
+
+    const flush = () => {
+      flushQueued = false;
+      const cellKeys = pendingCellKeys;
+      const structural = pendingStructural;
+      pendingCellKeys = new Set();
+      pendingStructural = false;
+
       const flat = readFlatFromYDoc(ydoc);
+      lastSyncedRef.current = flat; // 에코 diff 가 no-op 이 되도록 기준선 먼저 갱신
       sheetsRef.current = reconstructSheets(flat);
-      lastSyncedRef.current = flat;
-      skipFirst.current = true; // Workbook 리마운트 시 재초기화 콜백은 건너뛴다.
-      setRemoteVersion((v) => v + 1);
+
+      const wb = wbRef.current;
+      if (structural || !wb) {
+        skipFirst.current = true; // Workbook 리마운트 시 재초기화 콜백은 건너뛴다.
+        setRemoteVersion((v) => v + 1);
+        return;
+      }
+      for (const key of cellKeys) {
+        const sep1 = key.indexOf(":");
+        const sheetId = key.slice(0, sep1);
+        const rest = key.slice(sep1 + 1);
+        const sep2 = rest.indexOf(":");
+        const r = Number(rest.slice(0, sep2));
+        const c = Number(rest.slice(sep2 + 1));
+        if (!Number.isInteger(r) || !Number.isInteger(c)) continue;
+        try {
+          wb.clearCell(r, c, { id: sheetId });
+          const v = flat.cells.get(key);
+          if (v !== undefined && v !== null) {
+            wb.setCellValue(r, c, v, { id: sheetId });
+          }
+        } catch {
+          // 좌표가 현재 그리드 밖(행/열 수 차이 등)이면 이 셀만 건너뛴다 —
+          // 데이터는 이미 sheetsRef 에 있으므로 다음 구조 반영 때 나타난다.
+        }
+      }
     };
-    yOrder.observe(onRemoteChange);
-    yMetas.observe(onRemoteChange);
-    yCells.observe(onRemoteChange);
+
+    const queueFlush = () => {
+      if (!flushQueued) {
+        flushQueued = true;
+        queueMicrotask(flush);
+      }
+    };
+    const onCells = (event: Y.YMapEvent<unknown>) => {
+      if (!isApplyingRemoteRef.current) return;
+      for (const key of event.keysChanged) pendingCellKeys.add(key);
+      queueFlush();
+    };
+    const onStructural = () => {
+      if (!isApplyingRemoteRef.current) return;
+      pendingStructural = true;
+      queueFlush();
+    };
+    yOrder.observe(onStructural);
+    yMetas.observe(onStructural);
+    yCells.observe(onCells);
     return () => {
-      yOrder.unobserve(onRemoteChange);
-      yMetas.unobserve(onRemoteChange);
-      yCells.unobserve(onRemoteChange);
+      yOrder.unobserve(onStructural);
+      yMetas.unobserve(onStructural);
+      yCells.unobserve(onCells);
     };
   }, [ydoc]);
 
@@ -220,9 +281,11 @@ export function Spreadsheet({
         return;
       }
       const flat = flattenSheets(data);
-      syncFlatToYDoc(ydoc, lastSyncedRef.current, flat);
+      // 실제로 쓴 게 있을 때만 저장을 건다 — 원격 반영(API 로 셀 갱신)이
+      // 되돌려주는 onChange 는 diff 가 비어 "메아리 저장"이 걸리지 않는다.
+      const wrote = syncFlatToYDoc(ydoc, lastSyncedRef.current, flat);
       lastSyncedRef.current = flat;
-      markDirty();
+      if (wrote) markDirty();
     },
     [markDirty, ydoc]
   );
@@ -356,6 +419,7 @@ export function Spreadsheet({
         <div className="sh-paper">
           <Workbook
             key={remoteVersion}
+            ref={wbRef}
             data={sheetsRef.current}
             onChange={onSheetChange}
             allowEdit={canEdit}

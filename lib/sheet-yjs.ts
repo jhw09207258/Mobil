@@ -58,11 +58,14 @@ function shallowEqualJson(a: unknown, b: unknown): boolean {
 
 /** prev(직전 동기화 상태) → next(지금 로컬 상태) 로 바뀐 부분만 Yjs 문서에
  * 반영한다 — mind-elixir 의 syncFlatToYMap 과 동일한 이유: 안 바뀐 항목까지
- * 매번 다시 쓰면 동시편집 중 상대방이 방금 쓴 값을 내가 덮어써버릴 수 있다. */
-export function syncFlatToYDoc(ydoc: Y.Doc, prev: FlatSheets, next: FlatSheets): void {
+ * 매번 다시 쓰면 동시편집 중 상대방이 방금 쓴 값을 내가 덮어써버릴 수 있다.
+ * @returns 실제로 하나라도 썼는지 — 호출부가 "원격 반영의 메아리"(diff 없음)
+ * 를 로컬 편집으로 오인해 저장/전파를 걸지 않게 하는 판별값. */
+export function syncFlatToYDoc(ydoc: Y.Doc, prev: FlatSheets, next: FlatSheets): boolean {
   const yOrder = ydoc.getArray<string>("order");
   const yMetas = ydoc.getMap<Record<string, unknown>>("metas");
   const yCells = ydoc.getMap<unknown>("cells");
+  let changed = false;
 
   ydoc.transact(() => {
     const orderChanged =
@@ -71,27 +74,37 @@ export function syncFlatToYDoc(ydoc: Y.Doc, prev: FlatSheets, next: FlatSheets):
     if (orderChanged) {
       yOrder.delete(0, yOrder.length);
       yOrder.push(next.order);
+      changed = true;
     }
 
     for (const [id, meta] of next.metas) {
       const before = prev.metas.get(id);
       if (!before || !shallowEqualJson(before, meta)) {
         yMetas.set(id, meta);
+        changed = true;
       }
     }
     for (const id of prev.metas.keys()) {
-      if (!next.metas.has(id)) yMetas.delete(id);
+      if (!next.metas.has(id)) {
+        yMetas.delete(id);
+        changed = true;
+      }
     }
 
     for (const [key, v] of next.cells) {
       if (!prev.cells.has(key) || !shallowEqualJson(prev.cells.get(key), v)) {
         yCells.set(key, v);
+        changed = true;
       }
     }
     for (const key of prev.cells.keys()) {
-      if (!next.cells.has(key)) yCells.delete(key);
+      if (!next.cells.has(key)) {
+        yCells.delete(key);
+        changed = true;
+      }
     }
   });
+  return changed;
 }
 
 export function readFlatFromYDoc(ydoc: Y.Doc): FlatSheets {

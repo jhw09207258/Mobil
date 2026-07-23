@@ -52,6 +52,13 @@ export default function RootLayout({
             <link rel="dns-prefetch" href={SUPABASE_ORIGIN} />
           </>
         )}
+        {/* 사용자 테마(lib/theme.ts 가 저장한 계산된 CSS 변수)를 첫 페인트 전에
+            적용해 기본 테마가 잠깐 보이는 깜빡임을 막는다. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var s=JSON.parse(localStorage.getItem("mobil.theme.v1"));if(s&&s.vars){for(var k in s.vars)document.documentElement.style.setProperty(k,s.vars[k])}}catch(e){}`,
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>

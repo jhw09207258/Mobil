@@ -5,7 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
-import { IconPlus, IconClip, IconSmile, IconLink } from "../icons";
+import { IconPlus, IconClip, IconSmile, IconLink, IconImage } from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import {
   addMembers,
@@ -45,8 +45,14 @@ const PREVIEW_ATTACH_RE = new RegExp(
   "gi"
 );
 function previewText(raw: string): string {
-  return raw.replace(PREVIEW_ATTACH_RE, "⛓ attachment").replace(/```/g, "").replace(/\n+/g, " ");
+  return raw
+    .replace(/!\[[^\]\n]*\]\(https?:\/\/[^\s)]+\)/g, "🖼 photo")
+    .replace(PREVIEW_ATTACH_RE, "⛓ attachment")
+    .replace(/```/g, "")
+    .replace(/\n+/g, " ");
 }
+
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10MB
 
 function InlineTokens({
   tokens,
@@ -83,6 +89,13 @@ function InlineTokens({
             return (
               <a key={i} href={tok.href} target="_blank" rel="noopener noreferrer">
                 {tok.text}
+              </a>
+            );
+          case "image":
+            return (
+              <a key={i} href={tok.src} target="_blank" rel="noopener noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="chat-img" src={tok.src} alt={tok.alt} loading="lazy" />
               </a>
             );
           case "ref":
@@ -241,10 +254,12 @@ export function ChatShell({
   // 컴포저 옵션은 전부 + 버튼 하나 뒤의 계층 메뉴로 모은다(공간 절약).
   const [menu, setMenu] = useState<"root" | "attach" | "emoji" | "mention" | null>(null);
   const [attachables, setAttachables] = useState<AttachableItem[] | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const lastTypingSentRef = useRef(0);
 
   // + 메뉴: 바깥 클릭/Escape 로 닫기(이전 버전의 "메뉴가 안 닫히는" 버그 시정).
@@ -475,6 +490,38 @@ export function ChatShell({
   const openAttachMenu = () => {
     setMenu("attach");
     if (!attachables) listAttachableItems().then(setAttachables);
+  };
+
+  // 사진 전송 — 문서 에디터와 같은 공개 media 버킷({uid}/... 경로 정책)에
+  // 올리고 이미지 토큰(![alt](url))으로 삽입한다.
+  const uploadPhoto = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setError("Only image files can be sent as photos.");
+      return;
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setError("Photo exceeds the 10MB limit.");
+      return;
+    }
+    setError(null);
+    setUploadingPhoto(true);
+    try {
+      const supabase = createClient();
+      const id = crypto.randomUUID();
+      const safe = file.name.replace(/[^\w.\- ]+/g, "_");
+      const path = `${selfId}/chat/${id}/${safe}`;
+      const { error: upErr } = await supabase.storage
+        .from("media")
+        .upload(path, file, { contentType: file.type || undefined });
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("media").getPublicUrl(path);
+      insertAtCursor(`![${safe}](${data.publicUrl}) `);
+    } catch {
+      setError("Photo upload failed.");
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
   };
 
   const insertAttachment = (item: AttachableItem) => {
@@ -767,6 +814,17 @@ export function ChatShell({
                   </button>
                   {menu === "root" && (
                     <div className="chat-attach-menu chat-plus-menu">
+                      <button
+                        className="chat-attach-item"
+                        onClick={() => {
+                          setMenu(null);
+                          photoInputRef.current?.click();
+                        }}
+                        disabled={uploadingPhoto}
+                      >
+                        <span className="chat-menu-icon"><IconImage size={15} /></span>
+                        {uploadingPhoto ? "Uploading photo…" : "Send a photo"}
+                      </button>
                       <button className="chat-attach-item" onClick={openAttachMenu}>
                         <span className="chat-menu-icon"><IconClip size={15} /></span>
                         Attach workspace item
@@ -864,6 +922,16 @@ export function ChatShell({
                     </div>
                   )}
                 </div>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadPhoto(f);
+                  }}
+                />
                 <textarea
                   ref={inputRef}
                   className="chat-textarea"

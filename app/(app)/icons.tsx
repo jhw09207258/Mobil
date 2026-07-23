@@ -145,6 +145,15 @@ export function IconSmile({ size }: P) {
     </svg>
   );
 }
+export function IconImage({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <rect x="3" y="4" width="18" height="16" rx="1.5" />
+      <circle cx="8.5" cy="9.5" r="1.8" />
+      <path d="M3 17l5.5-5 4 3.5L17 11l4 4" />
+    </svg>
+  );
+}
 export function IconLink({ size }: P) {
   return (
     <svg {...base(size)}>

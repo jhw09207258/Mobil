@@ -7,7 +7,7 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
 import * as Y from "yjs";
 import Collaboration from "@tiptap/extension-collaboration";
-import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate } from "@/lib/yjs-transport";
+import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate, seedDeterministically } from "@/lib/yjs-transport";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
@@ -183,13 +183,18 @@ export function DocumentEditor({
 
   // Yjs 문서가 비어 있으면(기존 방식으로 저장된 레거시 문서를 이 기능이
   // 나온 뒤 처음 여는 경우) 기존 Tiptap JSON 콘텐츠로 한 번만 채워 넣는다.
+  // seedDeterministically: 두 클라이언트가 스냅샷 없는 문서를 동시에 열어
+  // 각자 시드하면 병합 시 본문이 통째로 복제되던 버그의 근본 시정 —
+  // 고정 clientID 로 시드해 양쪽 시드가 같은 오퍼레이션으로 병합되게 한다.
   useEffect(() => {
     if (!editor || bootstrapped.current) return;
     bootstrapped.current = true;
     if (!initialYjsState && isTiptapDoc(initialContent)) {
-      editor.commands.setContent(initialContent as object, false);
+      seedDeterministically(ydoc, () => {
+        editor.commands.setContent(initialContent as object, false);
+      });
     }
-  }, [editor, initialContent, initialYjsState]);
+  }, [editor, initialContent, initialYjsState, ydoc]);
 
   // Supabase Realtime Broadcast 로 다른 접속자와 Yjs 업데이트를 주고받는다.
   useEffect(() => {

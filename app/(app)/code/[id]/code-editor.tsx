@@ -13,7 +13,7 @@ import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import dynamic from "next/dynamic";
 import { LANGUAGES, isLangKey, detectLanguage, type LangKey } from "@/lib/languages";
 import { ShareDialog } from "@/components/share-dialog";
-import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate } from "@/lib/yjs-transport";
+import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate, seedDeterministically } from "@/lib/yjs-transport";
 import {
   saveCodeFile,
   deleteCodeFile,
@@ -100,7 +100,8 @@ export function CodeEditor({
     }
     const text = doc.getText("content");
     if (text.length === 0 && initialContent) {
-      text.insert(0, initialContent);
+      // 결정적 시드 — 두 클라이언트가 동시에 시드해도 병합 시 중복되지 않게.
+      seedDeterministically(doc, () => text.insert(0, initialContent));
     }
     ydocRef.current = doc;
   }

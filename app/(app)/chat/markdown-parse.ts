@@ -15,6 +15,7 @@ export type InlineToken =
   | { t: "text"; text: string }
   | { t: "bold" | "italic" | "underline" | "strike" | "code" | "mention"; text: string }
   | { t: "link"; text: string; href: string }
+  | { t: "image"; alt: string; src: string }
   | { t: "ref"; kind: RefKind; id: string; title: string };
 
 export type Block =
@@ -35,6 +36,7 @@ const INLINE_RE = new RegExp(
     "|(?<und>__[^_\\n]+__)" +
     "|(?<ital>\\*[^*\\n]+\\*)" +
     "|(?<strike>~~[^~\\n]+~~)" +
+    "|(?<img>!\\[[^\\]\\n]*\\]\\(https?://[^\\s)]+\\))" +
     "|(?<link>\\[[^\\]\\n]+\\]\\(https?://[^\\s)]+\\))" +
     `|(?<reftok>\\[\\[(?:document|code|sheet|mindmap):${UUID_PATTERN}\\|[^\\]]{1,160}\\]\\])` +
     `|(?<refpath>(?:https?://[^\\s]*)?/(?:documents|code|sheets|mindmap)/${UUID_PATTERN})` +
@@ -49,6 +51,7 @@ const REFTOK_RE = new RegExp(
 );
 const REFPATH_RE = new RegExp(`/(documents|code|sheets|mindmap)/(${UUID_PATTERN})`, "i");
 const LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/;
+const IMG_RE = /!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/;
 
 export function parseInline(line: string): InlineToken[] {
   const out: InlineToken[] = [];
@@ -62,7 +65,10 @@ export function parseInline(line: string): InlineToken[] {
     else if (g.und) out.push({ t: "underline", text: g.und.slice(2, -2) });
     else if (g.ital) out.push({ t: "italic", text: g.ital.slice(1, -1) });
     else if (g.strike) out.push({ t: "strike", text: g.strike.slice(2, -2) });
-    else if (g.link) {
+    else if (g.img) {
+      const im = g.img.match(IMG_RE)!;
+      out.push({ t: "image", alt: im[1] || "image", src: im[2] });
+    } else if (g.link) {
       const lm = g.link.match(LINK_RE)!;
       out.push({ t: "link", text: lm[1], href: lm[2] });
     } else if (g.reftok) {
