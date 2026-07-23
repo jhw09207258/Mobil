@@ -400,6 +400,8 @@
   background: var(--bg-3);
   color: var(--text-0);
   border-color: var(--border-1);
+  /* 엔터프라이즈 콘솔식 활성 표시 — 왼쪽 상태 바 */
+  box-shadow: inset 2px 0 0 var(--create);
 }
 .rail-link.active svg {
   color: var(--create);

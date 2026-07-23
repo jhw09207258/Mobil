@@ -31,7 +31,7 @@ type MindElixirRefNode = {
   children?: MindElixirRefNode[];
 };
 
-const REF_KINDS = new Set(["file", "code", "document"]);
+const REF_KINDS = new Set(["file", "code", "document", "sheet", "mindmap"]);
 
 /**
  * 마인드맵에서 참조 노드(ref)를 링크 대상으로 추출한다. 이 마인드맵이

@@ -597,6 +597,22 @@ function Inner({
                     {previewInfo.data.mimeType || "Unknown type"} · {formatBytes(previewInfo.data.sizeBytes)}
                   </span>
                 )}
+                {previewInfo.data.kind === "sheet" && (
+                  <span className="mm-preview-meta">
+                    {previewInfo.data.sheetCount} sheet{previewInfo.data.sheetCount === 1 ? "" : "s"} ·{" "}
+                    {previewInfo.data.cellCount} cell{previewInfo.data.cellCount === 1 ? "" : "s"} with data
+                  </span>
+                )}
+                {previewInfo.data.kind === "mindmap" && (
+                  <>
+                    <span className="mm-preview-meta">
+                      {previewInfo.data.nodeCount} node{previewInfo.data.nodeCount === 1 ? "" : "s"}
+                    </span>
+                    {previewInfo.data.snippet && (
+                      <p className="mm-preview-snippet">{previewInfo.data.snippet}</p>
+                    )}
+                  </>
+                )}
               </div>
             )}
             <div className="mm-preview-actions">

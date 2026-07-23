@@ -453,6 +453,39 @@ a:hover {
   user-select: all;
 }
 
+/* -------------------------------------------------------------------------
+   엔터프라이즈 마감 — 데이터 정렬·키보드 접근성·미세 깊이감
+   ------------------------------------------------------------------------- */
+/* 숫자 자릿수 고정폭 정렬 — 테이블/통계에서 숫자 열이 흔들리지 않게 */
+.mono,
+.table,
+.stat-val,
+.badge,
+.code-block {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 키보드 포커스 링(:focus-visible — 마우스 클릭에는 나타나지 않음) */
+.btn:focus-visible,
+.link-btn:focus-visible,
+a:focus-visible,
+.category-tab:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--steel);
+  outline-offset: 1px;
+}
+
+/* 패널·버튼의 미세한 깊이감 — 플랫함은 유지하되 표면 위계를 살짝 준다 */
+.panel {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.btn {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.btn-primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
 /* 유틸 */
 .row {
   display: flex;

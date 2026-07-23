@@ -23,9 +23,15 @@ const REQUEST_BUDGET_MS = 48_000;
 // 개별 NVIDIA 호출(연결+스트림 소비 전체)에 허용하는 최대 시간.
 const PER_CALL_TIMEOUT_MS = 30_000;
 
-const SYSTEM_PROMPT = `You are Sophia, the AI assistant built into Mobil (a personal workspace for documents, code, sheets, files and mind maps). Be helpful, concise, and clear.
+const SYSTEM_PROMPT = `You are Big Brother, the intelligence assistant built into Mobil (a workspace for documents, code, sheets, files and mind maps). Be helpful, concise, and clear.
 
-You have tools to search, read, create, and edit the user's Mobil content, and to search external papers/GitHub code (Big Brother). Use them whenever they'd help answer the question or complete a request — don't just describe what you would do, actually call the tool. Search first if you need an id you don't already have. Before a 'replace' edit that overwrites existing content, briefly confirm that's what the user wants unless they clearly already asked for exactly that. After using a tool, tell the user plainly what you found or did (don't narrate the tool call itself).`;
+Ground your answers in the user's actual knowledge base before answering from memory:
+- search_mobil finds items by keyword/#tag over the workspace ontology (documents, code, sheets, mind maps and the links between them).
+- semantic_search finds items by MEANING (vector similarity / RAG) — use it for conceptual questions or when keywords fail, then read the top matches and synthesize an answer from them, citing which items you used.
+- read_* tools fetch full content; create_*/update_* tools change it.
+- search_papers_and_code searches external academic papers and GitHub code — use it for evidence or prior work beyond the workspace.
+
+Use tools whenever they'd help — don't just describe what you would do, actually call the tool. Search first if you need an id you don't already have. Before a 'replace' edit that overwrites existing content, briefly confirm that's what the user wants unless they clearly already asked for exactly that. After using a tool, tell the user plainly what you found or did (don't narrate the tool call itself).`;
 
 type ToolCallOut = { id: string; type: "function"; function: { name: string; arguments: string } };
 
@@ -288,13 +294,13 @@ export async function POST(req: Request) {
     const s = r.upstreamStatus;
     const d = r.detail || "no detail";
     if (d.includes("missing NVIDIA_API_KEY")) {
-      return "Sophia isn't configured: no NVIDIA_API_KEY / NVIDIA_API_KEY_2 is set in this deployment's environment variables.";
+      return "Big Brother isn't configured: no NVIDIA_API_KEY / NVIDIA_API_KEY_2 is set in this deployment's environment variables.";
     }
     if (d.includes("timed out")) {
-      return `Sophia's request to NVIDIA timed out — the NVIDIA API isn't responding from the server (region icn1). This usually means the endpoint or key is wrong, or NVIDIA is unreachable from this deployment. Detail: ${d}`;
+      return `Big Brother's request to NVIDIA timed out — the NVIDIA API isn't responding from the server (region icn1). This usually means the endpoint or key is wrong, or NVIDIA is unreachable from this deployment. Detail: ${d}`;
     }
     if (s === 401 || s === 403) {
-      return `Sophia's NVIDIA API key was rejected (HTTP ${s}). The key is missing, invalid, or lacks access to the model. Detail: ${d}`;
+      return `Big Brother's NVIDIA API key was rejected (HTTP ${s}). The key is missing, invalid, or lacks access to the model. Detail: ${d}`;
     }
     if (s === 404) {
       return `NVIDIA returned 404 — the model "${NVIDIA_MODEL}" isn't available to this key/endpoint. Detail: ${d}`;
@@ -302,7 +308,7 @@ export async function POST(req: Request) {
     if (s === 429) {
       return `NVIDIA rate limit hit (HTTP 429). Try again shortly. Detail: ${d}`;
     }
-    return `Sophia is unavailable right now (NVIDIA ${s ?? "network"}: ${d})`;
+    return `Big Brother is unavailable right now (NVIDIA ${s ?? "network"}: ${d})`;
   };
 
   /** 실패 진단을 assistant 메시지로 남긴다 — 화면에도 남고, DB 로그로도
@@ -380,7 +386,7 @@ export async function POST(req: Request) {
           if (!pending) {
             // 예산을 넘겼으면 더 부르지 않고, 지금까지 받은 답으로 마무리한다.
             if (Date.now() >= deadline) {
-              if (!full) failed = "Sophia ran out of time before finishing (request budget exceeded).";
+              if (!full) failed = "Big Brother ran out of time before finishing (request budget exceeded).";
               break;
             }
             // 마지막 허용 라운드거나 도구가 꺼졌으면 tools 없이 스트리밍으로

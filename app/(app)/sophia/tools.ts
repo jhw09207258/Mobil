@@ -8,7 +8,7 @@ import { detectLanguage, isLangKey } from "@/lib/languages";
 import { markdownToTiptapDoc, tiptapToPlainText, tiptapToMarkdown } from "@/lib/doc-convert";
 import { importFileToSheetData, exportSheetToCsv } from "@/lib/sheet-convert";
 import { sheetRowsToMindmapData, type SheetCell } from "@/lib/outline-convert";
-import { searchOntology } from "../search/actions";
+import { searchOntology, searchSemantic } from "../search/actions";
 import { getDocumentForTab, saveDocument } from "../documents/actions";
 import { getCodeFileForTab, saveCodeFile } from "../code/actions";
 import { getSheetForTab } from "../sheets/actions";
@@ -35,6 +35,21 @@ export const SOPHIA_TOOLS = [
         type: "object",
         properties: {
           query: { type: "string", description: "Search text, or a #tag (e.g. '#project-x')." },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "semantic_search",
+      description:
+        "Find workspace items related to a concept by MEANING (vector similarity), even when the words don't match. Use this when keyword search (search_mobil) finds nothing, or when the user asks about a topic/idea rather than an exact title.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The concept or question to find related items for." },
         },
         required: ["query"],
       },
@@ -239,6 +254,23 @@ async function toolSearchMobil(args: { query?: string }): Promise<ToolResult> {
       id: r.id,
       title: r.title,
       updated_at: r.updated_at,
+    })),
+  };
+}
+
+async function toolSemanticSearch(args: { query?: string }): Promise<ToolResult> {
+  const query = String(args.query ?? "").trim();
+  if (!query) return { error: "query is required." };
+  const results = await searchSemantic(query);
+  if (results.length === 0) {
+    return { results: [], note: "No semantically related items (or semantic search is unavailable)." };
+  }
+  return {
+    results: results.map((r) => ({
+      kind: r.kind,
+      id: r.id,
+      title: r.title,
+      similarity: Math.round(r.similarity * 100) / 100,
     })),
   };
 }
@@ -479,6 +511,7 @@ async function toolSearchPapersAndCode(args: { query?: string }): Promise<ToolRe
 
 const HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<ToolResult>> = {
   search_mobil: toolSearchMobil,
+  semantic_search: toolSemanticSearch,
   read_document: toolReadDocument,
   read_code_file: toolReadCodeFile,
   read_sheet: toolReadSheet,

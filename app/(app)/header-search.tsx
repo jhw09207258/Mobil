@@ -6,9 +6,11 @@ import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconSearch 
 import { useWorkspace, type TabKind } from "./workspace/workspace-context";
 import {
   searchOntology,
+  searchSemantic,
   getLinkedObjects,
   type SearchResult,
   type LinkedObject,
+  type SemanticResult,
 } from "./search/actions";
 
 const KIND_ICON: Record<string, (props: { size?: number }) => React.ReactElement> = {
@@ -107,6 +109,11 @@ function ResultRow({
                 >
                   <LIcon size={12} />
                   <span>{l.title || "Untitled"}</span>
+                  {l.depth > 1 && l.via_title && (
+                    <span className="dim" style={{ fontSize: 11 }}>
+                      · via {l.via_title}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -119,6 +126,7 @@ function ResultRow({
 export function HeaderSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [semantic, setSemantic] = useState<SemanticResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   // 모바일에서는 검색창을 돋보기 아이콘으로 접어두고, 아이콘을 누를 때만
@@ -160,14 +168,19 @@ export function HeaderSearch() {
     const q = query.trim();
     if (!q) {
       setResults([]);
+      setSemantic([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     debounceRef.current = setTimeout(async () => {
+      // 어휘 검색(즉답)과 의미 검색(임베딩 API 왕복)을 병렬로 — 어휘 결과를
+      // 먼저 보여주고 의미 결과는 도착하는 대로 아래에 붙는다.
+      const semanticPromise = searchSemantic(q).then(setSemantic);
       const data = await searchOntology(q);
       setResults(data);
       setLoading(false);
+      await semanticPromise;
     }, 250);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -187,6 +200,10 @@ export function HeaderSearch() {
     (acc[r.kind] ??= []).push(r);
     return acc;
   }, {});
+
+  // 어휘 결과에 이미 있는 항목은 의미 검색 섹션에서 제외(중복 표시 방지).
+  const lexicalIds = new Set(results.map((r) => `${r.kind}:${r.id}`));
+  const semanticOnly = semantic.filter((s) => !lexicalIds.has(`${s.kind}:${s.id}`));
 
   return (
     <div className={`hsearch ${mobileOpen ? "mobile-open" : ""}`} ref={rootRef}>
@@ -214,7 +231,7 @@ export function HeaderSearch() {
       {open && query.trim() && (
         <div className="hsearch-dropdown">
           {loading && <div className="hsearch-empty">Searching…</div>}
-          {!loading && results.length === 0 && (
+          {!loading && results.length === 0 && semanticOnly.length === 0 && (
             <div className="hsearch-empty">No results for “{query}”.</div>
           )}
           {!loading &&
@@ -226,6 +243,25 @@ export function HeaderSearch() {
                 ))}
               </div>
             ))}
+          {!loading && semanticOnly.length > 0 && (
+            <div className="hsearch-group">
+              <div className="hsearch-group-label">Semantic matches</div>
+              {semanticOnly.map((s) => (
+                <ResultRow
+                  key={`sem:${s.kind}:${s.id}`}
+                  result={{
+                    kind: s.kind,
+                    id: s.id,
+                    title: s.title,
+                    snippet: `${Math.round(s.similarity * 100)}% related`,
+                    rank: s.similarity,
+                    updated_at: "",
+                  }}
+                  onOpenItem={onOpenItem}
+                />
+              ))}
+            </div>
+          )}
           {!loading && results.some((r) => r.kind === "file") && (
             <div className="hsearch-footer">
               <Link href="/files" onClick={() => setOpen(false)}>

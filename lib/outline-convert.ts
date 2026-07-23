@@ -112,6 +112,40 @@ export function documentJSONToMindmapData(
       // 이어붙여 한 노드로 뭉개버렸다("엉터리" 변환의 주된 원인).
       const parent = stack[stack.length - 1].node;
       (parent.children ??= []).push(...listToNodes(block));
+    } else if (block.type === "table") {
+      // 표는 행 단위로 보존한다 — "Table" 노드 아래에 행마다 자식 노드,
+      // 셀 텍스트는 " · " 로 구분(전부 이어붙이면 셀 경계가 사라진다).
+      const rows = (block.content ?? []).filter((r) => r.type === "tableRow");
+      const tableNode: NodeObj = { id: nextId(), topic: "Table", metadata: { kind: "note" } };
+      for (const row of rows) {
+        const cells = (row.content ?? [])
+          .map((c) => extractPlainText(c).trim())
+          .filter(Boolean);
+        if (cells.length === 0) continue;
+        (tableNode.children ??= []).push({
+          id: nextId(),
+          topic: cells.join(" · "),
+          metadata: { kind: "note" },
+        });
+      }
+      if (tableNode.children?.length) {
+        const parent = stack[stack.length - 1].node;
+        (parent.children ??= []).push(tableNode);
+      }
+    } else if (block.type === "blockquote") {
+      // 인용 블록 안의 문단들은 공백으로 구분해 하나의 노드로 — 그냥
+      // extractPlainText 를 쓰면 문단 경계 없이 글자가 붙어버린다.
+      const text = (block.content ?? [])
+        .map((c) => extractPlainText(c).trim())
+        .filter(Boolean)
+        .join(" ");
+      if (!text) continue;
+      const parent = stack[stack.length - 1].node;
+      (parent.children ??= []).push({
+        id: nextId(),
+        topic: `❝ ${text}`,
+        metadata: { kind: "note" },
+      });
     } else {
       const text = extractPlainText(block).trim();
       if (!text) continue;

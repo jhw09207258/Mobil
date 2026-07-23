@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { detectLanguage, isLangKey } from "@/lib/languages";
 import { extractTagsFromText } from "@/lib/tags";
+import { syncObjectEmbedding } from "@/lib/embeddings";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -138,6 +139,7 @@ export async function saveCodeFile(
         () => {},
         () => {}
       );
+    await syncObjectEmbedding(supabase, "code", id, finalName, content);
   });
 
   return { ok: true };

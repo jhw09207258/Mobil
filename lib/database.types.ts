@@ -362,6 +362,59 @@ export interface Database {
         Update: Record<string, never>;
         Relationships: [];
       };
+      chat_conversations: {
+        Row: {
+          id: string;
+          kind: "dm" | "group";
+          title: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          kind: "dm" | "group";
+          title?: string | null;
+          created_by: string;
+        };
+        Update: {
+          title?: string | null;
+        };
+        Relationships: [];
+      };
+      chat_members: {
+        Row: {
+          conversation_id: string;
+          user_id: string;
+          joined_at: string;
+          last_read_at: string;
+        };
+        Insert: {
+          conversation_id: string;
+          user_id: string;
+        };
+        Update: {
+          last_read_at?: string;
+        };
+        Relationships: [];
+      };
+      chat_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
       starred_items: {
         Row: {
           id: string;
@@ -525,6 +578,69 @@ export interface Database {
       can_view_object: {
         Args: { p_kind: string; p_id: string };
         Returns: boolean;
+      };
+      object_embedding_stale: {
+        Args: { p_kind: string; p_id: string; p_hash: string };
+        Returns: boolean;
+      };
+      upsert_object_embedding: {
+        Args: { p_kind: string; p_id: string; p_hash: string; p_embedding: string };
+        Returns: undefined;
+      };
+      match_objects: {
+        Args: { p_embedding: string; p_limit?: number; p_kind?: string | null };
+        Returns: { kind: string; id: string; title: string | null; similarity: number }[];
+      };
+      get_linked_objects_deep: {
+        Args: { p_kind: string; p_id: string; p_depth?: number };
+        Returns: {
+          kind: string;
+          id: string;
+          title: string | null;
+          link_source: string;
+          depth: number;
+          via_title: string | null;
+        }[];
+      };
+      start_chat_dm: {
+        Args: { p_other: string };
+        Returns: string;
+      };
+      create_chat_group: {
+        Args: { p_title: string; p_members: string[] };
+        Returns: string;
+      };
+      add_chat_members: {
+        Args: { p_conversation: string; p_members: string[] };
+        Returns: undefined;
+      };
+      list_chat_conversations: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          kind: "dm" | "group";
+          title: string;
+          member_count: number;
+          last_message: string | null;
+          last_message_at: string | null;
+          unread_count: number;
+          updated_at: string;
+        }[];
+      };
+      get_chat_messages: {
+        Args: { p_conversation: string; p_limit?: number };
+        Returns: {
+          id: string;
+          sender_id: string;
+          sender_name: string;
+          sender_avatar_url: string | null;
+          content: string;
+          created_at: string;
+        }[];
+      };
+      mark_chat_read: {
+        Args: { p_conversation: string };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;

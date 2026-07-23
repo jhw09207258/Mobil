@@ -114,11 +114,11 @@ export function IconEye({ size }: P) {
     </svg>
   );
 }
-export function IconSophia({ size }: P) {
+export function IconChat({ size }: P) {
   return (
     <svg {...base(size)}>
-      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" />
-      <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" />
+      <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+      <path d="M8 10h8M8 13h5" />
     </svg>
   );
 }

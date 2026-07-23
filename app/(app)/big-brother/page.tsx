@@ -1,25 +1,20 @@
 import { requireUser } from "@/lib/auth";
-import { BigBrotherSearch } from "./big-brother-search";
+import { listConversations } from "../sophia/actions";
+import { BigBrotherShell } from "./big-brother-shell";
 
 export const dynamic = "force-dynamic";
 
 export default async function BigBrotherPage() {
   await requireUser();
+  const conversations = await listConversations();
 
   return (
     <>
       <div className="topbar">
         <span className="topbar-title">Big Brother</span>
-        <span className="crumb">INTEGRATED SEARCH / BIG BROTHER</span>
+        <span className="crumb">INTELLIGENCE / BIG BROTHER</span>
       </div>
-      <div className="content">
-        <div className="page-head">
-          <div>
-            <h1 className="page-h">Big Brother</h1>
-          </div>
-        </div>
-        <BigBrotherSearch />
-      </div>
+      <BigBrotherShell initialConversations={conversations} />
     </>
   );
 }

@@ -1,20 +1,7 @@
-import { requireUser } from "@/lib/auth";
-import { listConversations } from "./actions";
-import { SophiaChat } from "./sophia-chat";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default async function SophiaPage() {
-  await requireUser();
-  const conversations = await listConversations();
-
-  return (
-    <>
-      <div className="topbar">
-        <span className="topbar-title">Sophia</span>
-        <span className="crumb">AI ASSISTANT / SOPHIA</span>
-      </div>
-      <SophiaChat initialConversations={conversations} />
-    </>
-  );
+// Sophia 는 Big Brother 로 통합되었다 — 대화 UI·기록(ai_conversations)은
+// 그대로 유지되고 /big-brother 의 Assistant 탭에서 이어진다.
+export default function SophiaPage() {
+  redirect("/big-brother");
 }

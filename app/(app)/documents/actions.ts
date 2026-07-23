@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 import { extractDocLinks } from "@/lib/ontology-links";
 import { extractTagsFromText, extractTiptapPlainText } from "@/lib/tags";
+import { syncObjectEmbedding } from "@/lib/embeddings";
 import {
   importFileToTiptapDoc,
   tiptapToPlainText,
@@ -55,13 +56,15 @@ export async function importDocument(
       target_id: data.id,
       action: "create",
     });
-    const tags = extractTagsFromText(`${data.title} ${extractTiptapPlainText(imported.content)}`);
+    const plain = extractTiptapPlainText(imported.content);
+    const tags = extractTagsFromText(`${data.title} ${plain}`);
     await supabase
       .rpc("sync_object_tags", { p_kind: "document", p_id: data.id, p_tag_names: tags })
       .then(
         () => {},
         () => {}
       );
+    await syncObjectEmbedding(supabase, "document", data.id, data.title, plain);
   });
 
   return {
@@ -257,13 +260,15 @@ export async function saveDocument(
         () => {},
         () => {}
       );
-    const tags = extractTagsFromText(`${title} ${extractTiptapPlainText(content)}`);
+    const plain = extractTiptapPlainText(content);
+    const tags = extractTagsFromText(`${title} ${plain}`);
     await supabase
       .rpc("sync_object_tags", { p_kind: "document", p_id: id, p_tag_names: tags })
       .then(
         () => {},
         () => {}
       );
+    await syncObjectEmbedding(supabase, "document", id, title, plain);
   });
 
   return { ok: true };

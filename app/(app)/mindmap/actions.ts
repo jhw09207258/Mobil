@@ -7,6 +7,7 @@ import type { Json } from "@/lib/database.types";
 import type { MindElixirData } from "mind-elixir";
 import { extractMindmapLinks } from "@/lib/ontology-links";
 import { extractTagsFromText, extractMindmapPlainText } from "@/lib/tags";
+import { syncObjectEmbedding } from "@/lib/embeddings";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -182,13 +183,15 @@ export async function saveMindMap(
         () => {},
         () => {}
       );
-    const tags = extractTagsFromText(`${finalTitle} ${extractMindmapPlainText(data)}`);
+    const plain = extractMindmapPlainText(data);
+    const tags = extractTagsFromText(`${finalTitle} ${plain}`);
     await supabase
       .rpc("sync_object_tags", { p_kind: "mindmap", p_id: id, p_tag_names: tags })
       .then(
         () => {},
         () => {}
       );
+    await syncObjectEmbedding(supabase, "mindmap", id, finalTitle, plain);
   });
 
   return { ok: true };
@@ -224,24 +227,35 @@ export async function setMindMapPublic(
   return { ok: true };
 }
 
-/** 참조 노드 선택용: 접근 가능한 파일·코드·문서 목록. */
+/** 참조 노드 선택용: 접근 가능한 파일·코드·문서·시트·마인드맵 목록.
+ * excludeMindmapId 는 현재 편집 중인 맵 — 자기 자신을 참조 노드로 넣는
+ * 순환을 막는다. */
 export type WorkspaceItem = {
   id: string;
   label: string;
-  kind: "file" | "code" | "document";
+  kind: "file" | "code" | "document" | "sheet" | "mindmap";
 };
 
-export async function listWorkspaceItems(): Promise<WorkspaceItem[]> {
+export async function listWorkspaceItems(
+  excludeMindmapId?: string
+): Promise<WorkspaceItem[]> {
   const supabase = await createClient();
-  const [files, code, docs] = await Promise.all([
+  const [files, code, docs, sheets, maps] = await Promise.all([
     supabase.from("files").select("id, file_name").order("created_at", { ascending: false }).limit(200),
     supabase.from("code_files").select("id, name").order("updated_at", { ascending: false }).limit(200),
     supabase.from("documents").select("id, title").order("updated_at", { ascending: false }).limit(200),
+    supabase.from("sheets").select("id, title").order("updated_at", { ascending: false }).limit(200),
+    supabase.from("mind_maps").select("id, title").order("updated_at", { ascending: false }).limit(200),
   ]);
   const out: WorkspaceItem[] = [];
   for (const f of files.data ?? []) out.push({ id: f.id, label: f.file_name, kind: "file" });
   for (const c of code.data ?? []) out.push({ id: c.id, label: c.name, kind: "code" });
   for (const d of docs.data ?? []) out.push({ id: d.id, label: d.title || "Untitled", kind: "document" });
+  for (const s of sheets.data ?? []) out.push({ id: s.id, label: s.title || "Untitled", kind: "sheet" });
+  for (const m of maps.data ?? []) {
+    if (m.id === excludeMindmapId) continue;
+    out.push({ id: m.id, label: m.title || "Untitled", kind: "mindmap" });
+  }
   return out;
 }
 
@@ -263,15 +277,72 @@ function extractText(node: unknown, out: string[], limit: number): void {
 export type ReferencePreview =
   | { kind: "document"; title: string; snippet: string }
   | { kind: "code"; title: string; language: string; snippet: string }
-  | { kind: "file"; title: string; sizeBytes: number | null; mimeType: string | null };
+  | { kind: "file"; title: string; sizeBytes: number | null; mimeType: string | null }
+  | { kind: "sheet"; title: string; sheetCount: number; cellCount: number }
+  | { kind: "mindmap"; title: string; nodeCount: number; snippet: string };
+
+/** 시트 데이터([{name, celldata}] 형태)에서 시트 수/값이 있는 셀 수를 센다. */
+function summarizeSheetData(data: unknown): { sheetCount: number; cellCount: number } {
+  if (!Array.isArray(data)) return { sheetCount: 0, cellCount: 0 };
+  let cells = 0;
+  for (const sheet of data) {
+    const celldata = (sheet as { celldata?: unknown[] } | null)?.celldata;
+    if (!Array.isArray(celldata)) continue;
+    for (const cell of celldata) {
+      const v = (cell as { v?: { v?: unknown; m?: unknown } | null } | null)?.v;
+      if (v && (v.v ?? v.m) != null && (v.v ?? v.m) !== "") cells++;
+    }
+  }
+  return { sheetCount: data.length, cellCount: cells };
+}
+
+/** 마인드맵 데이터에서 노드 수와 1단계 토픽 몇 개를 요약한다.
+ * 현행(nodeData 트리)과 레거시(React Flow nodes 배열) 모두 지원. */
+function summarizeMindmapData(data: unknown): { nodeCount: number; snippet: string } {
+  if (!data || typeof data !== "object") return { nodeCount: 0, snippet: "" };
+  const nodeData = (data as { nodeData?: unknown }).nodeData;
+  if (nodeData && typeof nodeData === "object") {
+    let count = 0;
+    const topics: string[] = [];
+    const walk = (n: { topic?: string; children?: unknown[] }, depth: number) => {
+      count++;
+      if (depth === 1 && n.topic && topics.length < 5) topics.push(n.topic);
+      for (const child of n.children ?? []) walk(child as { topic?: string; children?: unknown[] }, depth + 1);
+    };
+    walk(nodeData as { topic?: string; children?: unknown[] }, 0);
+    return { nodeCount: count, snippet: topics.join(" · ") };
+  }
+  const nodes = (data as { nodes?: unknown[] }).nodes;
+  return { nodeCount: Array.isArray(nodes) ? nodes.length : 0, snippet: "" };
+}
 
 /** 마인드맵 참조 노드 사이드 미리보기용: 대상 아이템의 요약 정보를 조회한다.
  * 일반 supabase 클라이언트(RLS 적용)를 쓰므로 접근 권한이 없으면 null 이 온다. */
 export async function getReferencePreview(
-  kind: "file" | "code" | "document",
+  kind: "file" | "code" | "document" | "sheet" | "mindmap",
   id: string
 ): Promise<ReferencePreview | null> {
   const supabase = await createClient();
+
+  if (kind === "sheet") {
+    const { data } = await supabase
+      .from("sheets")
+      .select("title, data")
+      .eq("id", id)
+      .maybeSingle();
+    if (!data) return null;
+    return { kind: "sheet", title: data.title || "Untitled", ...summarizeSheetData(data.data) };
+  }
+
+  if (kind === "mindmap") {
+    const { data } = await supabase
+      .from("mind_maps")
+      .select("title, data")
+      .eq("id", id)
+      .maybeSingle();
+    if (!data) return null;
+    return { kind: "mindmap", title: data.title || "Untitled", ...summarizeMindmapData(data.data) };
+  }
 
   if (kind === "document") {
     const { data } = await supabase

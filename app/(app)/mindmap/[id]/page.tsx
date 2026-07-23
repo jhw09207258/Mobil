@@ -35,7 +35,7 @@ export default async function MindMapEditorPage({
     canEdit = perm?.permission === "edit";
   }
 
-  const items = await listWorkspaceItems();
+  const items = await listWorkspaceItems(id);
 
   return (
     <>

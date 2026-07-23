@@ -11,7 +11,7 @@ import type { Json } from "@/lib/database.types";
 // convertLegacyGraph 로 정상 렌더링하는데도.
 // ============================================================================
 
-export type RefKind = "file" | "code" | "document";
+export type RefKind = "file" | "code" | "document" | "sheet" | "mindmap";
 export type NodeMeta = { kind: "note" } | { kind: RefKind; refId: string };
 
 type LegacyNode = { id: string; type?: string; data?: { kind?: string; label?: string; refId?: string } };

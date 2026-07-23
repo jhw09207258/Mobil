@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 import { extractTagsFromText } from "@/lib/tags";
+import { syncObjectEmbedding, extractSheetPlainText } from "@/lib/embeddings";
 import {
   importFileToSheetData,
   exportSheetToCsv,
@@ -52,6 +53,7 @@ export async function importSheet(
       () => {},
       () => {}
     );
+    await syncObjectEmbedding(supabase, "sheet", data.id, data.title, extractSheetPlainText(data.data));
   });
 
   return {
@@ -210,6 +212,7 @@ export async function saveSheet(
       () => {},
       () => {}
     );
+    await syncObjectEmbedding(supabase, "sheet", id, finalTitle, extractSheetPlainText(data));
   });
 
   return { ok: true };

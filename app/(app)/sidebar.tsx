@@ -10,8 +10,8 @@ import {
   IconSheet,
   IconMindmap,
   IconCoworkers,
+  IconChat,
   IconEye,
-  IconSophia,
   IconKey,
   IconConsole,
 } from "./icons";
@@ -28,7 +28,7 @@ const MAIN: Item[] = [
   { href: "/code", label: "Code", icon: <IconCode /> },
   { href: "/mindmap", label: "Link Graph", icon: <IconMindmap /> },
   { href: "/big-brother", label: "Big Brother", icon: <IconEye /> },
-  { href: "/sophia", label: "Sophia", icon: <IconSophia /> },
+  { href: "/chat", label: "Comms", icon: <IconChat /> },
   { href: "/coworkers", label: "Co-workers", icon: <IconCoworkers /> },
 ];
 

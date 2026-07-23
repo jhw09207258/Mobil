@@ -112,8 +112,8 @@ export function SophiaChat({
       });
 
       if (!res.ok || !res.body) {
-        const message = await res.text().catch(() => "Sophia is unavailable right now.");
-        setError(message || "Sophia is unavailable right now.");
+        const message = await res.text().catch(() => "Big Brother is unavailable right now.");
+        setError(message || "Big Brother is unavailable right now.");
         setMessages((prev) => prev.filter((m) => m.id !== userMsgId && m.id !== replyId));
         return;
       }
@@ -134,7 +134,7 @@ export function SophiaChat({
         prev.map((m) => (m.id === replyId ? { ...m, pending: false } : m))
       );
     } catch {
-      setError("Sophia is unavailable right now.");
+      setError("Big Brother is unavailable right now.");
       setMessages((prev) => prev.filter((m) => m.id !== userMsgId && m.id !== replyId));
     } finally {
       setSending(false);
@@ -199,7 +199,7 @@ export function SophiaChat({
 
         <div className="sophia-messages" ref={scrollRef}>
           {!activeId && !loadingMessages && (
-            <div className="sophia-empty">Start a new chat with Sophia below.</div>
+            <div className="sophia-empty">Start a new chat with Big Brother below.</div>
           )}
           {activeId && loadingMessages && (
             <div className="sophia-empty">Loading…</div>
@@ -220,7 +220,9 @@ export function SophiaChat({
           <textarea
             className="sophia-textarea"
             placeholder={
-              activeTitle ? `Message Sophia…` : "Ask Sophia anything… (Enter to send, Shift+Enter for a new line)"
+              activeTitle
+                ? `Message Big Brother…`
+                : "Ask Big Brother anything — your workspace, papers, code… (Enter to send, Shift+Enter for a new line)"
             }
             value={input}
             onChange={(e) => setInput(e.target.value)}

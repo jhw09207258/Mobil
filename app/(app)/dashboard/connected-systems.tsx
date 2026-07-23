@@ -60,7 +60,7 @@ export function ConnectedSystems() {
       logoChip: "white",
       status: nvidiaConfigured ? "connected" : "not-configured",
       statusLabel: nvidiaConfigured ? "Connected" : "Not configured",
-      details: ["Model: meta/llama-3.3-70b-instruct", "Powers Sophia"],
+      details: ["Model: meta/llama-3.3-70b-instruct", "Powers Big Brother"],
     },
     {
       key: "oracle",
