@@ -24,7 +24,7 @@
   color: var(--text-1);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 999px;
 }
 .hamburger-btn:hover {
   background: var(--bg-3);
@@ -50,7 +50,8 @@
    (~76px)를 비우고, 헤더 빈 영역을 드래그하면 창이 움직이게 한다. 내부의
    상호작용 요소는 전부 no-drag. 일반 브라우저에서는 무시된다. */
 html[data-desktop] .app-header {
-  padding-left: 84px;
+  /* 신호등(x:16 시작, 폭 ~54px)과 Mobil 로고가 겹치지 않게 넉넉히 비운다. */
+  padding-left: 96px;
   -webkit-app-region: drag;
 }
 html[data-desktop] .app-header a,
@@ -98,26 +99,31 @@ html[data-desktop] .app-header .hsearch {
   color: var(--text-1);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 999px;
 }
 .hsearch-icon-btn:hover {
   background: var(--bg-3);
   border-color: var(--border-1);
 }
+/* Liquid Glass 검색 필드 — 알약형, 반투명 유리 */
 .hsearch-input {
   width: min(280px, 32vw);
   height: 32px;
-  padding: 0 12px;
+  padding: 0 14px;
   font-size: 13px;
   color: var(--text-1);
-  background: var(--bg-2);
-  border: 1px solid var(--border-1);
-  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-3) 65%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-0);
+  border-radius: 999px;
   outline: none;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
 .hsearch-input:focus {
   border-color: var(--steel);
-  background: var(--bg-0);
+  background: var(--bg-2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--steel) 25%, transparent);
 }
 .hsearch-input::placeholder {
   color: var(--text-3);
@@ -153,7 +159,7 @@ html[data-desktop] .app-header .hsearch {
 }
 .hsearch-group-label {
   padding: 4px 8px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -211,7 +217,7 @@ html[data-desktop] .app-header .hsearch {
 }
 .search-result-kind {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   color: var(--text-3);
 }
@@ -258,16 +264,17 @@ html[data-desktop] .app-header .hsearch {
   align-items: center;
   gap: 8px;
   height: 34px;
-  padding: 0 8px;
+  padding: 0 10px 0 5px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 999px;
   cursor: pointer;
   color: var(--text-1);
+  transition: background 0.12s, border-color 0.12s;
 }
 .acct-btn:hover {
-  background: var(--bg-3);
-  border-color: var(--border-1);
+  background: color-mix(in srgb, var(--bg-3) 80%, transparent);
+  border-color: var(--border-0);
 }
 .acct-name {
   font-size: 13px;
@@ -299,7 +306,7 @@ html[data-desktop] .app-header .hsearch {
   margin-bottom: 6px;
 }
 .acct-license-title {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   letter-spacing: 0.04em;
   color: var(--text-0);
@@ -357,7 +364,7 @@ html[data-desktop] .app-header .hsearch {
   background: var(--bg-4);
   border: 1px solid var(--border-2);
   border-radius: 50%;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   color: var(--text-1);
   text-transform: uppercase;
@@ -413,15 +420,17 @@ html[data-desktop] .app-header .hsearch {
   color: var(--text-0);
   text-decoration: none;
 }
+/* 활성 표시 — 테두리/배경 없이 아이콘 색만 푸른빛으로. */
 .rail-link.active {
-  background: var(--bg-3);
-  color: var(--text-0);
-  border-color: var(--border-1);
-  /* 엔터프라이즈 콘솔식 활성 표시 — 왼쪽 상태 바 */
-  box-shadow: inset 2px 0 0 var(--create);
+  background: transparent;
+  border-color: transparent;
+  color: var(--create);
 }
 .rail-link.active svg {
   color: var(--create);
+}
+.rail-link.active:hover {
+  background: var(--bg-3);
 }
 .rail-spacer {
   flex: 1;
@@ -456,7 +465,7 @@ html[data-desktop] .app-header .hsearch {
   color: var(--text-0);
 }
 .crumb {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -513,7 +522,7 @@ html[data-desktop] .app-header .hsearch {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   color: var(--text-1);
 }
@@ -599,7 +608,7 @@ html[data-desktop] .app-header .hsearch {
 .category-tab {
   padding: 5px 12px;
   font-size: 12px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   color: var(--text-2);
   background: var(--bg-2);
   border: 1px solid var(--border-0);
@@ -630,7 +639,7 @@ html[data-desktop] .app-header .hsearch {
   border-radius: var(--radius-lg);
 }
 .stat-val {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 23px;
   font-weight: 500;
   color: var(--text-0);

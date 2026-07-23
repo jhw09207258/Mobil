@@ -34,7 +34,7 @@
   background: var(--bg-1);
 }
 .save-state {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -152,13 +152,13 @@
   border: 1px solid var(--border-1);
   border-radius: var(--radius);
   padding: 12px 14px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 13px;
   color: var(--text-1);
   overflow-x: auto;
 }
 .ProseMirror code {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.9em;
   background: var(--bg-3);
   border: 1px solid var(--border-0);
@@ -293,7 +293,7 @@
   min-width: 80px;
 }
 .ProseMirror table th {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -344,7 +344,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   color: var(--text-2);
   background: var(--bg-3);

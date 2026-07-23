@@ -43,7 +43,7 @@
   background: var(--bg-0);
 }
 .save-state {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.05em;
   text-transform: uppercase;

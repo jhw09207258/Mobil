@@ -200,10 +200,10 @@ strong {
    타이포 유틸
    ------------------------------------------------------------------------- */
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 .label {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -396,7 +396,7 @@ strong {
 .table th {
   text-align: left;
   padding: 9px 14px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -456,7 +456,7 @@ strong {
   min-width: 44px;
   height: 20px;
   padding: 0 8px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   line-height: 1;
   letter-spacing: 0.06em;

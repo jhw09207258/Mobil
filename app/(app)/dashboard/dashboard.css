@@ -62,22 +62,40 @@
   max-height: 190px;
 }
 
-/* 네트워크 모니터 */
+/* 네트워크 모니터 — 카드 폭 전체 사용 */
 .netmon {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
+}
+.netmon-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 .netmon-rate {
   font-size: 20px;
   color: var(--text-0);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .netmon-spark {
   display: block;
+  width: 100%;
+  height: 44px;
 }
 .netmon-meta {
   font-size: 9.5px;
+}
+
+/* 카드 정보 출처(대시보드 공용) */
+.card-source {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
 }
 
 /* Recent 패널 — 남는 세로 공간을 모두 차지, 넘치면 내부 스크롤 */

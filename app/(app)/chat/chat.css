@@ -51,7 +51,7 @@
   background: var(--bg-4);
   border: 1px solid var(--border-2);
   border-radius: 50%;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 14px;
   color: var(--text-1);
 }
@@ -77,7 +77,7 @@
 }
 .chat-conv-time {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   color: var(--text-3);
 }
@@ -100,7 +100,7 @@
   background: var(--create);
   color: var(--on-create);
   border-radius: 9px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 600;
 }
@@ -128,7 +128,7 @@
   min-width: 0;
 }
 .chat-thread-meta {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--text-3);
@@ -171,7 +171,7 @@
   color: var(--text-0);
 }
 .chat-msg-time {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   color: var(--text-3);
 }
@@ -232,7 +232,7 @@
 }
 .chat-li-marker {
   flex: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   color: var(--text-2);
   min-width: 16px;
@@ -276,7 +276,7 @@
   background: var(--bg-3);
 }
 .chat-ref-kind {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -384,12 +384,12 @@
   color: var(--text-2);
 }
 .chat-menu-glyph {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
 }
 .chat-menu-state {
   margin-left: auto;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   letter-spacing: 0.06em;
   color: var(--text-3);
@@ -447,7 +447,7 @@
   padding: 0;
   background: none;
   border: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10.5px;
   letter-spacing: 0.05em;
   color: var(--steel-hover);
@@ -526,7 +526,7 @@
   color: var(--text-0);
 }
 .chat-contact-email {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   color: var(--text-3);
   overflow: hidden;
@@ -578,7 +578,7 @@
 
 /* ---- 읽음 표시 ---- */
 .chat-receipt {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9.5px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -673,13 +673,14 @@
   background: transparent;
   color: var(--text-1);
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 999px;
   cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
 }
 .chat-header-btn:hover,
 .chat-header-btn.active {
-  background: var(--bg-3);
-  border-color: var(--border-1);
+  background: color-mix(in srgb, var(--bg-3) 80%, transparent);
+  border-color: var(--border-0);
   color: var(--text-0);
 }
 .chat-bubble-badge {

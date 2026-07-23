@@ -68,7 +68,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   color: var(--text-2);
 }
@@ -101,7 +101,7 @@
 .sys-details li {
   font-size: 11.5px;
   color: var(--text-2);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   /* 공백 없는 긴 문자열(호스트명, 모델명)이 카드/그리드를 옆으로 밀어내지
      않도록 필요하면 아무 데서나 줄바꿈한다. */
   overflow-wrap: anywhere;

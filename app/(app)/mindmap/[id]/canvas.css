@@ -39,7 +39,7 @@
   border-color: var(--border-1);
 }
 .save-state {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -151,7 +151,7 @@
   flex: none;
 }
 .mm-preview-kind {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -197,7 +197,7 @@
 .mm-preview-meta {
   display: block;
   color: var(--text-3);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 11px;
   margin-bottom: 8px;
 }

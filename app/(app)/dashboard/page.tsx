@@ -124,7 +124,7 @@ export default async function DashboardPage() {
               </span>
             </div>
             <div className="panel-body">
-              <Copyable value={userId} />
+              <Copyable value={userId} secret />
             </div>
           </div>
         </div>

@@ -10,7 +10,11 @@ import { useEffect } from "react";
  */
 export function DesktopChrome() {
   useEffect(() => {
-    if (navigator.userAgent.includes("MobilDesktop")) {
+    const isTauri =
+      navigator.userAgent.includes("MobilDesktop") ||
+      "__TAURI_INTERNALS__" in window ||
+      "__TAURI__" in window;
+    if (isTauri) {
       document.documentElement.dataset.desktop = "true";
     }
   }, []);

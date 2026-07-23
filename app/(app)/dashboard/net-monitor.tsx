@@ -48,26 +48,44 @@ export function NetMonitor() {
 
   const max = Math.max(peak, 1);
   const w = 120;
-  const h = 28;
+  const h = 34;
   const points = hist
-    .map((v, i) => `${((i / (WINDOW - 1)) * w).toFixed(1)},${(h - (v / max) * (h - 2)).toFixed(1)}`)
+    .map((v, i) => `${((i / (WINDOW - 1)) * w).toFixed(1)},${(h - (v / max) * (h - 4)).toFixed(1)}`)
     .join(" ");
+  const areaPoints = hist.length > 1 ? `0,${h} ${points} ${((hist.length - 1) / (WINDOW - 1)) * w},${h}` : "";
 
   return (
     <div className="netmon">
-      <div className="netmon-rate mono">{fmtRate(rate)}</div>
-      <svg width={w} height={h} className="netmon-spark" aria-hidden="true">
+      <div className="netmon-top">
+        <span className="netmon-rate">{fmtRate(rate)}</span>
+        <span className="netmon-meta label">PEAK {fmtRate(peak)}</span>
+      </div>
+      {/* 카드 폭 전체를 채우는 스파크라인(면 채움 포함) */}
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        className="netmon-spark"
+        aria-hidden="true"
+      >
         {hist.length > 1 && (
-          <polyline
-            points={points}
-            fill="none"
-            stroke="var(--create)"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
+          <>
+            <polygon points={areaPoints} fill="var(--create-ghost)" />
+            <polyline
+              points={points}
+              fill="none"
+              stroke="var(--create)"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </>
         )}
       </svg>
-      <div className="netmon-meta label">PEAK {fmtRate(peak)} · LAST 30S</div>
+      <div className="netmon-meta label">LAST 30 SECONDS</div>
+      <p className="card-source">
+        Source · live network traffic between this app and the Vercel/Supabase
+        servers, measured in your browser every second.
+      </p>
     </div>
   );
 }

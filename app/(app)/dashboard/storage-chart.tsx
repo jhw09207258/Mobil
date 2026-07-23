@@ -18,13 +18,16 @@ const ORDER: Category[] = [
   "media",
 ];
 
+// 짙은 파스텔 톤 팔레트 — 채도를 낮추고 명도를 맞춰 서로 잘 어울리게.
+// 인접 쌍(블루-세이지-모브-허니-틸-테라코타)은 색상환에서 충분히 떨어져
+// 있어 구분성이 유지된다.
 const META: Record<Category, { label: string; color: string }> = {
-  files: { label: "Repository", color: "#3987e5" },
-  documents: { label: "Docs +", color: "#008300" },
-  code: { label: "Code", color: "#d55181" },
-  sheets: { label: "Table", color: "#c98500" },
-  mindmaps: { label: "Link Graph", color: "#199e70" },
-  media: { label: "Media", color: "#d95926" },
+  files: { label: "Repository", color: "#7c9cd0" },
+  documents: { label: "Docs +", color: "#83b692" },
+  code: { label: "Code", color: "#c08bbe" },
+  sheets: { label: "Table", color: "#d9b36a" },
+  mindmaps: { label: "Link Graph", color: "#7fb8ae" },
+  media: { label: "Media", color: "#d89a84" },
 };
 
 export function StorageBreakdownChart({ rows }: { rows: Row[] }) {
@@ -136,6 +139,10 @@ export function StorageShareBar({
       <p className="page-sub" style={{ margin: "10px 0 0" }}>
         You are using <strong style={{ color: "var(--text-0)" }}>{formatBytes(myBytes)}</strong> of
         the shared Mobil storage pool.
+      </p>
+      <p className="card-source">
+        Source · Supabase Storage — project-wide bucket usage (files, documents,
+        code, tables, link graphs and media), refreshed on each dashboard load.
       </p>
     </div>
   );
