@@ -25,21 +25,26 @@
   flex: 1;
   overflow-y: auto;
 }
+/* Teams 스타일 — 대화 항목은 구분선 없이 여백으로 나누고, 선택/hover 시
+   둥근 알약 배경이 뜬다. */
+.chat-conv-list {
+  padding: 6px;
+}
 .chat-conv-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 8px 10px;
+  margin-bottom: 2px;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-0);
-  border-left: 2px solid transparent;
+  border-radius: 10px;
+  transition: background 0.12s;
 }
 .chat-conv-item:hover {
   background: var(--bg-2);
 }
 .chat-conv-item.active {
   background: var(--bg-3);
-  border-left-color: var(--create);
 }
 .chat-conv-avatar {
   flex: none;
@@ -146,10 +151,35 @@
 .chat-empty {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   color: var(--text-3);
   font-size: 13px;
+  text-align: center;
+  padding: 24px;
+}
+/* Teams 스타일 빈 대화 상태 — 아이콘 원 + 제목 + 안내 */
+.chat-empty-icon {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-2);
+  color: var(--create);
+  margin-bottom: 6px;
+}
+.chat-empty-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-0);
+}
+.chat-empty-sub {
+  font-size: 13px;
+  color: var(--text-2);
 }
 .chat-msg-row {
   display: flex;
@@ -327,37 +357,48 @@
   border-color: var(--steel) !important;
   color: var(--text-0);
 }
-/* 기본 상태에서 + 버튼(정사각형)·입력창·Send 버튼 높이 통일(38px) */
+/* Teams 스타일 컴포저 — +·입력창·Send 를 하나의 둥근 필드로 감싸고,
+   포커스 시 파란 액센트 링이 뜬다. + 버튼은 정사각형(입력창과 동일 높이). */
 .chat-input-bar {
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  padding: 10px 20px 14px;
+  margin: 10px 20px 14px;
+  padding: 5px 6px;
+  background: var(--bg-0);
+  border: 1px solid var(--border-1);
+  border-radius: 14px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.chat-input-bar:focus-within {
+  border-color: var(--create);
+  box-shadow: 0 0 0 3px var(--create-ghost);
 }
 .chat-input-bar .chat-plus-btn {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   padding: 0;
+  background: transparent;
+  border-color: transparent;
+}
+.chat-input-bar .chat-plus-btn:hover {
+  background: var(--bg-3);
 }
 .chat-input-bar > .btn-primary {
-  height: 38px;
+  height: 36px;
 }
 .chat-textarea {
   flex: 1;
-  min-height: 38px;
+  min-height: 36px;
   max-height: 160px;
   resize: none;
-  padding: 10px 12px;
+  padding: 8px 10px;
   font-size: 13.5px;
   font-family: var(--font-sans);
   color: var(--text-0);
-  background: var(--bg-0);
-  border: 1px solid var(--border-1);
-  border-radius: var(--radius);
+  background: transparent;
+  border: none;
   outline: none;
-}
-.chat-textarea:focus {
-  border-color: var(--steel);
 }
 /* + 버튼 하나에 모든 컴포저 옵션(첨부/서식/이모지/멘션)을 계층 메뉴로 수납 */
 .chat-plus {
@@ -586,6 +627,71 @@
   }
 }
 
+/* ---- 메시지 편집/삭제 ---- */
+.chat-msg-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 100%;
+}
+.chat-msg-row.mine .chat-msg-wrap {
+  flex-direction: row-reverse;
+}
+.chat-msg-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  align-self: center;
+  transition: opacity 0.12s;
+}
+.chat-msg-wrap:hover .chat-msg-actions {
+  opacity: 1;
+}
+.chat-msg-act {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chat-msg-act:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.chat-edited {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-left: 6px;
+}
+.chat-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+}
+.chat-edit-area {
+  min-height: 50px;
+  max-height: 200px;
+  resize: vertical;
+  padding: 6px 8px;
+  font-size: 13.5px;
+  font-family: var(--font-sans);
+  color: var(--text-0);
+  background: var(--bg-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  outline: none;
+}
+.chat-edit-area:focus {
+  border-color: var(--create);
+}
+
 /* ---- 읽음 표시 ---- */
 .chat-receipt {
   font-family: var(--font-sans);
@@ -765,7 +871,7 @@
   padding: 14px 16px;
 }
 .chat-shell.float .chat-input-bar {
-  padding: 8px 12px 10px;
+  margin: 8px 12px 10px;
 }
 .chat-shell.float .chat-fmt-bar {
   padding: 6px 12px 0;

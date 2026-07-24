@@ -8,6 +8,7 @@ import { getFileCategory, FILE_CATEGORY_LABEL, type FileCategory } from "@/lib/f
 import { extractTagsFromText } from "@/lib/tags";
 import { ShareDialog } from "@/components/share-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
+import { Modal } from "@/components/modal";
 import { StarButton } from "../star-button";
 import {
   deleteFile,
@@ -21,6 +22,7 @@ import {
   setItemRepository,
   listRepositoryContents,
   createRepository,
+  renameRepository,
   deleteRepository,
   type Repository,
   type RepositoryContents,
@@ -79,6 +81,9 @@ export function FilesClient({
   const [repoContents, setRepoContents] = useState<RepositoryContents | null>(null);
   const [unfiled, setUnfiled] = useState<RepositoryContents | null>(null);
   const [creating, setCreating] = useState(false);
+  // 저장소 생성/이름변경 다이얼로그(prompt 는 Tauri 웹뷰에서 동작하지 않으므로
+  // 모달 입력을 쓴다).
+  const [repoDialog, setRepoDialog] = useState<{ mode: "create" | "rename"; id?: string; name: string } | null>(null);
   const dragDepth = useRef(0);
   const [pending, start] = useTransition();
 
@@ -140,14 +145,19 @@ export function FilesClient({
     setRepoContents(null);
   };
 
-  const onNewRepo = async () => {
-    const name = prompt("New repository name");
-    if (!name?.trim()) return;
-    const res = await createRepository(name);
+  const submitRepoDialog = async () => {
+    if (!repoDialog) return;
+    const name = repoDialog.name.trim();
+    if (!name) return;
+    const res =
+      repoDialog.mode === "create"
+        ? await createRepository(name)
+        : await renameRepository(repoDialog.id!, name);
     if ("error" in res) {
       setError(res.error);
       return;
     }
+    setRepoDialog(null);
     router.refresh();
   };
 
@@ -354,7 +364,7 @@ export function FilesClient({
                 repositories. Open one to view, add or remove its items.
               </p>
             </div>
-            <button className="btn btn-primary" onClick={onNewRepo}>
+            <button className="btn btn-primary" onClick={() => setRepoDialog({ mode: "create", name: "" })}>
               + New repository
             </button>
           </div>
@@ -380,15 +390,26 @@ export function FilesClient({
               >
                 <span className="repo-card-name">{r.name}</span>
                 <span className="repo-card-sub">Open →</span>
-                <button
-                  className="btn btn-ghost btn-sm repo-card-del"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteRepo(r.id, r.name);
-                  }}
-                >
-                  Delete
-                </button>
+                <div className="repo-card-actions">
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRepoDialog({ mode: "rename", id: r.id, name: r.name });
+                    }}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm btn-danger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteRepo(r.id, r.name);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -683,6 +704,31 @@ export function FilesClient({
           onDeleted={() => router.refresh()}
           onClose={() => setDeleteTarget(null)}
         />
+      )}
+
+      {repoDialog && (
+        <Modal
+          title={repoDialog.mode === "create" ? "New repository" : "Rename repository"}
+          onClose={() => setRepoDialog(null)}
+        >
+          <input
+            className="input"
+            autoFocus
+            placeholder="Repository name"
+            value={repoDialog.name}
+            maxLength={80}
+            onChange={(e) => setRepoDialog((d) => (d ? { ...d, name: e.target.value } : d))}
+            onKeyDown={(e) => e.key === "Enter" && submitRepoDialog()}
+            style={{ marginBottom: 12 }}
+          />
+          <button
+            className="btn btn-primary btn-block"
+            onClick={submitRepoDialog}
+            disabled={!repoDialog.name.trim()}
+          >
+            {repoDialog.mode === "create" ? "Create" : "Save"}
+          </button>
+        </Modal>
       )}
 
       <style>{dropCss}</style>

@@ -79,6 +79,7 @@ type WorkspaceCtx = {
   openTab: (kind: TabKind, itemId: string, title: string, seed?: unknown) => void;
   consumeSeed: (id: string) => unknown | undefined;
   closeTab: (id: string) => void;
+  reorderTab: (fromId: string, toId: string) => void;
   focusTab: (id: string, pane?: Pane) => void;
   setPaneTab: (pane: Pane, id: string | null) => void;
   toggleSplit: () => void;
@@ -149,6 +150,20 @@ export function WorkspaceProvider({
     });
   }, []);
 
+  // 탭 순서 재배치 — fromId 를 toId 위치로 이동(드래그 앤 드롭).
+  const reorderTab = useCallback((fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    setState((s) => {
+      const from = s.tabs.findIndex((t) => t.id === fromId);
+      const to = s.tabs.findIndex((t) => t.id === toId);
+      if (from === -1 || to === -1) return s;
+      const tabs = [...s.tabs];
+      const [moved] = tabs.splice(from, 1);
+      tabs.splice(to, 0, moved);
+      return { ...s, tabs };
+    });
+  }, []);
+
   const focusTab = useCallback((id: string, pane: Pane = "left") => {
     setState((s) => ({
       ...s,
@@ -197,6 +212,7 @@ export function WorkspaceProvider({
       openTab,
       consumeSeed,
       closeTab,
+      reorderTab,
       focusTab,
       setPaneTab,
       toggleSplit,
@@ -204,7 +220,7 @@ export function WorkspaceProvider({
       hide,
       renameTab,
     }),
-    [state, openTab, consumeSeed, closeTab, focusTab, setPaneTab, toggleSplit, setSplitPct, hide, renameTab]
+    [state, openTab, consumeSeed, closeTab, reorderTab, focusTab, setPaneTab, toggleSplit, setSplitPct, hide, renameTab]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

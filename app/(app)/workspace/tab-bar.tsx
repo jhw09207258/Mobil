@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { IconDocuments, IconCode, IconSheet, IconMindmap, IconChat } from "../icons";
 import { useWorkspace, type Tab } from "./workspace-context";
 import { useIsMobile } from "@/lib/use-media-query";
@@ -12,17 +13,47 @@ const KIND_ICON = {
   chat: IconChat,
 };
 
-function TabChip({ tab }: { tab: Tab }) {
-  const { paneLeft, paneRight, open, focusTab, closeTab } = useWorkspace();
+function TabChip({
+  tab,
+  dragId,
+  setDragId,
+}: {
+  tab: Tab;
+  dragId: string | null;
+  setDragId: (id: string | null) => void;
+}) {
+  const { paneLeft, paneRight, open, focusTab, closeTab, reorderTab } = useWorkspace();
+  const [dragOver, setDragOver] = useState(false);
   const inPane = tab.id === paneLeft || tab.id === paneRight;
   const active = open && inPane;
   const Icon = KIND_ICON[tab.kind];
 
   return (
     <div
-      className={`wk-tab ${active ? "active" : inPane ? "in-pane" : ""}`}
+      className={`wk-tab ${active ? "active" : inPane ? "in-pane" : ""} ${
+        dragOver && dragId !== tab.id ? "drop-target" : ""
+      } ${dragId === tab.id ? "dragging" : ""}`}
       onClick={() => focusTab(tab.id, tab.id === paneRight ? "right" : "left")}
       title={tab.title}
+      // 드래그로 탭 순서 재배치
+      draggable
+      onDragStart={(e) => {
+        setDragId(tab.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onDragEnd={() => setDragId(null)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        if (dragId && dragId !== tab.id) reorderTab(dragId, tab.id);
+        setDragId(null);
+      }}
     >
       <span className="wk-tab-icon">
         <Icon size={13} />
@@ -45,6 +76,7 @@ function TabChip({ tab }: { tab: Tab }) {
 export function TabBar() {
   const { tabs, split, open, toggleSplit, hide } = useWorkspace();
   const isMobile = useIsMobile();
+  const [dragId, setDragId] = useState<string | null>(null);
 
   if (tabs.length === 0) return null;
 
@@ -52,7 +84,7 @@ export function TabBar() {
     <div className="wk-bar">
       <div className="wk-tabs">
         {tabs.map((t) => (
-          <TabChip key={t.id} tab={t} />
+          <TabChip key={t.id} tab={t} dragId={dragId} setDragId={setDragId} />
         ))}
       </div>
       <div className="wk-bar-actions">

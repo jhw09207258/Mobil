@@ -5,11 +5,13 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
-import { IconPlus, IconClip, IconSmile, IconLink, IconImage } from "../icons";
+import { IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat } from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import {
   addMembers,
   createGroup,
+  deleteChatMessage,
+  editChatMessage,
   getChatMembers,
   getChatMessages,
   leaveConversation,
@@ -248,6 +250,8 @@ export function ChatShell({
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"new" | "add-members" | null>(null);
   const [fmtOpen, setFmtOpen] = useState(false);
@@ -348,6 +352,20 @@ export function ChatShell({
             )
             .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
         );
+      })
+      .on("broadcast", { event: "edit" }, ({ payload }) => {
+        const p = payload as { id?: string; content?: string; edited_at?: string } | null;
+        if (!p?.id) return;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === p.id ? { ...m, content: p.content ?? m.content, edited_at: p.edited_at ?? null } : m
+          )
+        );
+      })
+      .on("broadcast", { event: "delete" }, ({ payload }) => {
+        const p = payload as { id?: string } | null;
+        if (!p?.id) return;
+        setMessages((prev) => prev.filter((m) => m.id !== p.id));
       })
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         const p = payload as { user_id?: string; name?: string } | null;
@@ -458,6 +476,43 @@ export function ChatShell({
       e.preventDefault();
       onSend();
     }
+  };
+
+  const startEdit = (m: ChatMessage) => {
+    setEditingId(m.id);
+    setEditText(m.content);
+  };
+
+  const saveEdit = async () => {
+    if (!editingId) return;
+    const text = editText.trim();
+    if (!text) return;
+    const res = await editChatMessage(editingId, text);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    setMessages((prev) =>
+      prev.map((m) => (m.id === editingId ? { ...m, content: text, edited_at: res.edited_at } : m))
+    );
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "edit",
+      payload: { id: editingId, content: text, edited_at: res.edited_at },
+    });
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const onDeleteMessage = async (id: string) => {
+    if (!confirm("Delete this message?")) return;
+    const res = await deleteChatMessage(id);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    channelRef.current?.send({ type: "broadcast", event: "delete", payload: { id } });
   };
 
   const openConversation = (id: string) => {
@@ -728,8 +783,50 @@ export function ChatShell({
                         <span className="chat-msg-time">{fmtTime(m.created_at)}</span>
                       </div>
                     )}
-                    <div className={`chat-msg ${mine ? "mine" : "theirs"}`}>
-                      <CollapsibleBody content={m.content} onOpenRef={openRef} />
+                    <div className="chat-msg-wrap">
+                      <div className={`chat-msg ${mine ? "mine" : "theirs"}`}>
+                        {editingId === m.id ? (
+                          <div className="chat-edit">
+                            <textarea
+                              className="chat-edit-area"
+                              value={editText}
+                              autoFocus
+                              onChange={(e) => setEditText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                  e.preventDefault();
+                                  saveEdit();
+                                } else if (e.key === "Escape") {
+                                  setEditingId(null);
+                                }
+                              }}
+                            />
+                            <div className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
+                              <button className="btn btn-sm btn-ghost" onClick={() => setEditingId(null)}>
+                                Cancel
+                              </button>
+                              <button className="btn btn-sm btn-primary" onClick={saveEdit} disabled={!editText.trim()}>
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <CollapsibleBody content={m.content} onOpenRef={openRef} />
+                            {m.edited_at && <span className="chat-edited">(edited)</span>}
+                          </>
+                        )}
+                      </div>
+                      {mine && editingId !== m.id && (
+                        <div className="chat-msg-actions">
+                          <button className="chat-msg-act" title="Edit" onClick={() => startEdit(m)}>
+                            ✎
+                          </button>
+                          <button className="chat-msg-act" title="Delete" onClick={() => onDeleteMessage(m.id)}>
+                            🗑
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {mine && readReceipt && lastMine?.id === m.id && (
                       <span className={`chat-receipt ${readReceipt.startsWith("Read") ? "read" : ""}`}>
@@ -740,7 +837,13 @@ export function ChatShell({
                 );
               })}
             {activeId && !loading && messages.length === 0 && (
-              <div className="chat-empty">No messages yet — say hello.</div>
+              <div className="chat-empty">
+                <span className="chat-empty-icon">
+                  <IconChat size={30} />
+                </span>
+                <span className="chat-empty-title">You&rsquo;re starting a new conversation</span>
+                <span className="chat-empty-sub">Type your first message below.</span>
+              </div>
             )}
             {activeId && typingNames.length > 0 && (
               <div className="chat-typing">

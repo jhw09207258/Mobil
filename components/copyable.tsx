@@ -25,21 +25,37 @@ export function Copyable({
     animRef.current = null;
   };
 
+  const step = Math.max(1, Math.round(value.length / 18));
+
   const toggleReveal = () => {
+    stopAnim();
     if (revealed) {
-      stopAnim();
-      setDisplay(null);
-      setRevealed(false);
+      // 숨기기 — 오른쪽부터 무작위 글자로 스크램블되며 사라지는 역애니메이션.
+      let settledLen = value.length;
+      animRef.current = setInterval(() => {
+        settledLen -= step;
+        if (settledLen <= 0) {
+          stopAnim();
+          setDisplay(null);
+          setRevealed(false);
+          return;
+        }
+        const settled = value.slice(0, settledLen);
+        const scrambled = Array.from({ length: value.length - settledLen }, () =>
+          SCRAMBLE[Math.floor(Math.random() * SCRAMBLE.length)]
+        ).join("");
+        setDisplay(settled + scrambled);
+      }, 35);
       return;
     }
+    // 보이기 — 왼쪽부터 실제 값으로 수렴하는 디코딩 애니메이션.
     setRevealed(true);
     let progress = 0;
-    stopAnim();
     animRef.current = setInterval(() => {
-      progress += Math.max(1, Math.round(value.length / 18));
+      progress += step;
       if (progress >= value.length) {
         stopAnim();
-        setDisplay(null); // 완료 — 실제 값 렌더
+        setDisplay(null);
         return;
       }
       const settled = value.slice(0, progress);

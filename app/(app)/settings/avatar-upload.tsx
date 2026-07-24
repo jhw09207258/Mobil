@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { setAvatarUrl } from "./actions";
+import { setAvatarUrl, removeAvatar } from "./actions";
 
 const BUCKET = "avatars";
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -25,6 +25,22 @@ export function AvatarUpload({
   const [error, setError] = useState<string | null>(null);
 
   const onPick = () => inputRef.current?.click();
+
+  const onRemove = async () => {
+    if (!url || uploading) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const res = await removeAvatar();
+      if ("error" in res) throw new Error(res.error);
+      setUrl(null);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove photo.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const onChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -98,9 +114,16 @@ export function AvatarUpload({
           hidden
           onChange={onChange}
         />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onPick} disabled={uploading}>
-          {uploading ? "Uploading…" : "Change photo"}
-        </button>
+        <div className="row" style={{ gap: 6 }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onPick} disabled={uploading}>
+            {uploading ? "Working…" : url ? "Change photo" : "Upload photo"}
+          </button>
+          {url && (
+            <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={onRemove} disabled={uploading}>
+              Remove
+            </button>
+          )}
+        </div>
         {error && <div className="notice notice-error" style={{ marginTop: 8 }}>{error}</div>}
       </div>
     </div>

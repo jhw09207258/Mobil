@@ -416,6 +416,7 @@ export interface Database {
           sender_id: string;
           content: string;
           created_at: string;
+          edited_at: string | null;
         };
         Insert: {
           id?: string;
@@ -423,7 +424,10 @@ export interface Database {
           sender_id: string;
           content: string;
         };
-        Update: Record<string, never>;
+        Update: {
+          content?: string;
+          edited_at?: string | null;
+        };
         Relationships: [];
       };
       repositories: {
@@ -665,6 +669,7 @@ export interface Database {
           sender_avatar_url: string | null;
           content: string;
           created_at: string;
+          edited_at: string | null;
         }[];
       };
       mark_chat_read: {

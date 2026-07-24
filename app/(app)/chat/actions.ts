@@ -22,6 +22,7 @@ export type ChatMessage = {
   sender_avatar_url: string | null;
   content: string;
   created_at: string;
+  edited_at?: string | null;
 };
 
 export type ChatContact = {
@@ -71,6 +72,39 @@ export async function sendChatMessage(
     sender_name: profile.display_name || profile.email,
     sender_avatar_url: profile.avatar_url,
   };
+}
+
+export async function editChatMessage(
+  messageId: string,
+  content: string
+): Promise<{ ok: true; edited_at: string } | { error: string }> {
+  const { userId } = await requireUser();
+  const text = content.trim();
+  if (!text) return { error: "Message can't be empty." };
+  if (text.length > 4000) return { error: "Message is too long (max 4,000 characters)." };
+  const supabase = await createClient();
+  const editedAt = new Date().toISOString();
+  const { error } = await supabase
+    .from("chat_messages")
+    .update({ content: text, edited_at: editedAt })
+    .eq("id", messageId)
+    .eq("sender_id", userId);
+  if (error) return { error: "Failed to edit — you can only edit your own messages." };
+  return { ok: true, edited_at: editedAt };
+}
+
+export async function deleteChatMessage(
+  messageId: string
+): Promise<{ ok: true } | { error: string }> {
+  const { userId } = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("chat_messages")
+    .delete()
+    .eq("id", messageId)
+    .eq("sender_id", userId);
+  if (error) return { error: "Failed to delete — you can only delete your own messages." };
+  return { ok: true };
 }
 
 export async function startDm(

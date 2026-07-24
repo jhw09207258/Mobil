@@ -40,6 +40,19 @@ export async function createRepository(
   return data;
 }
 
+export async function renameRepository(
+  id: string,
+  name: string
+): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 80) return { error: "Repository name must be 1-80 characters." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("repositories").update({ name: trimmed }).eq("id", id);
+  if (error) return { error: "Failed to rename repository." };
+  return { ok: true };
+}
+
 export async function deleteRepository(id: string): Promise<{ ok: true } | { error: string }> {
   await requireUser();
   const supabase = await createClient();

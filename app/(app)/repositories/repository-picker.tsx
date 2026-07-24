@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Modal } from "@/components/modal";
 import {
   createRepository,
   getItemRepository,
@@ -26,6 +27,8 @@ export function RepositoryPicker({
   const [repos, setRepos] = useState<Repository[] | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const [newName, setNewName] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -43,22 +46,28 @@ export function RepositoryPicker({
 
   if (!repos) return null;
 
+  const createAndAssign = async () => {
+    const name = newName.trim();
+    if (!name || busy) return;
+    setBusy(true);
+    const created = await createRepository(name);
+    if ("error" in created) {
+      setBusy(false);
+      return;
+    }
+    setRepos((prev) => [...(prev ?? []), created]);
+    await setItemRepository(kind, itemId, created.id);
+    setCurrent(created.id);
+    setNewOpen(false);
+    setNewName("");
+    setBusy(false);
+  };
+
   const onChange = async (value: string) => {
     if (busy) return;
     if (value === NEW_SENTINEL) {
-      const name = prompt("New repository name");
-      if (!name?.trim()) return;
-      setBusy(true);
-      const created = await createRepository(name);
-      if ("error" in created) {
-        alert(created.error);
-        setBusy(false);
-        return;
-      }
-      setRepos((prev) => [...(prev ?? []), created]);
-      await setItemRepository(kind, itemId, created.id);
-      setCurrent(created.id);
-      setBusy(false);
+      // prompt 는 Tauri 웹뷰에서 null 을 반환하므로 모달 입력을 쓴다.
+      setNewOpen(true);
       return;
     }
     const next = value === "" ? null : value;
@@ -71,21 +80,40 @@ export function RepositoryPicker({
   };
 
   return (
-    <select
-      className="select repo-picker"
-      value={current ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={!canEdit || busy}
-      title="Repository"
-      aria-label="Repository"
-    >
-      <option value="">Null Repository</option>
-      {repos.map((r) => (
-        <option key={r.id} value={r.id}>
-          {r.name}
-        </option>
-      ))}
-      {canEdit && <option value={NEW_SENTINEL}>+ New repository…</option>}
-    </select>
+    <>
+      <select
+        className="select repo-picker"
+        value={current ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={!canEdit || busy}
+        title="Repository"
+        aria-label="Repository"
+      >
+        <option value="">Null Repository</option>
+        {repos.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+          </option>
+        ))}
+        {canEdit && <option value={NEW_SENTINEL}>+ New repository…</option>}
+      </select>
+      {newOpen && (
+        <Modal title="New repository" onClose={() => setNewOpen(false)}>
+          <input
+            className="input"
+            autoFocus
+            placeholder="Repository name"
+            value={newName}
+            maxLength={80}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && createAndAssign()}
+            style={{ marginBottom: 12 }}
+          />
+          <button className="btn btn-primary btn-block" onClick={createAndAssign} disabled={!newName.trim() || busy}>
+            Create &amp; assign
+          </button>
+        </Modal>
+      )}
+    </>
   );
 }

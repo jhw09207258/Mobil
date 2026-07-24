@@ -121,3 +121,27 @@ export async function setAvatarUrl(
   if (error) return { error: "Failed to save avatar." };
   return { ok: true };
 }
+
+export async function removeAvatar(): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Authentication required." };
+
+  // 프로필의 avatar_url 을 비운다. 스토리지의 실제 오브젝트도 정리한다
+  // (best-effort — 삭제 실패해도 프로필은 이미 사진 없음으로 표시된다).
+  const { error } = await supabase
+    .from("profiles")
+    .update({ avatar_url: null })
+    .eq("id", user.id);
+  if (error) return { error: "Failed to remove avatar." };
+
+  for (const ext of ["jpg", "jpeg", "png", "webp", "gif"]) {
+    await supabase.storage.from("avatars").remove([`${user.id}/avatar.${ext}`]).then(
+      () => {},
+      () => {}
+    );
+  }
+  return { ok: true };
+}

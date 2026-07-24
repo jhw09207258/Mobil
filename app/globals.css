@@ -163,6 +163,43 @@ strong {
   font-weight: 500;
 }
 
+/* ---- 드래그-복사 방지 ----------------------------------------------------
+   SaaS 크롬(사이드바·헤더·목록·카드 등)에서는 텍스트 드래그로 복사되지 않게
+   막고, 실제 편집 대상(문서·코드·시트 에디터)과 메시지·입력 요소에서만 텍스트
+   선택/복사를 허용한다. 이미지 드래그도 막는다. */
+body {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+[contenteditable="true"],
+.ProseMirror,
+.cm-editor,
+.cm-content,
+.luckysheet,
+.luckysheet-cell-main,
+.sh-paper,
+.chat-msg,
+.sophia-msg,
+.chat-codeblock,
+.chat-inline-code,
+.code-block,
+.mm-preview-body,
+.mm-preview-snippet,
+.mm-preview-code {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+/* 이미지 드래그(끌어서 저장/복사) 방지 — 에디터 내부는 예외 없이 허용해도
+   무방하나 전역으로 막아 일관되게 한다. */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* 스크롤바 — 둥근 알약형 썸(macOS 계열) */
 ::-webkit-scrollbar {
   width: 12px;
@@ -646,10 +683,12 @@ html[data-theme="light"] .btn {
   font-size: 12px;
   color: var(--text-3);
 }
-.repo-card-del {
+.repo-card-actions {
   position: absolute;
   top: 10px;
   right: 10px;
+  display: flex;
+  gap: 4px;
 }
 
 /* 아이콘 인터랙션 — 부드러운 색/스케일 전환으로 살아있는 느낌을 준다. */

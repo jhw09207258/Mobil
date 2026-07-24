@@ -50,11 +50,11 @@
    Mobil 로고·검색창·채팅·프로필은 그 "아래" 줄에 일직선으로 내려온다.
    헤더 빈 영역 드래그로 창 이동, 내부 컨트롤은 no-drag. 브라우저에선 무시. */
 html[data-desktop] {
-  --header-h: 60px;
+  /* Safari 통합 툴바처럼 — 헤더 콘텐츠를 세로 중앙 정렬하고 신호등을 같은
+     높이에 맞춘다. 상단 여백을 더 줄인 컴팩트 높이. */
+  --header-h: 44px;
 }
 html[data-desktop] .app-header {
-  /* 신호등 클리어에 필요한 최소 상단 여백만 남긴다(과한 상부 공백 제거). */
-  padding-top: 18px;
   -webkit-app-region: drag;
 }
 /* 크롬(헤더+사이드바+탭바)을 반투명하게 — macOS 유리 질감.
@@ -66,10 +66,10 @@ html[data-desktop] body {
   background: transparent;
 }
 html[data-desktop] .app {
-  /* 크롬은 60% 불투명 유리, 콘텐츠 아일랜드(.app-main)만 완전 불투명 */
-  background: color-mix(in srgb, var(--bg-1) 60%, transparent);
-  -webkit-backdrop-filter: blur(30px) saturate(1.6);
-  backdrop-filter: blur(30px) saturate(1.6);
+  /* 크롬은 42% 불투명 유리(더 투명하게), 콘텐츠 아일랜드만 완전 불투명 */
+  background: color-mix(in srgb, var(--bg-1) 42%, transparent);
+  -webkit-backdrop-filter: blur(42px) saturate(1.7);
+  backdrop-filter: blur(42px) saturate(1.7);
 }
 html[data-desktop] .app-header a,
 html[data-desktop] .app-header button,

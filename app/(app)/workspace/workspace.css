@@ -68,6 +68,13 @@ html[data-theme="light"] .wk-tab.active {
 .wk-tab.in-pane {
   color: var(--steel-hover);
 }
+/* 드래그 재배치 시각 피드백 */
+.wk-tab.dragging {
+  opacity: 0.4;
+}
+.wk-tab.drop-target {
+  box-shadow: inset 2px 0 0 var(--create);
+}
 .wk-tab-icon {
   flex: none;
   display: flex;
