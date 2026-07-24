@@ -252,6 +252,8 @@ export function ChatShell({
   const [sending, setSending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  // 링크 삽입 모달 — null 이면 닫힘, 문자열이면 열림(값은 입력 중 URL).
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"new" | "add-members" | null>(null);
   const [fmtOpen, setFmtOpen] = useState(false);
@@ -309,6 +311,11 @@ export function ChatShell({
   // 대화 전환: 메시지+멤버 로딩, 읽음 표시, 실시간 채널 구독(멤버 전용 private).
   useEffect(() => {
     setActiveConversation(activeId);
+    // 대화를 바꾸면 이전 대화에서 편집/링크 중이던 UI 상태를 정리한다.
+    setEditingId(null);
+    setEditText("");
+    setLinkUrl(null);
+    setMenu(null);
     if (!activeId) {
       setMessages([]);
       setMembers([]);
@@ -428,9 +435,16 @@ export function ChatShell({
     return () => clearInterval(t);
   }, [refreshList]);
 
+  // 새 메시지가 "추가"될 때(또는 대화 전환·타이핑 표시)만 맨 아래로 스크롤한다.
+  // 기존 메시지 편집/삭제로 개수가 그대로거나 줄면 스크롤을 건드리지 않는다
+  // (오래된 메시지를 편집할 때 화면이 아래로 튀는 것 방지).
+  const prevMsgCountRef = useRef(0);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, typing]);
+    if (messages.length >= prevMsgCountRef.current) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    }
+    prevMsgCountRef.current = messages.length;
+  }, [messages, typing, activeId]);
 
   const onInputChange = (value: string) => {
     setInput(value);
@@ -502,6 +516,7 @@ export function ChatShell({
     });
     setEditingId(null);
     setEditText("");
+    refreshList(); // 마지막 메시지를 고쳤으면 목록 미리보기도 갱신.
   };
 
   const onDeleteMessage = async (id: string) => {
@@ -513,6 +528,7 @@ export function ChatShell({
     }
     setMessages((prev) => prev.filter((m) => m.id !== id));
     channelRef.current?.send({ type: "broadcast", event: "delete", payload: { id } });
+    refreshList(); // 마지막 메시지를 지웠으면 목록 미리보기도 갱신.
   };
 
   const openConversation = (id: string) => {
@@ -629,10 +645,14 @@ export function ChatShell({
     });
   };
 
-  const onLinkButton = () => {
-    const url = prompt("Link URL (https://…)");
-    if (!url || !/^https?:\/\//.test(url)) return;
+  // prompt 는 Tauri 웹뷰에서 null 을 반환하므로 링크 삽입은 모달로 받는다.
+  const onLinkButton = () => setLinkUrl("");
+
+  const insertLink = () => {
+    const url = (linkUrl ?? "").trim();
+    if (!/^https?:\/\//.test(url)) return;
     applyWrap("[", `](${url})`, "link text");
+    setLinkUrl(null);
   };
 
   // 읽음 표시 — 내가 보낸 "마지막" 메시지 하나에만 붙인다(Insta/카톡 스타일).
@@ -1070,6 +1090,26 @@ export function ChatShell({
             refreshList();
           }}
         />
+      )}
+      {linkUrl !== null && (
+        <Modal title="Insert link" onClose={() => setLinkUrl(null)}>
+          <input
+            className="input"
+            autoFocus
+            placeholder="https://…"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && insertLink()}
+            style={{ marginBottom: 12 }}
+          />
+          <button
+            className="btn btn-primary btn-block"
+            onClick={insertLink}
+            disabled={!/^https?:\/\//.test(linkUrl.trim())}
+          >
+            Insert
+          </button>
+        </Modal>
       )}
     </div>
   );

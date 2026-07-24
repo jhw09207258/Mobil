@@ -84,6 +84,8 @@ export function FilesClient({
   // 저장소 생성/이름변경 다이얼로그(prompt 는 Tauri 웹뷰에서 동작하지 않으므로
   // 모달 입력을 쓴다).
   const [repoDialog, setRepoDialog] = useState<{ mode: "create" | "rename"; id?: string; name: string } | null>(null);
+  // 파일 이름변경 모달(prompt 는 Tauri 웹뷰에서 동작하지 않음).
+  const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const dragDepth = useRef(0);
   const [pending, start] = useTransition();
 
@@ -331,14 +333,21 @@ export function FilesClient({
       } else setError(res.error);
     });
 
-  const rename = (row: FileRow) =>
+  const rename = (row: FileRow) => setRenameTarget({ id: row.id, name: row.file_name });
+
+  const submitRename = () => {
+    if (!renameTarget) return;
+    const next = renameTarget.name.trim();
+    if (!next) return;
     start(async () => {
-      const next = window.prompt("New file name", row.file_name);
-      if (next == null || next.trim() === "" || next === row.file_name) return;
-      const res = await renameFile(row.id, next);
+      const res = await renameFile(renameTarget.id, next);
       if (!res.ok) setError(res.error);
-      else router.refresh();
+      else {
+        setRenameTarget(null);
+        router.refresh();
+      }
     });
+  };
 
   // 삭제는 GitHub 처럼 파일 이름을 직접 입력해야 확정된다(DeleteConfirmDialog).
   // 목록은 삭제 성공 후 router.refresh() 로 즉시 갱신한다.
@@ -704,6 +713,27 @@ export function FilesClient({
           onDeleted={() => router.refresh()}
           onClose={() => setDeleteTarget(null)}
         />
+      )}
+
+      {renameTarget && (
+        <Modal title="Rename file" onClose={() => setRenameTarget(null)}>
+          <input
+            className="input"
+            autoFocus
+            placeholder="File name"
+            value={renameTarget.name}
+            onChange={(e) => setRenameTarget((t) => (t ? { ...t, name: e.target.value } : t))}
+            onKeyDown={(e) => e.key === "Enter" && submitRename()}
+            style={{ marginBottom: 12 }}
+          />
+          <button
+            className="btn btn-primary btn-block"
+            onClick={submitRename}
+            disabled={!renameTarget.name.trim() || pending}
+          >
+            {pending ? "Renaming…" : "Save"}
+          </button>
+        </Modal>
       )}
 
       {repoDialog && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const SCRAMBLE = "0123456789abcdef-";
 
@@ -19,11 +19,20 @@ export function Copyable({
   // 디코딩 애니메이션 — ●●● 에서 무작위 글자를 거쳐 실제 값으로 수렴한다.
   const [display, setDisplay] = useState<string | null>(null);
   const animRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopAnim = () => {
     if (animRef.current) clearInterval(animRef.current);
     animRef.current = null;
   };
+
+  // 언마운트 시 진행 중인 타이머 정리(setState-after-unmount 방지).
+  useEffect(() => {
+    return () => {
+      if (animRef.current) clearInterval(animRef.current);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const step = Math.max(1, Math.round(value.length / 18));
 
@@ -70,7 +79,8 @@ export function Copyable({
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1400);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 1400);
     } catch {
       /* clipboard 권한 없음 — 조용히 무시 */
     }
