@@ -62,11 +62,93 @@
 .save-state.saved {
   color: var(--ok);
 }
+/* 에디터 + 어시스트 패널을 좌우로 나란히 */
+.code-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
 .code-scroll {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--bg-1);
+}
+
+/* ---- 코드 어시스트 패널 ---- */
+.assist-panel {
+  flex: none;
+  width: min(380px, 42vw);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-left: 1px solid var(--border-0);
+  background: var(--bg-2);
+  overflow-y: auto;
+}
+.assist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.assist-close {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+}
+.assist-close:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.assist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.assist-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.assist-result {
+  flex: 1;
+  min-height: 0;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-1);
+  background: var(--bg-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+  user-select: text;
+}
+
+/* 좁은 화면에서는 패널을 아래로 쌓는다 */
+@media (max-width: 900px) {
+  .code-body {
+    flex-direction: column;
+  }
+  .assist-panel {
+    width: auto;
+    max-height: 45%;
+    border-left: none;
+    border-top: 1px solid var(--border-0);
+  }
 }
 /* Monaco 호스트 — 컨테이너 높이를 그대로 채운다(automaticLayout 이 리사이즈를
    감지하려면 부모가 확정된 높이를 가져야 한다). */

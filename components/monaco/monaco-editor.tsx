@@ -119,7 +119,12 @@ function defineThemes() {
   });
 }
 
-export type MonacoApi = { undo: () => void; redo: () => void };
+export type MonacoApi = {
+  undo: () => void;
+  redo: () => void;
+  /** 현재 선택 영역(없으면 전체 내용) — AI 어시스트에 넘길 코드. */
+  getSelection: () => string;
+};
 
 export function MonacoCodeEditor({
   value,
@@ -198,6 +203,11 @@ export function MonacoCodeEditor({
       redo: () => {
         editor.trigger("toolbar", "redo", null);
         editor.focus();
+      },
+      getSelection: () => {
+        const sel = editor.getSelection();
+        const picked = sel && !sel.isEmpty() ? editor.getModel()?.getValueInRange(sel) : "";
+        return picked || editor.getValue();
       },
     });
 

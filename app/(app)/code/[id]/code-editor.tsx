@@ -14,6 +14,7 @@ import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import dynamic from "next/dynamic";
 import { LANGUAGES, isLangKey, detectLanguage, type LangKey } from "@/lib/languages";
 import { ShareDialog } from "@/components/share-dialog";
+import { AssistPanel } from "./assist-panel";
 import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate, seedDeterministically } from "@/lib/yjs-transport";
 import {
   saveCodeFile,
@@ -85,7 +86,12 @@ export function CodeEditor({
   const [error, setError] = useState<string | null>(null);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cmApiRef = useRef<{ undo: () => void; redo: () => void } | null>(null);
+  const cmApiRef = useRef<{
+    undo: () => void;
+    redo: () => void;
+    getSelection: () => string;
+  } | null>(null);
+  const [assistOpen, setAssistOpen] = useState(false);
   const nameRef = useRef(name);
   const langRef = useRef(language);
   const contentRef = useRef(initialContent);
@@ -264,6 +270,13 @@ export function CodeEditor({
           </select>
         </div>
         <div className="row hscroll" style={{ gap: 10 }}>
+          <button
+            className={`btn btn-sm ${assistOpen ? "chat-tool-active" : ""}`}
+            onClick={() => setAssistOpen((v) => !v)}
+            title="Ask Claude about the selected code"
+          >
+            Assist
+          </button>
           {canEdit && (
             <>
               <button className="btn btn-sm" onClick={() => cmApiRef.current?.undo()} title="Undo (⌘Z)">
@@ -324,17 +337,27 @@ export function CodeEditor({
         </div>
       )}
 
-      <div className="code-scroll">
-        <CodeMirror
-          value={initialContent}
-          language={language}
-          editable={canEdit}
-          onChange={onContentChange}
-          ytext={ytext}
-          onReady={(api) => {
-            cmApiRef.current = api;
-          }}
-        />
+      <div className="code-body">
+        <div className="code-scroll">
+          <CodeMirror
+            value={initialContent}
+            language={language}
+            editable={canEdit}
+            onChange={onContentChange}
+            ytext={ytext}
+            onReady={(api) => {
+              cmApiRef.current = api;
+            }}
+          />
+        </div>
+        {assistOpen && (
+          <AssistPanel
+            getSelection={() => cmApiRef.current?.getSelection() ?? ""}
+            language={language}
+            filename={name || "untitled"}
+            onClose={() => setAssistOpen(false)}
+          />
+        )}
       </div>
 
       {showShare && (
