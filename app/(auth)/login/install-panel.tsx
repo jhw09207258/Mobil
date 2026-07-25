@@ -4,22 +4,30 @@ import { useState } from "react";
 
 type Os = "mac" | "windows";
 
+const REPO_URL = "https://github.com/jhw09207258/Mobil.git";
+
+// 서명·공증된 배포 파이프라인이 아직 없어 possion.app 에서 바로 받는
+// curl/irm 원라이너 대신, 실제로 지금 동작하는 방법 — 공개 GitHub 저장소를
+// 그대로 clone 해 로컬에서 빌드하는 절차를 안내한다.
 const LINES: Record<Os, { prompt: boolean; text: string }[]> = {
   mac: [
-    { prompt: true, text: "curl -fsSL https://possion.app/install.sh | sh" },
-    { prompt: false, text: "Fetching Possion for macOS..." },
-    { prompt: false, text: "Verifying package signature..." },
-    { prompt: false, text: "Installing to /Applications/Possion.app" },
-    { prompt: false, text: "Installation complete." },
-    { prompt: true, text: "open -a Possion" },
+    { prompt: true, text: `git clone ${REPO_URL}` },
+    { prompt: false, text: "Cloning into 'Mobil'..." },
+    { prompt: true, text: "cd Mobil && npm install" },
+    { prompt: false, text: "Installing dependencies..." },
+    { prompt: true, text: "npm run tauri build" },
+    { prompt: false, text: "Building Possion.app (a few minutes)..." },
+    { prompt: true, text: "open src-tauri/target/release/bundle/macos/Possion.app" },
   ],
   windows: [
-    { prompt: true, text: "irm https://possion.app/install.ps1 | iex" },
-    { prompt: false, text: "Fetching Possion for Windows..." },
-    { prompt: false, text: "Verifying package signature..." },
-    { prompt: false, text: "Installing to C:\\Program Files\\Possion" },
-    { prompt: false, text: "Installation complete." },
-    { prompt: true, text: "start Possion" },
+    { prompt: true, text: `git clone ${REPO_URL}` },
+    { prompt: false, text: "Cloning into 'Mobil'..." },
+    { prompt: true, text: "cd Mobil; npm install" },
+    { prompt: false, text: "Installing dependencies..." },
+    { prompt: true, text: "npm run tauri build" },
+    { prompt: false, text: "Building the Windows installer (a few minutes)..." },
+    { prompt: true, text: "start .\\src-tauri\\target\\release\\bundle\\" },
+    { prompt: false, text: "Run the .msi or .exe installer from that folder." },
   ],
 };
 
@@ -71,7 +79,13 @@ export function InstallPanel({ os, onBack }: { os: Os; onBack: () => void }) {
           <div className="terminal-cursor" aria-hidden="true" />
         </div>
       </div>
-      <div className="install-note">Direct install isn&apos;t live yet — check back soon.</div>
+      <div className="install-note">
+        Requires Node.js 18+ and Rust (rustup.rs) already installed.
+        <br />
+        <a href={REPO_URL.replace(/\.git$/, "")} target="_blank" rel="noopener noreferrer">
+          View source on GitHub
+        </a>
+      </div>
     </div>
   );
 }
