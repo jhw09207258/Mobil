@@ -276,16 +276,23 @@ function Inner({
     // 한다 — 인라인 스타일 문자열은 그대로 두면서 화면에 그려지는 변환만
     // !important 로 웃돈다(인라인 스타일도 !important 규칙에는 진다).
     const mapCanvas = containerRef.current.querySelector(".map-canvas") as HTMLElement | null;
+    // 좌표/배율은 관찰 대상(.map-canvas)이 아니라 그 부모(.mm-mount)에 쓴다 —
+    // CSS 커스텀 프로퍼티는 자식으로 상속되므로 .map-canvas 의 transform 규칙이
+    // 그대로 값을 받아 쓰고, 관찰 콜백이 자기가 감시하는 style 속성을 건드리지
+    // 않게 되어 무한 변이 루프가 구조적으로 불가능해진다(부모에 쓰지 않고
+    // .map-canvas 에 직접 쓰면 setProperty → style 변이 → 콜백 재실행이
+    // 끝없이 반복돼 탭이 멈춘다).
+    const varHost = containerRef.current;
     const syncFlatTransform = () => {
       if (!mapCanvas) return;
       const t = mapCanvas.style.transform;
       const pos = t.match(/translate3d\(([^,]+),\s*([^,]+),/);
       const scale = t.match(/scale\(([^)]+)\)/);
       if (pos) {
-        mapCanvas.style.setProperty("--mm-tx", pos[1].trim());
-        mapCanvas.style.setProperty("--mm-ty", pos[2].trim());
+        varHost.style.setProperty("--mm-tx", pos[1].trim());
+        varHost.style.setProperty("--mm-ty", pos[2].trim());
       }
-      mapCanvas.style.setProperty("--mm-scale", scale ? scale[1].trim() : "1");
+      varHost.style.setProperty("--mm-scale", scale ? scale[1].trim() : "1");
     };
     const demoteObserver = new MutationObserver(syncFlatTransform);
     if (mapCanvas) {
