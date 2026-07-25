@@ -1,188 +1,61 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/modal";
-import { IconCode, IconFiles } from "../icons";
-import { OpenItemButton } from "../workspace/open-item-button";
+import { IconFiles } from "../icons";
 import { planImport, parseGitHubUrl, MAX_FILES, type ImportPlan } from "@/lib/github-import";
 import { startImport, useImportState, dismissImport } from "./import-store";
 import {
-  addCodeFileToRepo,
   createCodeRepository,
   deleteCodeRepository,
-  listCodeRepoFiles,
   renameCodeRepository,
-  type CodeRepoFile,
   type CodeRepository,
 } from "./repo-actions";
 
-/** 파일 확장자 기준으로 텍스트만 골라낸다(대량 업로드 시 바이너리 방지). */
-const MAX_UPLOAD_BYTES = 200 * 1024;
-
+/**
+ * Code Space 목록 — 기존 Repositories(문서·파일 범용 저장소)와는 별개다.
+ * 하나를 열면 트리 + 에디터 + Antigravity 에이전트가 있는 워크스페이스로 간다.
+ */
 export function CodeRepos({ repos }: { repos: CodeRepository[] }) {
   const router = useRouter();
-  const [openRepo, setOpenRepo] = useState<CodeRepository | null>(null);
-  const [files, setFiles] = useState<CodeRepoFile[] | null>(null);
   const [dialog, setDialog] = useState<"import" | "create" | null>(null);
   const [renameTarget, setRenameTarget] = useState<CodeRepository | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const uploadRef = useRef<HTMLInputElement>(null);
   const imp = useImportState();
 
-  // 임포트가 끝나면 목록과 열린 저장소를 갱신한다.
   useEffect(() => {
     if (imp.finishedTick === 0) return;
     router.refresh();
-    if (openRepo) listCodeRepoFiles(openRepo.id).then(setFiles);
-    // openRepo 를 의존성에 넣으면 저장소를 열 때마다 refresh 가 돈다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imp.finishedTick, router]);
 
-  const enterRepo = (r: CodeRepository) => {
-    setOpenRepo(r);
-    setFiles(null);
-    listCodeRepoFiles(r.id).then(setFiles);
-  };
-
-  const onUpload = async (list: FileList | null) => {
-    if (!list?.length || !openRepo) return;
-    setBusy(true);
-    setError(null);
-    let failed = 0;
-    for (const f of Array.from(list)) {
-      if (f.size > MAX_UPLOAD_BYTES) {
-        failed++;
-        continue;
-      }
-      try {
-        const text = await f.text();
-        // 폴더 업로드면 webkitRelativePath 에 폴더 구조가 들어 있다.
-        const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
-        const res = await addCodeFileToRepo(openRepo.id, rel || f.name, text);
-        if ("error" in res) failed++;
-      } catch {
-        failed++;
-      }
-    }
-    setBusy(false);
-    if (failed) setError(`${failed} file(s) were skipped (too large or unreadable).`);
-    if (uploadRef.current) uploadRef.current.value = "";
-    listCodeRepoFiles(openRepo.id).then(setFiles);
-    router.refresh();
-  };
+  const open = (r: CodeRepository) => router.push(`/code/space/${r.id}`);
 
   const onDelete = async (r: CodeRepository) => {
     if (!confirm(`Move "${r.name}" and its files to the Trash?`)) return;
     const res = await deleteCodeRepository(r.id);
     if ("error" in res) setError(res.error);
-    else {
-      if (openRepo?.id === r.id) setOpenRepo(null);
-      router.refresh();
-    }
+    else router.refresh();
   };
 
-  // ---- 저장소 상세 ----
-  if (openRepo) {
-    return (
-      <>
-        {error && <div className="notice notice-error">{error}</div>}
-        <div className="row" style={{ gap: 8, marginBottom: 14, alignItems: "center" }}>
-          <button className="btn btn-sm" onClick={() => setOpenRepo(null)}>
-            ‹ All repositories
-          </button>
-          <h2 className="h-title" style={{ margin: 0 }}>{openRepo.name}</h2>
-          {openRepo.github_owner && (
-            <a
-              className="page-sub"
-              style={{ margin: 0 }}
-              href={`https://github.com/${openRepo.github_owner}/${openRepo.github_repo}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {openRepo.github_owner}/{openRepo.github_repo}
-              {openRepo.github_ref ? `@${openRepo.github_ref}` : ""} ↗
-            </a>
-          )}
-          <div className="row" style={{ gap: 6, marginLeft: "auto" }}>
-            <button
-              className="btn btn-sm"
-              onClick={() => uploadRef.current?.click()}
-              disabled={busy}
-            >
-              {busy ? "Adding…" : "Add files"}
-            </button>
-          </div>
-        </div>
-        <input
-          ref={uploadRef}
-          type="file"
-          multiple
-          hidden
-          onChange={(e) => onUpload(e.target.files)}
-        />
-
-        {files === null ? (
-          <div className="empty">Loading…</div>
-        ) : files.length === 0 ? (
-          <div className="empty">No files yet — use “Add files” to upload some.</div>
-        ) : (
-          <div className="table-scroll">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th style={{ width: 40 }}></th>
-                  <th>Path</th>
-                  <th style={{ width: 110 }} className="col-hide-mobile">Language</th>
-                  <th style={{ width: 90 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.map((f) => (
-                  <tr key={f.id}>
-                    <td>
-                      <span className="drive-icon"><IconCode size={15} /></span>
-                    </td>
-                    <td>
-                      <OpenItemButton kind="code" id={f.id} title={f.name} className="link-btn">
-                        {f.path || f.name}
-                      </OpenItemButton>
-                    </td>
-                    <td className="muted col-hide-mobile">{f.language}</td>
-                    <td>
-                      <OpenItemButton kind="code" id={f.id} title={f.name} className="btn btn-ghost btn-sm">
-                        Open
-                      </OpenItemButton>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  // ---- 저장소 목록 ----
   return (
     <>
       {error && <div className="notice notice-error">{error}</div>}
       <ImportProgress />
 
       <div className="row" style={{ gap: 8, marginBottom: 14 }}>
-        <button className="btn btn-sm btn-primary" onClick={() => setDialog("import")}>
-          Import from GitHub
+        <button className="btn btn-sm btn-primary" onClick={() => setDialog("create")}>
+          New Code Space
         </button>
-        <button className="btn btn-sm" onClick={() => setDialog("create")}>
-          New code repository
+        <button className="btn btn-sm" onClick={() => setDialog("import")}>
+          Import from GitHub
         </button>
       </div>
 
       {repos.length === 0 ? (
         <div className="empty">
-          No code repositories yet. Import one from GitHub, or create an empty one.
+          No Code Spaces yet. Create an empty one and build it with the agent, or import a
+          repository from GitHub.
         </div>
       ) : (
         <div className="table-scroll" style={{ marginBottom: 22 }}>
@@ -190,25 +63,28 @@ export function CodeRepos({ repos }: { repos: CodeRepository[] }) {
             <thead>
               <tr>
                 <th style={{ width: 46 }}></th>
-                <th>Repository</th>
+                <th>Code Space</th>
                 <th style={{ width: 90 }}>Files</th>
                 <th style={{ width: 200 }} className="col-hide-mobile">Source</th>
-                <th style={{ width: 150 }}></th>
+                <th style={{ width: 190 }}></th>
               </tr>
             </thead>
             <tbody>
               {repos.map((r) => (
                 <tr key={r.id} className="drive-row clickable">
-                  <td onClick={() => enterRepo(r)}>
+                  <td onClick={() => open(r)}>
                     <span className="drive-icon folder"><IconFiles size={16} /></span>
                   </td>
-                  <td onClick={() => enterRepo(r)}>{r.name}</td>
+                  <td onClick={() => open(r)}>{r.name}</td>
                   <td className="mono muted">{r.file_count}</td>
                   <td className="muted col-hide-mobile" style={{ fontSize: 12 }}>
                     {r.github_owner ? `${r.github_owner}/${r.github_repo}` : "—"}
                   </td>
                   <td>
                     <div className="row row-actions" style={{ gap: 4 }}>
+                      <button className="btn btn-sm btn-primary" onClick={() => open(r)}>
+                        Open
+                      </button>
                       <button className="btn btn-sm" onClick={() => setRenameTarget(r)}>
                         Rename
                       </button>
@@ -228,7 +104,13 @@ export function CodeRepos({ repos }: { repos: CodeRepository[] }) {
         <ImportDialog onClose={() => setDialog(null)} onDone={() => { setDialog(null); router.refresh(); }} />
       )}
       {dialog === "create" && (
-        <CreateDialog onClose={() => setDialog(null)} onDone={() => { setDialog(null); router.refresh(); }} />
+        <CreateDialog
+          onClose={() => setDialog(null)}
+          onDone={(id) => {
+            setDialog(null);
+            router.push(`/code/space/${id}`);
+          }}
+        />
       )}
       {renameTarget && (
         <RenameDialog
@@ -365,32 +247,39 @@ function ImportDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
   );
 }
 
-function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: (id: string) => void }) {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const create = async () => {
+    setBusy(true);
+    const res = await createCodeRepository(name);
+    setBusy(false);
+    if ("error" in res) setError(res.error);
+    else onDone(res.id);
+  };
+
   return (
-    <Modal title="New code repository" onClose={onClose} width={420}>
+    <Modal title="New Code Space" onClose={onClose} width={440}>
       {error && <div className="notice notice-error">{error}</div>}
       <input
         className="input"
         style={{ width: "100%" }}
-        placeholder="Repository name"
+        placeholder="Code Space name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         autoFocus
+        onKeyDown={(e) => e.key === "Enter" && name.trim() && !busy && create()}
       />
+      <p className="page-sub" style={{ marginTop: 8, fontSize: 11.5 }}>
+        Starts empty. Open it and describe what you want — the agent can create the whole
+        project for you.
+      </p>
       <div className="row" style={{ gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
         <button className="btn btn-sm" onClick={onClose}>Cancel</button>
-        <button
-          className="btn btn-sm btn-primary"
-          disabled={!name.trim()}
-          onClick={async () => {
-            const res = await createCodeRepository(name);
-            if ("error" in res) setError(res.error);
-            else onDone();
-          }}
-        >
-          Create
+        <button className="btn btn-sm btn-primary" disabled={!name.trim() || busy} onClick={create}>
+          {busy ? "Creating…" : "Create"}
         </button>
       </div>
     </Modal>
@@ -409,7 +298,7 @@ function RenameDialog({
   const [name, setName] = useState(repo.name);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal title="Rename repository" onClose={onClose} width={420}>
+    <Modal title="Rename Code Space" onClose={onClose} width={420}>
       {error && <div className="notice notice-error">{error}</div>}
       <input
         className="input"

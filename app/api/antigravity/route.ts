@@ -5,19 +5,35 @@ import { detectLanguage } from "@/lib/languages";
 import {
   AGENT_MODELS,
   buildSources,
-  runAgentTurn,
+  startTurn,
+  pollTurn,
+  type CommitHandlers,
   type MountFile,
 } from "@/lib/antigravity";
 
 // ============================================================================
 // Code Space 단위 Antigravity 세션.
 //
-// 첫 요청은 Code Space 의 모든 파일을 원격 샌드박스에 마운트하고 환경 ID 를
-// 돌려준다. 이어지는 요청은 그 환경 + previous_interaction_id 로 같은 세션을
-// 계속하므로, 에이전트는 앞서 한 작업과 샌드박스 상태를 그대로 기억한다.
+// action=start  첫 턴이면 Code Space 전체를 원격 샌드박스에 마운트하고 에이전트를
+//               background 로 띄운다. 이어가는 턴이면 기존 환경을 재사용한다.
+// action=poll   진행 상황을 한 번 확인한다. 에이전트가 도구를 기다리고 있으면
+//               여기서 파일을 DB 에 쓰고 다음 interaction 을 띄운다.
+//
+// 에이전트 실행은 몇 분이 걸릴 수 있어서 한 요청에 다 태우면 서버리스 함수
+// 타임아웃에 걸린다. 그래서 두 단계로 쪼갠다 — 요청 하나는 항상 짧게 끝난다.
 // ============================================================================
 
-export const maxDuration = 300;
+export const maxDuration = 60;
+
+type Body = {
+  action?: "start" | "poll";
+  spaceId?: string;
+  input?: string;
+  interactionId?: string;
+  previousInteractionId?: string;
+  environmentId?: string;
+  model?: string;
+};
 
 export async function POST(request: NextRequest) {
   const { userId } = await requireUser();
@@ -30,13 +46,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: {
-    spaceId?: string;
-    input?: string;
-    previousInteractionId?: string;
-    environmentId?: string;
-    model?: string;
-  };
+  let body: Body;
   try {
     body = await request.json();
   } catch {
@@ -44,9 +54,7 @@ export async function POST(request: NextRequest) {
   }
 
   const spaceId = body.spaceId;
-  const input = (body.input ?? "").trim();
   if (!spaceId) return NextResponse.json({ error: "No Code Space given." }, { status: 400 });
-  if (!input) return NextResponse.json({ error: "Nothing to send." }, { status: 400 });
 
   const model = AGENT_MODELS.includes(body.model as (typeof AGENT_MODELS)[number])
     ? (body.model as string)
@@ -54,10 +62,10 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // RLS 가 남의 Code Space 를 걸러주지만, 소유자만 에이전트를 돌릴 수 있게 한 번 더 확인한다.
+  // RLS 가 남의 것을 걸러주지만, 에이전트는 소유자만 돌릴 수 있게 한 번 더 막는다.
   const { data: space } = await supabase
     .from("code_repositories")
-    .select("id, name, owner_id")
+    .select("id, owner_id")
     .eq("id", spaceId)
     .single();
   if (!space) return NextResponse.json({ error: "Code Space not found." }, { status: 404 });
@@ -65,11 +73,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not your Code Space." }, { status: 403 });
   }
 
-  // ---- 파일을 DB 에 쓰는 도구 구현 ----
   const pathKey = (p: string) => p.replace(/^\/+/, "").replace(/^workspace\//, "");
 
-  const handlers = {
-    async commit(files: MountFile[]) {
+  const handlers: CommitHandlers = {
+    async commit(files) {
       const saved: string[] = [];
       const failed: string[] = [];
       for (const f of files) {
@@ -87,7 +94,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
 
         // yjs_state 를 반드시 지운다 — 에디터는 스냅샷이 있으면 그걸 우선하므로,
-        // 남겨두면 새로 쓴 content 가 화면에 안 나타난다.
+        // 남겨두면 새로 쓴 content 가 파일을 열었을 때 안 보인다.
         const { error } = existing
           ? await supabase
               .from("code_files")
@@ -107,7 +114,7 @@ export async function POST(request: NextRequest) {
       return { saved, failed };
     },
 
-    async remove(paths: string[]) {
+    async remove(paths) {
       const deleted: string[] = [];
       for (const raw of paths) {
         const path = pathKey(raw);
@@ -125,45 +132,62 @@ export async function POST(request: NextRequest) {
     },
   };
 
-  // ---- 첫 턴이면 Code Space 전체를 마운트 ----
-  let sources: { type: "inline"; content: string; target: string }[] | undefined;
-  let skipped: string[] = [];
-  let mountedCount = 0;
-  const resuming = Boolean(body.environmentId && body.previousInteractionId);
-
-  if (!resuming) {
-    const { data: files } = await supabase
-      .from("code_files")
-      .select("path, name, content")
-      .eq("code_repository_id", spaceId);
-    const mount: MountFile[] = (files ?? []).map((f) => ({
-      path: pathKey(f.path || f.name || "untitled"),
-      content: f.content ?? "",
-    }));
-    const built = buildSources(mount);
-    sources = built.sources;
-    skipped = built.skipped;
-    mountedCount = built.sources.length;
-  }
-
-  const prompt =
-    resuming || skipped.length === 0
-      ? input
-      : `${input}\n\n[Note: these files were too large to mount and are not in /workspace: ${skipped
-          .slice(0, 20)
-          .join(", ")}]`;
-
   try {
-    const result = await runAgentTurn({
+    // ---- 폴링 ----
+    if (body.action === "poll") {
+      if (!body.interactionId) {
+        return NextResponse.json({ error: "No interaction to poll." }, { status: 400 });
+      }
+      const res = await pollTurn({
+        apiKey,
+        interactionId: body.interactionId,
+        model,
+        environmentId: body.environmentId,
+        handlers,
+      });
+      return NextResponse.json(res);
+    }
+
+    // ---- 시작 ----
+    const input = (body.input ?? "").trim();
+    if (!input) return NextResponse.json({ error: "Nothing to send." }, { status: 400 });
+
+    const resuming = Boolean(body.environmentId && body.previousInteractionId);
+    let sources: { type: "inline"; content: string; target: string }[] | undefined;
+    let skipped: string[] = [];
+    let mountedCount = 0;
+
+    if (!resuming) {
+      const { data: files } = await supabase
+        .from("code_files")
+        .select("path, name, content")
+        .eq("code_repository_id", spaceId);
+      const mount: MountFile[] = (files ?? []).map((f) => ({
+        path: pathKey(f.path || f.name || "untitled"),
+        content: f.content ?? "",
+      }));
+      const built = buildSources(mount);
+      sources = built.sources;
+      skipped = built.skipped;
+      mountedCount = built.sources.length;
+    }
+
+    const prompt =
+      skipped.length === 0
+        ? input
+        : `${input}\n\n[Note: these files were too large to mount and are not in /workspace: ${skipped
+            .slice(0, 20)
+            .join(", ")}]`;
+
+    const started = await startTurn({
       apiKey,
       input: prompt,
       model,
       sources,
       previousInteractionId: body.previousInteractionId,
       environmentId: body.environmentId,
-      handlers,
     });
-    return NextResponse.json({ ...result, model, mountedCount, skipped });
+    return NextResponse.json({ ...started, model, mountedCount, skipped });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (/API_KEY|api key|PERMISSION_DENIED/i.test(msg)) {
@@ -175,16 +199,19 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
-    if (/not found|unsupported|INVALID_ARGUMENT/i.test(msg)) {
+    if (/NOT_FOUND|not found|unsupported|INVALID_ARGUMENT/i.test(msg)) {
       return NextResponse.json(
         {
           error:
-            "The Antigravity agent rejected this request. It is in preview — your API key's project may not have access yet. Details: " +
+            "The Antigravity agent rejected this request — it is in preview and may not be enabled on this API key yet. " +
             msg.slice(0, 200),
         },
         { status: 400 }
       );
     }
-    return NextResponse.json({ error: `Agent request failed: ${msg.slice(0, 200)}` }, { status: 502 });
+    return NextResponse.json(
+      { error: `Agent request failed: ${msg.slice(0, 200)}` },
+      { status: 502 }
+    );
   }
 }

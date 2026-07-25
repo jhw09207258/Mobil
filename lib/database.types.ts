@@ -166,6 +166,7 @@ export interface Database {
           github_repo: string | null;
           github_ref: string | null;
           imported_at: string | null;
+          github_pushed_at: string | null;
           created_at: string;
           deleted_at: string | null;
         };
@@ -180,9 +181,38 @@ export interface Database {
         };
         Update: {
           name?: string;
+          github_owner?: string | null;
+          github_repo?: string | null;
           github_ref?: string | null;
           imported_at?: string | null;
+          github_pushed_at?: string | null;
           deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      user_integrations: {
+        Row: {
+          user_id: string;
+          provider: string;
+          token: string;
+          account: string | null;
+          meta: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          provider: string;
+          token: string;
+          account?: string | null;
+          meta?: Json;
+          updated_at?: string;
+        };
+        Update: {
+          token?: string;
+          account?: string | null;
+          meta?: Json;
+          updated_at?: string;
         };
         Relationships: [];
       };

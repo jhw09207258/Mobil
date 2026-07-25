@@ -180,13 +180,65 @@ export function summarizeStep(step: RawStep): AgentStep | null {
   return null;
 }
 
-export type TurnResult = {
+export type CommitHandlers = {
+  commit: (files: MountFile[]) => Promise<{ saved: string[]; failed: string[] }>;
+  remove: (paths: string[]) => Promise<{ deleted: string[] }>;
+};
+
+/** 에이전트 실행은 몇 분이 걸릴 수 있다. 서버리스 함수 타임아웃에 걸리지 않도록
+ *  background 로 띄우고 폴링한다 — 요청 하나하나는 짧게 끝난다. */
+const BASE = (model: string) => ({
+  agent: ANTIGRAVITY_AGENT,
+  tools: AGENT_TOOLS,
+  system_instruction: SYSTEM,
+  agent_config: { type: "antigravity" as const, model },
+  store: true,
+  background: true,
+});
+
+export type StartedTurn = {
   interactionId: string;
   environmentId?: string;
   status: string;
+};
+
+/** 턴을 띄우기만 하고 즉시 반환한다. */
+export async function startTurn(opts: {
+  apiKey: string;
+  input: string;
+  model: string;
+  /** 첫 턴이면 마운트할 파일들, 이어가는 턴이면 생략. */
+  sources?: { type: "inline"; content: string; target: string }[];
+  previousInteractionId?: string;
+  environmentId?: string;
+}): Promise<StartedTurn> {
+  const ai = new GoogleGenAI({ apiKey: opts.apiKey });
+  const res = await ai.interactions.create({
+    ...BASE(opts.model),
+    environment: opts.environmentId
+      ? opts.environmentId
+      : { type: "remote" as const, sources: opts.sources ?? [] },
+    ...(opts.previousInteractionId
+      ? { previous_interaction_id: opts.previousInteractionId }
+      : {}),
+    input: opts.input,
+  });
+  return {
+    interactionId: res.id,
+    environmentId: res.environment_id,
+    status: res.status,
+  };
+}
+
+export type PolledTurn = {
+  /** 이어서 폴링할 대상. 도구를 실행하면 새 interaction 으로 넘어간다. */
+  interactionId: string;
+  environmentId?: string;
+  /** running 이면 클라이언트가 계속 폴링한다. */
+  status: "running" | "done" | "failed";
+  rawStatus: string;
   text: string;
   steps: AgentStep[];
-  /** 이번 턴에서 실제로 저장/삭제된 경로. */
   committed: string[];
   deleted: string[];
   totalTokens: number;
@@ -195,133 +247,113 @@ export type TurnResult = {
   thoughtTokens: number;
 };
 
-export type CommitHandlers = {
-  commit: (files: MountFile[]) => Promise<{ saved: string[]; failed: string[] }>;
-  remove: (paths: string[]) => Promise<{ deleted: string[] }>;
-};
-
 /**
- * 한 턴을 끝까지 돌린다 — 에이전트가 도구를 부르면 실행하고 결과를 되돌려주며
- * status 가 completed 가 될 때까지 반복한다.
+ * 한 번 폴링한다. 에이전트가 도구를 기다리고 있으면 여기서 실행하고 다음
+ * interaction 을 띄운 뒤 그 ID 를 돌려준다.
  */
-export async function runAgentTurn(opts: {
+export async function pollTurn(opts: {
   apiKey: string;
-  input: string;
+  interactionId: string;
   model: string;
-  /** 첫 턴이면 마운트할 파일들, 이어가는 턴이면 생략. */
-  sources?: { type: "inline"; content: string; target: string }[];
-  previousInteractionId?: string;
   environmentId?: string;
   handlers: CommitHandlers;
-}): Promise<TurnResult> {
+}): Promise<PolledTurn> {
   const ai = new GoogleGenAI({ apiKey: opts.apiKey });
-
-  const base = {
-    agent: ANTIGRAVITY_AGENT,
-    tools: AGENT_TOOLS,
-    system_instruction: SYSTEM,
-    agent_config: { type: "antigravity" as const, model: opts.model },
-    store: true,
-  };
-
-  // 첫 턴은 파일을 마운트하며 새 환경을 만들고, 이후 턴은 그 환경을 재사용한다.
-  const environment = opts.environmentId
-    ? opts.environmentId
-    : { type: "remote" as const, sources: opts.sources ?? [] };
-
-  let res = await ai.interactions.create({
-    ...base,
-    environment,
-    ...(opts.previousInteractionId
-      ? { previous_interaction_id: opts.previousInteractionId }
-      : {}),
-    input: opts.input,
-  });
+  const res = await ai.interactions.get(opts.interactionId);
 
   const steps: AgentStep[] = [];
+  for (const s of res.steps ?? []) {
+    const line = summarizeStep(s as RawStep);
+    if (line) steps.push(line);
+  }
+  const u = res.usage;
+  const usage = {
+    totalTokens: u?.total_tokens ?? 0,
+    inputTokens: u?.total_input_tokens ?? 0,
+    outputTokens: u?.total_output_tokens ?? 0,
+    thoughtTokens: u?.total_thought_tokens ?? 0,
+  };
   const committed: string[] = [];
   const deleted: string[] = [];
-  let totalTokens = 0;
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let thoughtTokens = 0;
 
-  const absorb = (r: typeof res) => {
-    for (const s of r.steps ?? []) {
-      const line = summarizeStep(s as RawStep);
-      if (line) steps.push(line);
-    }
-    const u = r.usage;
-    if (u) {
-      totalTokens += u.total_tokens ?? 0;
-      inputTokens += u.total_input_tokens ?? 0;
-      outputTokens += u.total_output_tokens ?? 0;
-      thoughtTokens += u.total_thought_tokens ?? 0;
-    }
-  };
-  absorb(res);
-
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    if (res.status !== "requires_action") break;
-
+  if (res.status === "requires_action") {
     const calls = (res.steps ?? []).filter(
-      (s): s is typeof s & { type: "function_call"; id: string; name: string } =>
+      (s): s is typeof s & { id: string; name: string } =>
         (s as RawStep).type === "function_call"
     );
-    if (calls.length === 0) break;
-
-    const results = [];
-    for (const call of calls) {
-      const args = ((call as RawStep).arguments ?? {}) as Record<string, unknown>;
-      let result: Record<string, unknown>;
-      if (call.name === "commit_files") {
-        const files = (Array.isArray(args.files) ? args.files : []).filter(
-          (f): f is MountFile =>
-            !!f && typeof f === "object" && typeof (f as MountFile).path === "string"
-        );
-        const out = await opts.handlers.commit(files);
-        committed.push(...out.saved);
-        result = out.failed.length
-          ? { ok: false, saved: out.saved, failed: out.failed, error: "Some files could not be saved." }
-          : { ok: true, saved: out.saved, message: `Saved ${out.saved.length} file(s).` };
-      } else if (call.name === "delete_files") {
-        const paths = (Array.isArray(args.paths) ? args.paths : []).filter(
-          (p): p is string => typeof p === "string"
-        );
-        const out = await opts.handlers.remove(paths);
-        deleted.push(...out.deleted);
-        result = { ok: true, deleted: out.deleted };
-      } else {
-        result = { ok: false, error: `Unknown tool ${call.name}` };
+    if (calls.length > 0) {
+      const results = [];
+      for (const call of calls) {
+        const args = ((call as RawStep).arguments ?? {}) as Record<string, unknown>;
+        let result: Record<string, unknown>;
+        if (call.name === "commit_files") {
+          const files = (Array.isArray(args.files) ? args.files : []).filter(
+            (f): f is MountFile =>
+              !!f && typeof f === "object" && typeof (f as MountFile).path === "string"
+          );
+          const out = await opts.handlers.commit(files);
+          committed.push(...out.saved);
+          result = out.failed.length
+            ? {
+                ok: false,
+                saved: out.saved,
+                failed: out.failed,
+                error: "Some files could not be saved.",
+              }
+            : { ok: true, saved: out.saved, message: `Saved ${out.saved.length} file(s).` };
+        } else if (call.name === "delete_files") {
+          const paths = (Array.isArray(args.paths) ? args.paths : []).filter(
+            (p): p is string => typeof p === "string"
+          );
+          const out = await opts.handlers.remove(paths);
+          deleted.push(...out.deleted);
+          result = { ok: true, deleted: out.deleted };
+        } else {
+          result = { ok: false, error: `Unknown tool ${call.name}` };
+        }
+        results.push({
+          type: "function_result" as const,
+          call_id: call.id,
+          name: call.name,
+          result,
+        });
       }
-      results.push({
-        type: "function_result" as const,
-        call_id: call.id,
-        name: call.name,
-        result,
+      const next = await ai.interactions.create({
+        ...BASE(opts.model),
+        environment: res.environment_id ?? opts.environmentId ?? "",
+        previous_interaction_id: res.id,
+        input: results,
       });
+      return {
+        interactionId: next.id,
+        environmentId: next.environment_id ?? res.environment_id,
+        status: "running",
+        rawStatus: res.status,
+        text: "",
+        steps,
+        committed,
+        deleted,
+        ...usage,
+      };
     }
-
-    res = await ai.interactions.create({
-      ...base,
-      environment: res.environment_id ?? environment,
-      previous_interaction_id: res.id,
-      input: results,
-    });
-    absorb(res);
   }
+
+  const terminal =
+    res.status === "completed" ||
+    res.status === "incomplete" ||
+    res.status === "budget_exceeded";
+  const failed =
+    res.status === "failed" || res.status === "cancelled";
 
   return {
     interactionId: res.id,
-    environmentId: res.environment_id,
-    status: res.status,
+    environmentId: res.environment_id ?? opts.environmentId,
+    status: failed ? "failed" : terminal ? "done" : "running",
+    rawStatus: res.status,
     text: res.output_text ?? "",
     steps,
     committed,
     deleted,
-    totalTokens,
-    inputTokens,
-    outputTokens,
-    thoughtTokens,
+    ...usage,
   };
 }

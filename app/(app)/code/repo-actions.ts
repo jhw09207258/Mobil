@@ -117,6 +117,85 @@ export async function deleteCodeRepository(
   return { ok: true };
 }
 
+/** Code Space 워크스페이스에서 파일 하나를 연다. */
+export async function getCodeSpace(
+  id: string
+): Promise<{ id: string; name: string; github_owner: string | null; github_repo: string | null } | null> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("code_repositories")
+    .select("id, name, github_owner, github_repo")
+    .eq("id", id)
+    .single();
+  return data ?? null;
+}
+
+export async function readSpaceFile(
+  fileId: string
+): Promise<{ content: string; language: string; name: string } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("code_files")
+    .select("content, language, name")
+    .eq("id", fileId)
+    .single();
+  if (!data) return { error: "File not found." };
+  return { content: data.content ?? "", language: data.language, name: data.name };
+}
+
+/**
+ * 워크스페이스 에디터의 저장. yjs_state 를 비우는 게 중요하다 — 탭 에디터는
+ * 스냅샷이 있으면 그걸 우선하므로, 남겨두면 여기서 쓴 내용이 사라진 것처럼 보인다.
+ */
+export async function writeSpaceFile(
+  fileId: string,
+  content: string
+): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("code_files")
+    .update({ content, yjs_state: null })
+    .eq("id", fileId);
+  if (error) return { error: "Save failed." };
+  return { ok: true };
+}
+
+/** 빈 파일을 만든다 — 새 Code Space 를 바닥부터 만들 때 쓴다. */
+export async function createSpaceFile(
+  spaceId: string,
+  path: string
+): Promise<{ id: string } | { error: string }> {
+  const { userId } = await requireUser();
+  const clean = path.trim().replace(/^\/+/, "");
+  if (!clean) return { error: "Give the file a path." };
+  const supabase = await createClient();
+  const { data: dupe } = await supabase
+    .from("code_files")
+    .select("id")
+    .eq("code_repository_id", spaceId)
+    .eq("path", clean)
+    .maybeSingle();
+  if (dupe) return { error: `${clean} already exists.` };
+  const name = clean.split("/").pop() || "untitled";
+  const { data, error } = await supabase
+    .from("code_files")
+    .insert({
+      owner_id: userId,
+      name,
+      path: clean,
+      language: detectLanguage(name),
+      content: "",
+      code_repository_id: spaceId,
+    })
+    .select("id")
+    .single();
+  if (error || !data) return { error: "Could not create the file." };
+  return { id: data.id };
+}
+
 /** 임포트/업로드로 들어온 파일 한 개를 저장한다. 경로에서 언어를 추론한다. */
 export async function addCodeFileToRepo(
   repoId: string,

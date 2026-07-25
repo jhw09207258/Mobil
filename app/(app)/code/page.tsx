@@ -36,6 +36,9 @@ export default async function CodePage() {
           <NewItemButton kind="code" label="New code file" create={createCodeFileTab} />
         </div>
 
+        <h2 className="h-title" style={{ margin: "0 0 12px" }}>
+          Code Spaces
+        </h2>
         <CodeRepos repos={codeRepos} />
 
         <h2 className="h-title" style={{ margin: "8px 0 12px" }}>
