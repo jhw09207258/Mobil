@@ -10,6 +10,9 @@
 
 const API = "https://api.vercel.com";
 
+/** 인라인 배포 요청 하나에 담는 총 내용 상한. */
+const MAX_DEPLOY_BYTES = 8_000_000;
+
 export type DeployFile = { path: string; content: string };
 
 export type DeployResult = {
@@ -48,6 +51,15 @@ export async function deployToVercel(opts: {
   production?: boolean;
 }): Promise<DeployResult> {
   if (opts.files.length === 0) throw new Error("This Code Space has no files to deploy.");
+  // 파일을 인라인으로 싣기 때문에 요청 본문이 전체 소스 크기만큼 커진다.
+  const totalBytes = opts.files.reduce((n, f) => n + f.content.length, 0);
+  if (totalBytes > MAX_DEPLOY_BYTES) {
+    throw new Error(
+      `This Code Space is too large to deploy inline (${Math.round(
+        totalBytes / 1_000_000
+      )} MB, limit ${MAX_DEPLOY_BYTES / 1_000_000} MB).`
+    );
+  }
 
   const qs = new URLSearchParams({ skipAutoDetectionConfirmation: "1", forceNew: "1" });
   if (opts.teamId) qs.set("teamId", opts.teamId);

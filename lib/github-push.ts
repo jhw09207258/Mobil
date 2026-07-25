@@ -11,6 +11,9 @@
 
 const API = "https://api.github.com";
 
+/** 트리 생성 요청 하나에 담는 총 내용 상한. */
+const MAX_PUSH_BYTES = 8_000_000;
+
 export type PushFile = { path: string; content: string };
 
 export type PushResult = {
@@ -89,6 +92,16 @@ export async function pushToGitHub(opts: {
 
   if (opts.files.length === 0) {
     throw new GitHubError("This Code Space has no files to push.");
+  }
+  // 트리 한 번에 모든 내용을 인라인으로 싣기 때문에 요청 본문이 통째로 커진다.
+  // 상한을 넘으면 GitHub 이 애매한 오류를 주므로 여기서 먼저 분명하게 막는다.
+  const totalBytes = opts.files.reduce((n, f) => n + f.content.length, 0);
+  if (totalBytes > MAX_PUSH_BYTES) {
+    throw new GitHubError(
+      `This Code Space is too large to push in one request (${Math.round(
+        totalBytes / 1_000_000
+      )} MB, limit ${MAX_PUSH_BYTES / 1_000_000} MB).`
+    );
   }
 
   // 1. 저장소 확보 — 없으면 만든다.

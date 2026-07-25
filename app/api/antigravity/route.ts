@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { detectLanguage } from "@/lib/languages";
+import { sanitizeRepoPath } from "@/lib/code-space";
 import {
   AGENT_MODELS,
   buildSources,
@@ -73,14 +74,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not your Code Space." }, { status: 403 });
   }
 
-  const pathKey = (p: string) => p.replace(/^\/+/, "").replace(/^workspace\//, "");
-
   const handlers: CommitHandlers = {
     async commit(files) {
       const saved: string[] = [];
       const failed: string[] = [];
       for (const f of files) {
-        const path = pathKey(f.path);
+        // 경로는 GitHub 트리와 Vercel 배포 목록으로 그대로 나가므로 반드시 정규화한다.
+        const path = sanitizeRepoPath(f.path);
         if (!path || typeof f.content !== "string") {
           failed.push(f.path);
           continue;
@@ -117,7 +117,8 @@ export async function POST(request: NextRequest) {
     async remove(paths) {
       const deleted: string[] = [];
       for (const raw of paths) {
-        const path = pathKey(raw);
+        const path = sanitizeRepoPath(raw);
+        if (!path) continue;
         const { data: file } = await supabase
           .from("code_files")
           .select("id")
@@ -162,10 +163,12 @@ export async function POST(request: NextRequest) {
         .from("code_files")
         .select("path, name, content")
         .eq("code_repository_id", spaceId);
-      const mount: MountFile[] = (files ?? []).map((f) => ({
-        path: pathKey(f.path || f.name || "untitled"),
-        content: f.content ?? "",
-      }));
+      const mount: MountFile[] = (files ?? [])
+        .map((f) => ({
+          path: sanitizeRepoPath(f.path || f.name || "untitled") ?? "",
+          content: f.content ?? "",
+        }))
+        .filter((f) => f.path);
       const built = buildSources(mount);
       sources = built.sources;
       skipped = built.skipped;

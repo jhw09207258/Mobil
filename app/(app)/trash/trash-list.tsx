@@ -8,6 +8,7 @@ import { purgeItem, restoreItem, type TrashItem } from "./actions";
 const KIND_ICON: Record<string, (p: { size?: number }) => React.ReactElement> = {
   document: IconDocuments,
   code: IconCode,
+  code_space: IconFiles,
   sheet: IconSheet,
   mindmap: IconMindmap,
   file: IconFiles,
@@ -15,6 +16,7 @@ const KIND_ICON: Record<string, (p: { size?: number }) => React.ReactElement> = 
 const KIND_LABEL: Record<string, string> = {
   document: "Docs +",
   code: "Code",
+  code_space: "Code Space",
   sheet: "Table",
   mindmap: "Link Graph",
   file: "File",

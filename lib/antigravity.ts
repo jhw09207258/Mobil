@@ -98,6 +98,21 @@ export const AGENT_TOOLS = [
 export type MountFile = { path: string; content: string };
 
 /**
+ * 에이전트가 절대 읽을 필요가 없는데 용량만 큰 것들. 락파일 하나가 수백 KB라
+ * 진짜 소스가 마운트 예산 밖으로 밀려나는 일이 실제로 생긴다.
+ */
+const NOISE = [
+  /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb|composer\.lock|Cargo\.lock|Gemfile\.lock|poetry\.lock)$/,
+  /\.min\.(js|css)$/,
+  /\.map$/,
+  /(^|\/)(node_modules|\.next|dist|build|coverage|vendor|\.git)\//,
+];
+
+export function isMountNoise(path: string): boolean {
+  return NOISE.some((re) => re.test(path));
+}
+
+/**
  * 파일 목록을 샌드박스 마운트용 inline source 로 바꾼다.
  * 총량이 상한을 넘으면 큰 파일부터 버리고, 버린 목록을 함께 돌려준다
  * (에이전트에게 "이건 안 올라갔다"고 알려주기 위해).
@@ -106,8 +121,10 @@ export function buildSources(files: MountFile[]): {
   sources: { type: "inline"; content: string; target: string }[];
   skipped: string[];
 } {
+  // 잡음 파일은 예산을 계산하기 전에 뺀다 — 이것 때문에 진짜 소스가 밀리면 안 된다.
+  const useful = files.filter((f) => !isMountNoise(f.path));
   // 작은 파일이 먼저 들어가도록 크기 오름차순 — 파일 수를 최대한 살린다.
-  const ordered = [...files].sort((a, b) => a.content.length - b.content.length);
+  const ordered = [...useful].sort((a, b) => a.content.length - b.content.length);
   const sources: { type: "inline"; content: string; target: string }[] = [];
   const skipped: string[] = [];
   let total = 0;

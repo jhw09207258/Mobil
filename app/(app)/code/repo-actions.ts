@@ -102,17 +102,12 @@ export async function deleteCodeRepository(
 ): Promise<{ ok: true } | { error: string }> {
   await requireUser();
   const supabase = await createClient();
-  const { data: files } = await supabase
-    .from("code_files")
-    .select("id")
-    .eq("code_repository_id", id);
-  for (const f of files ?? []) {
-    await supabase.rpc("move_to_trash", { p_kind: "code", p_id: f.id });
-  }
-  const { error } = await supabase
-    .from("code_repositories")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
+  // Space 와 그 안의 파일을 한 번에 휴지통으로. 휴지통에서 Space 를 복원하면
+  // 파일도 함께 돌아온다(0056).
+  const { error } = await supabase.rpc("move_to_trash", {
+    p_kind: "code_space",
+    p_id: id,
+  });
   if (error) return { error: "Delete failed." };
   return { ok: true };
 }
