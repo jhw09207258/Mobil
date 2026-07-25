@@ -185,14 +185,25 @@ export type CommitHandlers = {
   remove: (paths: string[]) => Promise<{ deleted: string[] }>;
 };
 
-/** 에이전트 실행은 몇 분이 걸릴 수 있다. 서버리스 함수 타임아웃에 걸리지 않도록
- *  background 로 띄우고 폴링한다 — 요청 하나하나는 짧게 끝난다. */
-const BASE = (model: string) => ({
+/**
+ * 이 에이전트를 부를 때 항상 같아야 하는 설정. 진단 엔드포인트도 이걸 그대로
+ * 써야 한다 — 따로 손으로 짜면 실제 호출과 어긋나서, 멀쩡한 키를 두고 "안 된다"고
+ * 오진한다(실제로 environment 누락과 store=false 로 두 번 그랬다).
+ *
+ * store 는 반드시 true — 이 에이전트는 store=false 를 거부한다.
+ */
+export const agentBaseConfig = (model: string) => ({
   agent: ANTIGRAVITY_AGENT,
   tools: AGENT_TOOLS,
   system_instruction: SYSTEM,
   agent_config: { type: "antigravity" as const, model },
   store: true,
+});
+
+/** 에이전트 실행은 몇 분이 걸릴 수 있다. 서버리스 함수 타임아웃에 걸리지 않도록
+ *  background 로 띄우고 폴링한다 — 요청 하나하나는 짧게 끝난다. */
+const BASE = (model: string) => ({
+  ...agentBaseConfig(model),
   background: true,
 });
 

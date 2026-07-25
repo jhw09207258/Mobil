@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { ANTIGRAVITY_AGENT, AGENT_MODELS } from "@/lib/antigravity";
+import { ANTIGRAVITY_AGENT, AGENT_MODELS, agentBaseConfig } from "@/lib/antigravity";
 
 // 코드 에이전트 진단(로그인 필요). /api/code-agent/health 를 브라우저에서 열면
 // GEMINI_API_KEY 가 이 배포에 실제로 주입됐는지, 그리고 그 키로 Gemini 호출이
@@ -21,14 +21,14 @@ const MODEL = "gemini-3.5-flash";
 async function probeAntigravity(ai: GoogleGenAI) {
   const t = Date.now();
   try {
-    // environment 는 이 에이전트의 필수 필드다(빼면 400). 빈 sources 로 최소
-    // 샌드박스만 띄운다 — preview 동안 컴퓨트는 과금되지 않는다.
+    // 실제 에이전트와 똑같은 설정으로 부른다 — 여기서 손으로 따로 짜면 필수
+    // 필드가 어긋나 멀쩡한 키를 "안 된다"고 오진한다. 다른 건 두 가지뿐:
+    // 빈 샌드박스(마운트할 파일이 없다)와 동기 실행(폴링 없이 바로 답을 본다).
     const res = await ai.interactions.create({
-      agent: ANTIGRAVITY_AGENT,
-      agent_config: { type: "antigravity", model: AGENT_MODELS[0] },
+      ...agentBaseConfig(AGENT_MODELS[0]),
       environment: { type: "remote", sources: [] },
+      background: false,
       input: "Reply with the single word OK. Do not use any tools.",
-      store: false,
     });
     return {
       available: true,
