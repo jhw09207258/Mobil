@@ -21,10 +21,21 @@
   flex: 1;
   min-width: 0;
 }
-.mm-title {
-  min-width: 0;
+/* 버튼이 아무리 많아져도 겹치지 않도록 이 묶음만 좌우로 스크롤된다 —
+   제목 입력창은 스크롤 밖에 고정. */
+.mm-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex: 1;
-  max-width: 320px;
+  min-width: 0;
+}
+.mm-bar-actions > * {
+  flex: none;
+}
+.mm-title {
+  flex: none;
+  width: 180px;
   height: 32px;
   padding: 0 10px;
   font-size: 15px;
@@ -76,6 +87,14 @@
 .mm-mount {
   height: 100%;
   width: 100%;
+}
+/* 실제 화면에 그려지는 변환은 여기서 2d translate 로만 수행한다(GPU 레이어
+   승격 없음) — canvas.tsx 의 MutationObserver 가 mind-elixir 가 쓴
+   translate3d(...)/scale(...) 문자열에서 좌표만 읽어 커스텀 프로퍼티로
+   옮겨준다. !important 는 인라인 style.transform(mind-elixir 가 자기
+   좌표 계산에 그대로 되읽는 값)을 건드리지 않고도 인라인 스타일을 이긴다. */
+.mm-mount .map-canvas {
+  transform: translate(var(--mm-tx, 0px), var(--mm-ty, 0px)) scale(var(--mm-scale, 1)) !important;
 }
 
 /* -------------------------------------------------------------------------
@@ -236,26 +255,8 @@
   .mm-bar {
     padding: 8px 14px;
   }
-  /* 액션 버튼 묶음이 한 줄에 못 들어가면 줄바꿈 대신 좌우 스크롤로 넘긴다. */
-  .mm-bar > .row {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-  .mm-bar > .row > * {
-    flex: none;
-  }
   .mm-bar-left {
     flex-basis: 100%;
-  }
-  .mm-picker {
-    max-width: none;
-    flex: 1;
   }
   /* 좁은 화면에서는 고정폭 대신 캔버스 대부분을 덮는 바텀시트에 가깝게 */
   .mm-preview {
@@ -268,7 +269,8 @@
   }
 }
 
-/* 스플릿뷰 등 좁은 폭에서 상단바 액션 버튼이 겹치지 않고 좌우 스크롤되게 한다. */
+/* 스플릿뷰 등 좁은 폭에서 상단바 액션 버튼이 겹치지 않고 좌우 스크롤되게 한다
+   (실제 overflow/스크롤바 숨김은 globals.css 의 .hscroll 유틸이 담당). */
 .mm-bar {
   flex-wrap: nowrap;
 }
@@ -276,9 +278,6 @@
   min-width: 0;
   flex: 0 1 auto;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
 .mm-bar > .row > * {
   flex: none;

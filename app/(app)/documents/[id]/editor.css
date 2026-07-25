@@ -353,6 +353,27 @@
 .doc-media-wrap.selected .doc-media-handle {
   display: block;
 }
+
+/* @ 로 삽입하는 워크스페이스 항목 링크 칩 */
+.doc-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 1px;
+  padding: 1px 8px;
+  font-size: 0.9em;
+  color: var(--steel-hover);
+  background: var(--bg-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  cursor: pointer;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.doc-ref-chip:hover {
+  border-color: var(--steel);
+  background: var(--bg-3);
+}
 /* 터치 기기 — 손가락으로 정확히 잡기엔 12px 는 너무 작다. 시각적 크기는
    유지하고 히트 영역만 :after 로 넓힌다. */
 @media (pointer: coarse) {
@@ -528,14 +549,12 @@
   }
   /* 액션 버튼 묶음(Public/Share/Delete/Export/Save)이 한 줄에 다 못 들어가면
      줄바꿈 대신 좌우 스크롤로 넘기게 한다 — 2줄로 접히거나 버튼끼리 겹치는
-     문제 없이 항상 한 줄을 유지한다(모바일 편집 불가 증상 해결). */
+     문제 없이 항상 한 줄을 유지한다(모바일 편집 불가 증상 해결). 실제
+     overflow/스크롤바 숨김은 globals.css 의 .hscroll 유틸이 담당. */
   .editor-bar > .row {
     flex-wrap: nowrap;
     justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
     min-width: 0;
     flex: 1 1 auto;
   }
@@ -565,9 +584,6 @@
   min-width: 0;
   flex: 0 1 auto;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
 .editor-bar > .row > * {
   flex: none;

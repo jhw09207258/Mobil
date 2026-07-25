@@ -1,85 +1,65 @@
-.stg-grid {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 14px;
-  margin-bottom: 24px;
-}
-@media (max-width: 860px) {
-  .stg-grid {
-    grid-template-columns: 1fr;
-  }
-}
 
-.stg-total {
+/* 도넛 차트 — My Storage Usage */
+.stg-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1;
+  min-height: 0;
+}
+.stg-donut {
+  position: relative;
+  width: 108px;
+  height: 108px;
+  flex: none;
+}
+.stg-donut svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.stg-donut-track {
+  fill: none;
+  stroke: var(--bg-1);
+  stroke-width: 14;
+}
+.stg-donut-seg {
+  fill: none;
+  cursor: default;
+  transition: opacity 0.12s;
+}
+.stg-donut-seg.dim {
+  opacity: 0.32;
+}
+.stg-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.stg-donut-total {
   font-family: var(--font-sans);
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-0);
 }
-.stg-total .unit {
-  font-size: 12px;
+.stg-donut-sub {
+  font-size: 10px;
   color: var(--text-3);
-  margin-left: 6px;
-}
-
-/* stacked composition bar */
-.stg-bar-wrap {
-  position: relative;
-  margin: 14px 0 4px;
-}
-.stg-bar {
-  display: flex;
-  width: 100%;
-  height: 14px;
-  border-radius: 3px;
-  overflow: hidden;
-  background: var(--bg-1);
-  border: 1px solid var(--border-1);
-}
-.stg-seg {
-  height: 100%;
-  min-width: 2px;
-  cursor: default;
-  transition: opacity 0.1s;
-  border-right: 2px solid var(--bg-2);
-}
-.stg-seg:last-child {
-  border-right: none;
-}
-.stg-seg.dim {
-  opacity: 0.35;
-}
-.stg-bar.empty {
-  background: var(--bg-3);
-}
-
-.stg-tooltip {
-  position: absolute;
-  bottom: 100%;
-  transform: translateX(-50%);
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  background: var(--bg-4);
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius);
-  font-size: 12px;
-  color: var(--text-0);
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 5;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-.stg-tooltip .k {
-  color: var(--text-2);
-  margin-left: 4px;
+  margin-top: 2px;
 }
 
 /* legend */
 .stg-legend {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px 16px;
-  margin-top: 16px;
+  flex: 1;
+  min-width: 0;
 }
 .stg-legend-item {
   display: flex;

@@ -37,7 +37,9 @@ import {
   type DocExportFormat,
 } from "../actions";
 import { downloadBase64File } from "@/lib/download-file";
-import { useWorkspace, tabId } from "../../workspace/workspace-context";
+import { useWorkspace, tabId, type TabKind } from "../../workspace/workspace-context";
+import { WorkspaceLink } from "./workspace-link";
+import { WorkspaceMention } from "./mention-command";
 import { ContributorBadges } from "../../contributors/contributor-badges";
 import { RepositoryPicker } from "../../repositories/repository-picker";
 import { ActivityPanel } from "./activity-panel";
@@ -175,10 +177,20 @@ export function DocumentEditor({
       TableHeader,
       TableCell,
       Video,
-      Placeholder.configure({ placeholder: "Write your idea here… (type / for commands)" }),
+      Placeholder.configure({ placeholder: "Write your idea here… (type / for commands, @ to link an item)" }),
       SlashCommand,
+      WorkspaceLink,
+      WorkspaceMention,
     ],
-    editorProps: { attributes: { class: "ProseMirror" } },
+    editorProps: {
+      attributes: { class: "ProseMirror" },
+      handleClickOn: (_view, _pos, node) => {
+        if (node.type.name !== "workspaceLink") return false;
+        const { kind, refId, label } = node.attrs as { kind: string; refId: string; label: string };
+        openTab(kind as TabKind, refId, label);
+        return true;
+      },
+    },
     onUpdate: () => {
       if (canEdit && !isApplyingRemoteRef.current) markDirty();
     },
@@ -351,7 +363,7 @@ export function DocumentEditor({
           placeholder="Untitled"
           disabled={!canEdit}
         />
-        <div className="row" style={{ gap: 10 }}>
+        <div className="row hscroll" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
           <RepositoryPicker kind="document" itemId={docId} canEdit={canEdit} />
           <ContributorBadges kind="document" id={docId} refreshToken={saveState} />

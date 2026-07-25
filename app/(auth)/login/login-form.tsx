@@ -37,9 +37,7 @@ export function LoginForm({
       <div className="auth-brand">
         <span className="brand-logo brand-logo-lg">Possion</span>
       </div>
-      <div className="auth-tagline">
-        Possess Your <span className="tagline-emphasis">PASSION</span>.
-      </div>
+      <div className="auth-tagline">Creating Value Integrating Society</div>
       <form action={formAction}>
         {state && "error" in state && (
           <div className="notice notice-error">{state.error}</div>

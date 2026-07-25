@@ -349,7 +349,7 @@ export function Spreadsheet({
             disabled={!canEdit}
           />
         </div>
-        <div className="row" style={{ gap: 10 }}>
+        <div className="row hscroll" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
           <RepositoryPicker kind="sheet" itemId={sheetId} canEdit={canEdit} />
           <ContributorBadges kind="sheet" id={sheetId} refreshToken={saveState} />

@@ -261,7 +261,7 @@ export function CodeEditor({
             ))}
           </select>
         </div>
-        <div className="row" style={{ gap: 10 }}>
+        <div className="row hscroll" style={{ gap: 10 }}>
           {canEdit && (
             <>
               <button className="btn btn-sm" onClick={() => cmApiRef.current?.undo()} title="Undo (⌘Z)">

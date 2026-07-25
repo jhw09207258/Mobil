@@ -884,3 +884,48 @@ html[data-desktop] .app-header .hsearch {
     min-height: 36px;
   }
 }
+
+/* -------------------------------------------------------------------------
+   로그아웃 모션 — 검정 화면이 페이드인되고, 흰 파동이 중앙에서 한 번 퍼져
+   나가며 사라진다. header.tsx 가 이 애니메이션 길이(0.9s)만큼 기다렸다가
+   실제 로그아웃을 처리하고 /login 으로 이동한다(도착하면 로그인 화면
+   자신의 fade-in 이 이어서 재생된다).
+   ------------------------------------------------------------------------- */
+.signout-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+  opacity: 0;
+  animation: signout-fade-in 0.3s ease forwards;
+}
+@keyframes signout-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+.signout-ripple {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0;
+  animation: signout-ripple 0.6s ease-out 0.3s forwards;
+}
+@keyframes signout-ripple {
+  0% {
+    transform: scale(0);
+    opacity: 0.9;
+  }
+  60% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(60);
+    opacity: 0;
+  }
+}

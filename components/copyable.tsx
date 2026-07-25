@@ -90,11 +90,21 @@ export function Copyable({
     <div>
       {label && <div className="label" style={{ marginBottom: 6 }}>{label}</div>}
       <div className="row" style={{ gap: 8, alignItems: "stretch" }}>
-        <code className="code-block grow" style={{ display: "flex", alignItems: "center" }}>
+        <code
+          className="code-block grow"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            // 마스킹 점(●)에 글자 간격을 주면 실제 값(간격 없음)보다 넓어져
+            // 보기/숨기기 전환 때마다 칸 폭이 바뀐다 — 문자 수 기준 고정폭으로
+            // 두 상태의 렌더 너비를 맞춘다.
+            width: `${Math.min(value.length, 36)}ch`,
+          }}
+        >
           {revealed ? (
             display ?? value
           ) : (
-            <span style={{ color: "var(--text-3)", letterSpacing: 2 }}>
+            <span style={{ color: "var(--text-3)" }}>
               {"●".repeat(Math.min(value.length, 36))}
             </span>
           )}

@@ -229,6 +229,16 @@ img {
   background-clip: padding-box;
 }
 
+/* 좌우 스크롤은 되지만 스크롤바는 보이지 않는 바(툴바/탭 스트립 공용) */
+.hscroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.hscroll::-webkit-scrollbar {
+  display: none;
+}
+
 /* -------------------------------------------------------------------------
    공용 모션 — 화면이 준비된 뒤 fade-in, 로딩 스피너 회전.
    ------------------------------------------------------------------------- */
@@ -708,22 +718,8 @@ html[data-theme="light"] .btn {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  color: #fff;
-}
-.drive-icon.folder {
-  background: var(--steel);
-}
-.drive-icon.document {
-  background: #3a86c8;
-}
-.drive-icon.sheet {
-  background: #2e9e6b;
-}
-.drive-icon.code {
-  background: #b0689e;
-}
-.drive-icon.mindmap {
-  background: #c98a3e;
+  color: var(--text-2);
+  background: var(--bg-3);
 }
 .drive-name {
   display: block;

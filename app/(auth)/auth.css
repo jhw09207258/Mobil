@@ -113,7 +113,7 @@
   min-height: 100dvh;
 }
 .login-fade-in {
-  animation: possion-fade-in 0.35s ease both;
+  animation: possion-fade-in 0.7s var(--ease-spring) both;
 }
 .login-fade-out {
   animation: possion-fade-out 0.2s ease both;
@@ -150,10 +150,6 @@
   color: rgba(255, 255, 255, 0.42);
   margin: 0 0 24px;
 }
-.tagline-emphasis {
-  letter-spacing: 1.25px;
-}
-
 /* 입력칸 뒤로 파티클 배경이 그대로 비치면 타이핑 중 글자 가독성이 떨어져
    블러를 얹는다 — 그룹 컨테이너 하나에만 적용해 두 입력이 함께 블러된다. */
 .auth-input-group {
@@ -182,11 +178,11 @@
 }
 /* Sign in 버튼 — 로그인 화면 전용으로 살짝 투명하게 */
 .login-screen .btn-primary {
-  background: color-mix(in srgb, var(--create) 82%, transparent);
-  border-color: color-mix(in srgb, var(--create-dim) 82%, transparent);
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(0, 0, 0, 0.3);
 }
 .login-screen .btn-primary:hover {
-  background: color-mix(in srgb, var(--create-hover) 88%, transparent);
+  background: rgba(0, 0, 0, 0.42);
 }
 
 .auth-input-group .input {
@@ -268,6 +264,14 @@
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
+.install-note {
+  width: 100%;
+  max-width: 460px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+}
 .terminal-bar {
   display: flex;
   align-items: center;
@@ -294,11 +298,31 @@
   word-break: break-all;
 }
 .terminal-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   color: #f2f2f2;
 }
 .terminal-output {
   color: #767676;
   padding-left: 14px;
+}
+.terminal-copy {
+  flex: none;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.terminal-copy:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
 }
 .terminal-cursor {
   display: inline-block;

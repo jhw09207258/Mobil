@@ -364,18 +364,13 @@
    높이(38px)를 정확히 맞춘다. 포커스 시 파란 액센트 링. */
 .chat-input-bar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 6px;
   margin: 10px 20px 14px;
   padding: 3px;
   background: var(--bg-0);
   border: 1px solid var(--border-1);
   border-radius: 22px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.chat-input-bar:focus-within {
-  border-color: var(--create);
-  box-shadow: 0 0 0 3px var(--create-ghost);
 }
 .chat-input-bar .chat-plus-btn {
   width: 38px;
@@ -878,9 +873,9 @@
   display: flex;
   flex-direction: column;
   /* 반투명 + 블러 — 뒤 레이어가 은은히 비치는 유리 패널 */
-  background: color-mix(in srgb, var(--bg-1) 72%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  backdrop-filter: blur(16px) saturate(1.4);
+  background: color-mix(in srgb, var(--bg-1) 48%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
   border-left: 1px solid var(--border-1);
   border-radius: var(--radius-lg) 0 0 var(--radius-lg);
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.35), -32px 0 80px rgba(0, 0, 0, 0.2);
@@ -901,7 +896,7 @@
 .chat-float-panel .chat-composer,
 .chat-float-panel .chat-thread-head,
 .chat-float-panel .chat-float-head {
-  background: color-mix(in srgb, var(--bg-1) 55%, transparent);
+  background: color-mix(in srgb, var(--bg-1) 35%, transparent);
 }
 .chat-float-head {
   flex: none;

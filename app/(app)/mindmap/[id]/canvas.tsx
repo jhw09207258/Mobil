@@ -261,24 +261,35 @@ function Inner({
     // 대형 맵 이동 시 화면이 통째로 비는 버그의 근본 시정 — mind-elixir 는
     // 패닝/줌마다 .map-canvas 에 translate3d 를 쓰는데, 3d 변환은 요소를 GPU
     // 레이어로 승격시키고, max-content 로 커진 초대형 맵은 GPU 텍스처 한계
-    // (보통 16384px)를 넘겨 이동하는 동안 빈 타일만 보인다. translate3d 를
-    // 동일한 2d translate 로 강등하면 레이어 승격이 사라져 브라우저가 필요한
-    // 부분만 다시 그린다(스크롤 성능을 약간 내주고 가시성을 얻는 트레이드오프).
+    // (보통 16384px)를 넘겨 이동하는 동안 빈 타일만 보인다.
+    //
+    // 예전 구현은 mapCanvas.style.transform 문자열 자체를 translate3d →
+    // translate 로 고쳐 썼는데, mind-elixir 의 scale()/move() 는 다음 확대·
+    // 축소·이동 때 이 문자열을 자기 자신이 쓴 값으로 가정하고 정규식
+    // (translate3d(...) 패턴)으로 되읽어 현재 좌표를 계산한다 — 문자열에서
+    // translate3d 가 사라지면 그 파싱이 실패해 좌표를 0,0 으로 오인하고,
+    // 다음 확대/축소 때 맵 전체가 화면 밖으로 튕겨 나가 "안 보이는" 버그가
+    // 났다. 그래서 이제 mapCanvas.style.transform 자체는 절대 건드리지
+    // 않고(= mind-elixir 의 자체 파싱은 항상 정상), 좌표/배율만 읽어
+    // CSS 커스텀 프로퍼티로 옮겨 별도 스타일시트 규칙(.map-canvas 의
+    // !important 규칙, 아래)이 실제 렌더링에 쓸 2d translate 를 계산하게
+    // 한다 — 인라인 스타일 문자열은 그대로 두면서 화면에 그려지는 변환만
+    // !important 로 웃돈다(인라인 스타일도 !important 규칙에는 진다).
     const mapCanvas = containerRef.current.querySelector(".map-canvas") as HTMLElement | null;
-    let demoting = false;
-    const demoteObserver = new MutationObserver(() => {
-      if (demoting || !mapCanvas) return;
+    const syncFlatTransform = () => {
+      if (!mapCanvas) return;
       const t = mapCanvas.style.transform;
-      if (t && t.includes("translate3d")) {
-        demoting = true;
-        mapCanvas.style.transform = t.replace(
-          /translate3d\(([^,]+),\s*([^,]+),\s*[^)]+\)/g,
-          "translate($1, $2)"
-        );
-        demoting = false;
+      const pos = t.match(/translate3d\(([^,]+),\s*([^,]+),/);
+      const scale = t.match(/scale\(([^)]+)\)/);
+      if (pos) {
+        mapCanvas.style.setProperty("--mm-tx", pos[1].trim());
+        mapCanvas.style.setProperty("--mm-ty", pos[2].trim());
       }
-    });
+      mapCanvas.style.setProperty("--mm-scale", scale ? scale[1].trim() : "1");
+    };
+    const demoteObserver = new MutationObserver(syncFlatTransform);
     if (mapCanvas) {
+      syncFlatTransform();
       demoteObserver.observe(mapCanvas, { attributes: true, attributeFilter: ["style"] });
     }
 
@@ -569,80 +580,82 @@ function Inner({
             placeholder="Untitled map"
             disabled={!canEdit}
           />
-          {canEdit && (
-            <>
+          <div className="mm-bar-actions hscroll">
+            {canEdit && (
+              <>
+                <button
+                  className="btn btn-sm"
+                  onClick={addParent}
+                  title="Add a node above the selected node (wraps the root if it's selected)"
+                >
+                  + Parent
+                </button>
+                <button className="btn btn-sm" onClick={addNote} title="Add a child of the selected node">
+                  + Note
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={addSibling}
+                  title="Add a node at the same level as the selected node"
+                >
+                  + Sibling
+                </button>
+                <select
+                  className="mm-picker"
+                  value={pick}
+                  onChange={(e) => setPick(e.target.value)}
+                >
+                  <option value="">Add reference…</option>
+                  {items.map((i) => (
+                    <option key={`${i.kind}:${i.id}`} value={`${i.kind}:${i.id}`}>
+                      [{i.kind}] {i.label}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn btn-sm" onClick={addReference} disabled={!pick}>
+                  Add
+                </button>
+                {canEdit && (
+                  <>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        (meRef.current as unknown as { undo?: () => void } | null)?.undo?.();
+                        syncHistoryRef.current?.();
+                      }}
+                      title="Undo (⌘Z)"
+                    >
+                      ↩
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => {
+                        (meRef.current as unknown as { redo?: () => void } | null)?.redo?.();
+                        syncHistoryRef.current?.();
+                      }}
+                      title="Redo (⇧⌘Z)"
+                    >
+                      ↪
+                    </button>
+                  </>
+                )}
+                <button className="btn btn-sm" onClick={fitView} title="Fit the map to the screen">
+                  Fit view
+                </button>
+              </>
+            )}
+            {selectedRef && (
               <button
                 className="btn btn-sm"
-                onClick={addParent}
-                title="Add a node above the selected node (wraps the root if it's selected)"
+                onClick={() => setPreview(selectedRef)}
+                title="Open a preview of the selected reference node"
               >
-                + Parent
+                Open reference
               </button>
-              <button className="btn btn-sm" onClick={addNote} title="Add a child of the selected node">
-                + Note
-              </button>
-              <button
-                className="btn btn-sm"
-                onClick={addSibling}
-                title="Add a node at the same level as the selected node"
-              >
-                + Sibling
-              </button>
-              <select
-                className="mm-picker"
-                value={pick}
-                onChange={(e) => setPick(e.target.value)}
-              >
-                <option value="">Add reference…</option>
-                {items.map((i) => (
-                  <option key={`${i.kind}:${i.id}`} value={`${i.kind}:${i.id}`}>
-                    [{i.kind}] {i.label}
-                  </option>
-                ))}
-              </select>
-              <button className="btn btn-sm" onClick={addReference} disabled={!pick}>
-                Add
-              </button>
-              {canEdit && (
-                <>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => {
-                      (meRef.current as unknown as { undo?: () => void } | null)?.undo?.();
-                      syncHistoryRef.current?.();
-                    }}
-                    title="Undo (⌘Z)"
-                  >
-                    ↩
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    onClick={() => {
-                      (meRef.current as unknown as { redo?: () => void } | null)?.redo?.();
-                      syncHistoryRef.current?.();
-                    }}
-                    title="Redo (⇧⌘Z)"
-                  >
-                    ↪
-                  </button>
-                </>
-              )}
-              <button className="btn btn-sm" onClick={fitView} title="Fit the map to the screen">
-                Fit view
-              </button>
-            </>
-          )}
-          {selectedRef && (
-            <button
-              className="btn btn-sm"
-              onClick={() => setPreview(selectedRef)}
-              title="Open a preview of the selected reference node"
-            >
-              Open reference
-            </button>
-          )}
+            )}
+          </div>
         </div>
-        <div className="row" style={{ gap: 10 }}>
+        <div className="row hscroll" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
           <RepositoryPicker kind="mindmap" itemId={mapId} canEdit={canEdit} />
           <ContributorBadges kind="mindmap" id={mapId} refreshToken={saveState} />

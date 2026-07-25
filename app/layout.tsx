@@ -15,6 +15,14 @@ const notoSans = Noto_Sans_KR({
 export const metadata: Metadata = {
   title: "Possion",
   description: "A private idea vault for personal and security work — files, documents and code in one place",
+  // favicon.ico / icon.png / apple-icon.png 는 app/ 특수 파일 규칙으로 자동
+  // 연결된다 — manifest(PWA)·Windows 타일 아이콘만 명시적으로 연결한다.
+  manifest: "/manifest.json",
+  other: {
+    "msapplication-TileColor": "#ffffff",
+    "msapplication-TileImage": "/ms-icon-144x144.png",
+    "msapplication-config": "/browserconfig.xml",
+  },
 };
 
 // 편집기(문서/코드/시트) 사용 중 핀치·더블탭 확대가 걸려 타이핑을 방해하지

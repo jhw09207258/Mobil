@@ -30,6 +30,9 @@ const META: Record<Category, { label: string; color: string }> = {
   media: { label: "Media", color: "#d89a84" },
 };
 
+const R = 40;
+const CIRC = 2 * Math.PI * R;
+
 export function StorageBreakdownChart({ rows }: { rows: Row[] }) {
   const [hover, setHover] = useState<Category | null>(null);
 
@@ -40,54 +43,54 @@ export function StorageBreakdownChart({ rows }: { rows: Row[] }) {
   }, [rows]);
 
   const total = rows.reduce((s, r) => s + r.bytes, 0);
+  const itemCount = rows.reduce((s, r) => s + r.item_count, 0);
 
-  // 세그먼트 중심의 대략적 위치(%) — 툴팁 가로 배치용
-  let cursor = 0;
-  const positions = new Map<Category, number>();
-  for (const cat of ORDER) {
+  // 도넛 세그먼트 — 누적 dasharray offset 으로 원 둘레를 나눠 그린다.
+  let acc = 0;
+  const segments = ORDER.map((cat) => {
     const bytes = byCat.get(cat)?.bytes ?? 0;
-    const pct = total > 0 ? (bytes / total) * 100 : 0;
-    positions.set(cat, cursor + pct / 2);
-    cursor += pct;
-  }
+    const pct = total > 0 ? bytes / total : 0;
+    const dash = pct * CIRC;
+    const offset = acc;
+    acc += dash;
+    return { cat, bytes, dash, offset };
+  }).filter((s) => s.dash > 0);
+
+  const hoverRow = hover ? byCat.get(hover) : null;
 
   return (
-    <div>
-      <div className="stg-total">
-        {formatBytes(total)}
-        <span className="unit">used across {rows.reduce((s, r) => s + r.item_count, 0)} items</span>
-      </div>
-
-      <div className="stg-bar-wrap">
-        {hover && total > 0 && (
-          <div
-            className="stg-tooltip"
-            style={{ left: `${positions.get(hover)}%` }}
-          >
-            {META[hover].label}
-            <span className="k">
-              {formatBytes(byCat.get(hover)?.bytes ?? 0)} ·{" "}
-              {byCat.get(hover)?.item_count ?? 0} items
-            </span>
-          </div>
-        )}
-        <div className={`stg-bar ${total === 0 ? "empty" : ""}`}>
-          {total === 0
-            ? null
-            : ORDER.map((cat) => {
-                const bytes = byCat.get(cat)?.bytes ?? 0;
-                if (bytes === 0) return null;
-                const pct = (bytes / total) * 100;
-                return (
-                  <div
-                    key={cat}
-                    className={`stg-seg ${hover && hover !== cat ? "dim" : ""}`}
-                    style={{ width: `${pct}%`, background: META[cat].color }}
-                    onMouseEnter={() => setHover(cat)}
-                    onMouseLeave={() => setHover(null)}
-                  />
-                );
-              })}
+    <div className="stg-donut-wrap">
+      <div className="stg-donut">
+        <svg viewBox="0 0 100 100">
+          <circle className="stg-donut-track" cx="50" cy="50" r={R} />
+          {segments.map((s) => (
+            <circle
+              key={s.cat}
+              cx="50"
+              cy="50"
+              r={R}
+              stroke={META[s.cat].color}
+              strokeWidth="14"
+              strokeDasharray={`${s.dash} ${CIRC - s.dash}`}
+              strokeDashoffset={-s.offset}
+              className={`stg-donut-seg ${hover && hover !== s.cat ? "dim" : ""}`}
+              onMouseEnter={() => setHover(s.cat)}
+              onMouseLeave={() => setHover(null)}
+            />
+          ))}
+        </svg>
+        <div className="stg-donut-center">
+          {hoverRow ? (
+            <>
+              <div className="stg-donut-total">{formatBytes(hoverRow.bytes)}</div>
+              <div className="stg-donut-sub">{hover && META[hover].label}</div>
+            </>
+          ) : (
+            <>
+              <div className="stg-donut-total">{formatBytes(total)}</div>
+              <div className="stg-donut-sub">{itemCount} items</div>
+            </>
+          )}
         </div>
       </div>
 

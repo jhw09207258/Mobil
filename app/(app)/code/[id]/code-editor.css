@@ -91,14 +91,12 @@
     max-width: none;
   }
   /* 액션 버튼 묶음(Share/Delete/Save)이 한 줄에 못 들어가면 줄바꿈 대신
-     좌우 스크롤로 넘긴다 — 다른 편집기(문서/시트/마인드맵)와 동일한 방식. */
+     좌우 스크롤로 넘긴다 — 다른 편집기(문서/시트/마인드맵)와 동일한 방식
+     (overflow/스크롤바 숨김은 .hscroll 유틸이 담당). */
   .code-bar > .row {
     flex-wrap: nowrap;
     justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
     min-width: 0;
     flex: 1 1 auto;
   }
@@ -115,9 +113,6 @@
   min-width: 0;
   flex: 0 1 auto;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
 .code-bar > .row > * {
   flex: none;

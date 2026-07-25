@@ -87,14 +87,12 @@
   .sh-bar {
     padding: 8px 14px;
   }
-  /* 액션 버튼 묶음이 한 줄에 못 들어가면 줄바꿈 대신 좌우 스크롤로 넘긴다. */
+  /* 액션 버튼 묶음이 한 줄에 못 들어가면 줄바꿈 대신 좌우 스크롤로 넘긴다
+     (overflow/스크롤바 숨김은 .hscroll 유틸이 담당). */
   .sh-bar > .row {
     flex-wrap: nowrap;
     justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
     min-width: 0;
     flex: 1 1 auto;
   }
@@ -117,9 +115,6 @@
   min-width: 0;
   flex: 0 1 auto;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
 .sh-bar > .row > * {
   flex: none;
