@@ -201,6 +201,27 @@
 .tool.em {
   font-style: italic;
 }
+/* 글자 크기 선택 — 툴바 버튼과 같은 높이/톤을 유지한다. */
+.tool-size {
+  height: 28px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-family: var(--font-sans);
+  color: var(--text-2);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  outline: none;
+}
+.tool-size:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.tool-size:focus {
+  border-color: var(--border-2);
+  color: var(--text-0);
+}
 .tool-sep {
   width: 1px;
   height: 18px;

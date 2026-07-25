@@ -40,6 +40,7 @@ import { downloadBase64File } from "@/lib/download-file";
 import { useWorkspace, tabId, type TabKind } from "../../workspace/workspace-context";
 import { WorkspaceLink } from "./workspace-link";
 import { WorkspaceMention } from "./mention-command";
+import { FontSize, FONT_SIZES } from "./font-size";
 import { ContributorBadges } from "../../contributors/contributor-badges";
 import { RepositoryPicker } from "../../repositories/repository-picker";
 import { ActivityPanel } from "./activity-panel";
@@ -166,6 +167,7 @@ export function DocumentEditor({
       Collaboration.configure({ document: ydoc }),
       Underline,
       TextStyle,
+      FontSize,
       Color,
       Highlight.configure({ multicolor: true }),
       Link.configure({ openOnClick: false, autolink: true, HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" } }),
@@ -562,6 +564,25 @@ function Toolbar({
       <button className={btn(editor.isActive("heading", { level: 1 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1">H1</button>
       <button className={btn(editor.isActive("heading", { level: 2 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">H2</button>
       <button className={btn(editor.isActive("heading", { level: 3 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Heading 3">H3</button>
+      {/* 자유 글자 크기 — H1~H3 는 문단의 의미를 바꾸므로 본문 크기 조절에는 쓸 수 없다. */}
+      <select
+        className="tool-size"
+        title="Font size"
+        aria-label="Font size"
+        value={(editor.getAttributes("textStyle").fontSize as string) || ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v) editor.chain().focus().setFontSize(v).run();
+          else editor.chain().focus().unsetFontSize().run();
+        }}
+      >
+        <option value="">Size</option>
+        {FONT_SIZES.map((s) => (
+          <option key={s} value={`${s}px`}>
+            {s}
+          </option>
+        ))}
+      </select>
       <span className="tool-sep" />
       <button className={btn(editor.isActive("bold"), "strong")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">B</button>
       <button className={btn(editor.isActive("italic"), "em")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">I</button>

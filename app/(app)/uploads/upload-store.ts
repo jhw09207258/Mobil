@@ -17,6 +17,10 @@ import { extractTagsFromText } from "@/lib/tags";
 // ============================================================================
 
 const BUCKET = "files";
+// files 버킷의 서버 측 한도(0034_tighten_object_metadata_and_storage.sql).
+// 미리 걸러내지 않으면 100MB 를 다 올린 뒤에야 413 으로 실패한다 — 다른
+// 업로드 경로(아바타·문서 미디어·채팅 사진)처럼 시작 전에 확인한다.
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 export type UploadStatus = "uploading" | "done" | "error";
 
@@ -140,6 +144,9 @@ export function startUploads(
       const path = `${opts.userId}/${job.id}/${safeName}`;
 
       try {
+        if (file.size > MAX_UPLOAD_BYTES) {
+          throw new Error("File is too large (max 100MB)");
+        }
         if (!token || !base || !apikey) throw new Error("Not signed in");
         const encoded = path.split("/").map(encodeURIComponent).join("/");
         await xhrUpload({

@@ -31,6 +31,15 @@ function hasMark(node: TTNode, type: string): boolean {
   return !!node.marks?.some((m) => m.type === type);
 }
 
+/** textStyle 마크의 fontSize("18px")를 docx 의 size 단위(half-point)로 변환.
+ *  CSS px → pt 는 ×0.75, docx 는 half-point 라 다시 ×2 → 결국 ×1.5. */
+function docxFontSize(node: TTNode): number | undefined {
+  const raw = node.marks?.find((m) => m.type === "textStyle")?.attrs?.fontSize;
+  if (typeof raw !== "string") return undefined;
+  const px = parseFloat(raw);
+  return Number.isFinite(px) && px > 0 ? Math.round(px * 1.5) : undefined;
+}
+
 const LIST_TYPES = new Set(["bulletList", "orderedList", "taskList"]);
 
 function listItemMarker(listType: string | undefined, item: TTNode, index: number): string {
@@ -490,6 +499,7 @@ export async function tiptapToDocxBuffer(content: Json, title: string): Promise<
           underline: hasMark(node, "underline") ? {} : undefined,
           strike: hasMark(node, "strike"),
           font: hasMark(node, "code") ? "Courier New" : undefined,
+          size: docxFontSize(node),
         }),
       ];
     }
