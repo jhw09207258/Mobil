@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { detectLanguage } from "@/lib/languages";
 import { sanitizeRepoPath } from "@/lib/code-space";
+import { mergeContentIntoSnapshot } from "@/lib/text-delta";
 import {
   AGENT_MODELS,
   buildSources,
@@ -88,17 +89,23 @@ export async function POST(request: NextRequest) {
         const name = path.split("/").pop() || "untitled";
         const { data: existing } = await supabase
           .from("code_files")
-          .select("id")
+          .select("id, yjs_state")
           .eq("code_repository_id", spaceId)
           .eq("path", path)
           .maybeSingle();
 
-        // yjs_state 를 반드시 지운다 — 에디터는 스냅샷이 있으면 그걸 우선하므로,
-        // 남겨두면 새로 쓴 content 가 파일을 열었을 때 안 보인다.
+        // 에디터는 스냅샷이 있으면 content 보다 그걸 우선하므로, 스냅샷을 낡은
+        // 채로 두면 에이전트의 변경이 안 보인다. 그렇다고 null 로 지우면 그
+        // 파일을 열어 둔 사람의 협업 이력이 통째로 날아간다 — 이전 상태 위에
+        // 최소 델타를 얹어 정상적인 Yjs 스냅샷으로 갱신한다.
         const { error } = existing
           ? await supabase
               .from("code_files")
-              .update({ content: f.content, yjs_state: null, language: detectLanguage(name) })
+              .update({
+                content: f.content,
+                yjs_state: mergeContentIntoSnapshot(existing.yjs_state, f.content),
+                language: detectLanguage(name),
+              })
               .eq("id", existing.id)
           : await supabase.from("code_files").insert({
               owner_id: userId,

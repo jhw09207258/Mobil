@@ -126,33 +126,43 @@ export async function getCodeSpace(
   return data ?? null;
 }
 
-export async function readSpaceFile(
-  fileId: string
-): Promise<{ content: string; language: string; name: string } | { error: string }> {
+export async function readSpaceFile(fileId: string): Promise<
+  | { content: string; language: string; name: string; yjsState: string | null }
+  | { error: string }
+> {
   await requireUser();
   const supabase = await createClient();
   const { data } = await supabase
     .from("code_files")
-    .select("content, language, name")
+    .select("content, language, name, yjs_state")
     .eq("id", fileId)
     .single();
   if (!data) return { error: "File not found." };
-  return { content: data.content ?? "", language: data.language, name: data.name };
+  return {
+    content: data.content ?? "",
+    language: data.language,
+    name: data.name,
+    yjsState: data.yjs_state,
+  };
 }
 
 /**
- * 워크스페이스 에디터의 저장. yjs_state 를 비우는 게 중요하다 — 탭 에디터는
- * 스냅샷이 있으면 그걸 우선하므로, 남겨두면 여기서 쓴 내용이 사라진 것처럼 보인다.
+ * 워크스페이스 에디터의 저장.
+ *
+ * yjs_state 를 반드시 함께 쓴다. 예전에는 여기서 null 로 지웠는데, 그러면 같은
+ * 파일을 탭 편집기(/code/[id])에서 열어 둔 사람의 협업 스냅샷이 매 저장마다
+ * 날아갔다. 이제 워크스페이스도 정식 Yjs 피어라서 자기 스냅샷을 남긴다.
  */
 export async function writeSpaceFile(
   fileId: string,
-  content: string
+  content: string,
+  yjsState?: string | null
 ): Promise<{ ok: true } | { error: string }> {
   await requireUser();
   const supabase = await createClient();
   const { error } = await supabase
     .from("code_files")
-    .update({ content, yjs_state: null })
+    .update({ content, ...(yjsState !== undefined ? { yjs_state: yjsState } : {}) })
     .eq("id", fileId);
   if (error) return { error: "Save failed." };
   return { ok: true };

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as monaco from "monaco-editor";
 import { MonacoBinding } from "y-monaco";
+import { applyTextDelta } from "@/lib/text-delta";
 import type * as Y from "yjs";
 import type { LangKey } from "@/lib/languages";
 
@@ -216,27 +217,9 @@ export function MonacoCodeEditor({
       getValue: () => editor.getValue(),
       applyContent: (next: string) => {
         if (next === editor.getValue()) return;
-        if (ytext) {
-          // 통째로 지우고 다시 넣으면 협업 문서의 델타가 불필요하게 커지고
-          // 다른 사람 커서가 튄다 — 앞뒤 공통 부분을 빼고 달라진 구간만 고친다.
-          const cur = ytext.toString();
-          let head = 0;
-          const max = Math.min(cur.length, next.length);
-          while (head < max && cur[head] === next[head]) head++;
-          let tail = 0;
-          while (
-            tail < max - head &&
-            cur[cur.length - 1 - tail] === next[next.length - 1 - tail]
-          ) tail++;
-          const removed = cur.length - head - tail;
-          const inserted = next.slice(head, next.length - tail);
-          ytext.doc?.transact(() => {
-            if (removed > 0) ytext.delete(head, removed);
-            if (inserted) ytext.insert(head, inserted);
-          });
-        } else {
-          editor.setValue(next);
-        }
+        // 협업 문서면 최소 델타로 — 통째로 갈아끼우면 다른 사람 커서가 튄다.
+        if (ytext) applyTextDelta(ytext, next);
+        else editor.setValue(next);
       },
     });
 

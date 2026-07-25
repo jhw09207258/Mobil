@@ -3,18 +3,10 @@
 import * as Y from "yjs";
 import { createClient } from "@/lib/supabase/client";
 
-export function encodeYUpdate(update: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < update.length; i++) binary += String.fromCharCode(update[i]);
-  return btoa(binary);
-}
-
-export function decodeYUpdate(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
+// 구현은 lib/text-delta.ts 에 있다(서버 라우트도 써야 하는데 이 파일은
+// "use client" 라 서버에서 import 할 수 없다). 기존 호출부를 위해 이름은 유지.
+export { encodeUpdate as encodeYUpdate, decodeUpdate as decodeYUpdate } from "@/lib/text-delta";
+import { encodeUpdate as encodeYUpdate, decodeUpdate as decodeYUpdate } from "@/lib/text-delta";
 
 const REMOTE_ORIGIN = "remote-broadcast";
 
@@ -155,3 +147,4 @@ export function seedDeterministically(ydoc: Y.Doc, seed: () => void): void {
     ydoc.clientID = original === 1 ? new Y.Doc().clientID : original;
   }
 }
+
