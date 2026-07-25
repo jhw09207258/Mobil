@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
+import type { Json } from "@/lib/database.types";
 
 export type ChatConversation = {
   id: string;
@@ -15,6 +16,8 @@ export type ChatConversation = {
   updated_at: string;
 };
 
+export type ChatReaction = { emoji: string; count: number; reacted_by_me: boolean };
+
 export type ChatMessage = {
   id: string;
   sender_id: string;
@@ -23,6 +26,10 @@ export type ChatMessage = {
   content: string;
   created_at: string;
   edited_at?: string | null;
+  reply_to_id?: string | null;
+  reply_to_sender_name?: string | null;
+  reply_to_content?: string | null;
+  reactions?: ChatReaction[];
 };
 
 export type ChatContact = {
@@ -39,6 +46,12 @@ export async function listChatConversations(): Promise<ChatConversation[]> {
   return data ?? [];
 }
 
+// get_chat_messages 의 reactions 는 jsonb(Json) 로 내려오므로 실제 형태
+// (ChatReaction[])로 좁혀준다 — null 이면 반응 없음.
+function toChatMessage(row: Omit<ChatMessage, "reactions"> & { reactions: Json }): ChatMessage {
+  return { ...row, reactions: (row.reactions as unknown as ChatReaction[] | null) ?? [] };
+}
+
 export async function getChatMessages(
   conversationId: string
 ): Promise<ChatMessage[]> {
@@ -47,14 +60,15 @@ export async function getChatMessages(
     p_conversation: conversationId,
   });
   // RPC 는 최신순으로 잘라 오므로 화면 표시는 시간순으로 뒤집는다.
-  return (data ?? []).reverse();
+  return (data ?? []).map(toChatMessage).reverse();
 }
 
 export async function sendChatMessage(
   conversationId: string,
-  content: string
+  content: string,
+  replyToId?: string | null
 ): Promise<ChatMessage | { error: string }> {
-  const { userId, profile } = await requireUser();
+  const { userId } = await requireUser();
   const text = content.trim();
   if (!text) return { error: "Message is empty." };
   if (text.length > 4000) return { error: "Message is too long (max 4,000 characters)." };
@@ -62,16 +76,33 @@ export async function sendChatMessage(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("chat_messages")
-    .insert({ conversation_id: conversationId, sender_id: userId, content: text })
-    .select("id, sender_id, content, created_at")
+    .insert({ conversation_id: conversationId, sender_id: userId, content: text, reply_to_id: replyToId || null })
+    .select("id")
     .single();
   if (error || !data) return { error: "Failed to send — you may no longer be a member." };
 
-  return {
-    ...data,
-    sender_name: profile.display_name || profile.email,
-    sender_avatar_url: profile.avatar_url,
-  };
+  // get_chat_messages 가 답장 미리보기·공감 집계를 이미 계산해 주므로, 방금
+  // 넣은 메시지 하나만 다시 읽어 그대로 재사용한다(별도 RPC 불필요).
+  const { data: rows } = await supabase.rpc("get_chat_messages", {
+    p_conversation: conversationId,
+    p_limit: 1,
+  });
+  if (!rows?.[0]) return { error: "Message sent, but couldn't load it back." };
+  return toChatMessage(rows[0]);
+}
+
+export async function toggleReaction(
+  messageId: string,
+  emoji: string
+): Promise<{ ok: true; active: boolean } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("toggle_chat_reaction", {
+    p_message: messageId,
+    p_emoji: emoji,
+  });
+  if (error) return { error: "Failed to react." };
+  return { ok: true, active: !!data };
 }
 
 export async function editChatMessage(

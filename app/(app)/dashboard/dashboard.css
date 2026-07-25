@@ -99,6 +99,25 @@
 .dash-share-id .label {
   white-space: nowrap;
 }
+/* 대시보드에서는 전체 ID 를 다 보여줄 필요 없다 — 절반 두께의 짧은 칩으로 */
+.dash-share-id .code-block {
+  display: block !important;
+  width: 130px !important;
+  padding: 3px 10px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-share-id .stack {
+  flex-direction: row;
+  gap: 4px;
+}
+.dash-share-id .btn-sm {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 10.5px;
+}
 .cell-label {
   display: block;
   margin-bottom: 8px;

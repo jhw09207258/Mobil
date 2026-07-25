@@ -417,17 +417,34 @@ export interface Database {
           content: string;
           created_at: string;
           edited_at: string | null;
+          reply_to_id: string | null;
         };
         Insert: {
           id?: string;
           conversation_id: string;
           sender_id: string;
           content: string;
+          reply_to_id?: string | null;
         };
         Update: {
           content?: string;
           edited_at?: string | null;
         };
+        Relationships: [];
+      };
+      chat_message_reactions: {
+        Row: {
+          message_id: string;
+          user_id: string;
+          emoji: string;
+          created_at: string;
+        };
+        Insert: {
+          message_id: string;
+          user_id: string;
+          emoji: string;
+        };
+        Update: Record<string, never>;
         Relationships: [];
       };
       repositories: {
@@ -670,7 +687,15 @@ export interface Database {
           content: string;
           created_at: string;
           edited_at: string | null;
+          reply_to_id: string | null;
+          reply_to_sender_name: string | null;
+          reply_to_content: string | null;
+          reactions: Json;
         }[];
+      };
+      toggle_chat_reaction: {
+        Args: { p_message: string; p_emoji: string };
+        Returns: boolean;
       };
       mark_chat_read: {
         Args: { p_conversation: string };

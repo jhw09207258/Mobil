@@ -21,11 +21,13 @@ import {
   markChatRead,
   sendChatMessage,
   startDm,
+  toggleReaction,
   type AttachableItem,
   type ChatContact,
   type ChatConversation,
   type ChatMemberInfo,
   type ChatMessage,
+  type ChatReaction,
 } from "./actions";
 import {
   onMessageNotify,
@@ -203,6 +205,32 @@ const EMOJIS = [
   "🎉", "💯", "🚀", "✅", "❌", "⭐", "💡", "📌",
 ];
 
+// 메시지 공감(빠른 반응) — 전체 이모지 중 가장 자주 쓰는 것만 추린 소집합.
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+// 다른 멤버의 공감 브로드캐스트를 받아 로컬 reactions 배열에 반영한다.
+function applyReactionUpdate(
+  reactions: ChatReaction[] | undefined,
+  emoji: string,
+  active: boolean,
+  isSelf: boolean
+): ChatReaction[] {
+  const list = reactions ? [...reactions] : [];
+  const i = list.findIndex((r) => r.emoji === emoji);
+  if (active) {
+    if (i === -1) {
+      list.push({ emoji, count: 1, reacted_by_me: isSelf });
+    } else {
+      list[i] = { ...list[i], count: list[i].count + 1, reacted_by_me: list[i].reacted_by_me || isSelf };
+    }
+  } else if (i !== -1) {
+    const count = list[i].count - 1;
+    if (count <= 0) list.splice(i, 1);
+    else list[i] = { ...list[i], count, reacted_by_me: isSelf ? false : list[i].reacted_by_me };
+  }
+  return list;
+}
+
 function fmtTime(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -263,6 +291,10 @@ export function ChatShell({
   const [menu, setMenu] = useState<"root" | "attach" | "emoji" | "mention" | null>(null);
   const [attachables, setAttachables] = useState<AttachableItem[] | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // 답장 대상 — 컴포저 위 배너에 표시되고, 전송 시 reply_to_id 로 붙는다.
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  // 공감 빠른 선택 팝오버가 열려 있는 메시지 id.
+  const [reactMenuFor, setReactMenuFor] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -286,6 +318,23 @@ export function ChatShell({
       document.removeEventListener("keydown", onKey);
     };
   }, [menu]);
+
+  // 공감 빠른 선택 팝오버 — 바깥 클릭/Escape 로 닫기(+ 메뉴와 동일한 패턴).
+  useEffect(() => {
+    if (!reactMenuFor) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest(".chat-react-popover")) setReactMenuFor(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setReactMenuFor(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [reactMenuFor]);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
@@ -393,6 +442,17 @@ export function ChatShell({
         if (!p?.user_id || !p.at) return;
         setMembers((prev) =>
           prev.map((m) => (m.user_id === p.user_id ? { ...m, last_read_at: p.at! } : m))
+        );
+      })
+      .on("broadcast", { event: "reaction" }, ({ payload }) => {
+        const p = payload as { message_id?: string; emoji?: string; active?: boolean; user_id?: string } | null;
+        if (!p?.message_id || !p.emoji) return;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === p.message_id
+              ? { ...m, reactions: applyReactionUpdate(m.reactions, p.emoji!, !!p.active, p.user_id === selfId) }
+              : m
+          )
         );
       })
       .subscribe((status) => {
@@ -512,13 +572,14 @@ export function ChatShell({
     if (!text || sending || !activeId) return;
     setSending(true);
     setError(null);
-    const res = await sendChatMessage(activeId, text);
+    const res = await sendChatMessage(activeId, text, replyTo?.id ?? null);
     setSending(false);
     if ("error" in res) {
       setError(res.error);
       return;
     }
     setInput("");
+    setReplyTo(null);
     setMessages((prev) => [...prev, res]);
     channelRef.current?.send({ type: "broadcast", event: "message", payload: res });
     setConversations((prev) =>
@@ -577,6 +638,39 @@ export function ChatShell({
     setMessages((prev) => prev.filter((m) => m.id !== id));
     channelRef.current?.send({ type: "broadcast", event: "delete", payload: { id } });
     refreshList(); // 마지막 메시지를 지웠으면 목록 미리보기도 갱신.
+  };
+
+  // 공감 토글 — 낙관적으로 먼저 반영하고, 실패하면 되돌린다. 다른 멤버에게는
+  // chat:<id> 브로드캐스트로 즉시 전파(메시지 편집/삭제와 같은 방식).
+  const onToggleReaction = async (messageId: string, emoji: string) => {
+    setReactMenuFor(null);
+    const mine = messages.find((m) => m.id === messageId)?.reactions?.find((r) => r.emoji === emoji)?.reacted_by_me;
+    const optimisticActive = !mine;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, reactions: applyReactionUpdate(m.reactions, emoji, optimisticActive, true) }
+          : m
+      )
+    );
+    const res = await toggleReaction(messageId, emoji);
+    if ("error" in res) {
+      // 실패 — 낙관적 반영을 되돌린다.
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, reactions: applyReactionUpdate(m.reactions, emoji, !optimisticActive, true) }
+            : m
+        )
+      );
+      setError(res.error);
+      return;
+    }
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "reaction",
+      payload: { message_id: messageId, emoji, active: res.active, user_id: selfId },
+    });
   };
 
   const openConversation = (id: string) => {
@@ -844,7 +938,7 @@ export function ChatShell({
                   prev.sender_id !== m.sender_id ||
                   new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60_000;
                 return (
-                  <div key={m.id} className={`chat-msg-row ${mine ? "mine" : ""}`}>
+                  <div key={m.id} id={`chat-msg-${m.id}`} className={`chat-msg-row ${mine ? "mine" : ""}`}>
                     {showHead && (
                       <div className="chat-msg-head">
                         {!mine && (
@@ -856,6 +950,22 @@ export function ChatShell({
                     )}
                     <div className="chat-msg-wrap">
                       <div className={`chat-msg ${mine ? "mine" : "theirs"}`}>
+                        {m.reply_to_id && (
+                          <button
+                            type="button"
+                            className="chat-reply-quote"
+                            onClick={() =>
+                              document
+                                .getElementById(`chat-msg-${m.reply_to_id}`)
+                                ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                            }
+                          >
+                            <span className="chat-reply-quote-name">
+                              {m.reply_to_sender_name ?? "Deleted message"}
+                            </span>
+                            <span className="chat-reply-quote-text">{m.reply_to_content ?? "—"}</span>
+                          </button>
+                        )}
                         {editingId === m.id ? (
                           <div className="chat-edit">
                             <textarea
@@ -888,17 +998,59 @@ export function ChatShell({
                           </>
                         )}
                       </div>
-                      {mine && editingId !== m.id && (
-                        <div className="chat-msg-actions">
-                          <button className="chat-msg-act" title="Edit" onClick={() => startEdit(m)}>
-                            ✎
+                      {editingId !== m.id && (
+                        <div className={`chat-msg-actions ${reactMenuFor === m.id ? "force-visible" : ""}`}>
+                          <button className="chat-msg-act" title="Reply" onClick={() => setReplyTo(m)}>
+                            ↩
                           </button>
-                          <button className="chat-msg-act" title="Delete" onClick={() => onDeleteMessage(m.id)}>
-                            🗑
-                          </button>
+                          <div className="chat-react-popover">
+                            <button
+                              className="chat-msg-act"
+                              title="React"
+                              onClick={() => setReactMenuFor((v) => (v === m.id ? null : m.id))}
+                            >
+                              ☺
+                            </button>
+                            {reactMenuFor === m.id && (
+                              <div className="chat-react-menu">
+                                {QUICK_REACTIONS.map((e) => (
+                                  <button
+                                    key={e}
+                                    className="chat-react-menu-btn"
+                                    onClick={() => onToggleReaction(m.id, e)}
+                                  >
+                                    {e}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {mine && (
+                            <>
+                              <button className="chat-msg-act" title="Edit" onClick={() => startEdit(m)}>
+                                ✎
+                              </button>
+                              <button className="chat-msg-act" title="Delete" onClick={() => onDeleteMessage(m.id)}>
+                                🗑
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
+                    {m.reactions && m.reactions.length > 0 && (
+                      <div className="chat-reactions">
+                        {m.reactions.map((r) => (
+                          <button
+                            key={r.emoji}
+                            className={`chat-reaction-pill ${r.reacted_by_me ? "active" : ""}`}
+                            onClick={() => onToggleReaction(m.id, r.emoji)}
+                          >
+                            {r.emoji} {r.count}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {mine && readReceipt && lastMine?.id === m.id && (
                       <span className={`chat-receipt ${readReceipt.startsWith("Read") ? "read" : ""}`}>
                         {readReceipt}
@@ -930,6 +1082,20 @@ export function ChatShell({
 
           {activeId && (
             <div className="chat-composer">
+              {replyTo && (
+                <div className="chat-reply-banner">
+                  <span className="chat-reply-banner-name">Replying to {replyTo.sender_name}</span>
+                  <span className="chat-reply-banner-text">{replyTo.content}</span>
+                  <button
+                    type="button"
+                    className="chat-reply-banner-close"
+                    onClick={() => setReplyTo(null)}
+                    aria-label="Cancel reply"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               {fmtOpen && (
                 <div className="chat-fmt-bar">
                   <button className="chat-fmt-btn" title="Bold (**text**)" onClick={() => applyWrap("**")}>
@@ -1110,6 +1276,7 @@ export function ChatShell({
                   ref={inputRef}
                   className="chat-textarea"
                   placeholder="Message"
+                  rows={1}
                   value={input}
                   onChange={(e) => onInputChange(e.target.value)}
                   onKeyDown={onKeyDown}

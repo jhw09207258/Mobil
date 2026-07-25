@@ -677,7 +677,8 @@
   align-self: center;
   transition: opacity 0.12s;
 }
-.chat-msg-wrap:hover .chat-msg-actions {
+.chat-msg-wrap:hover .chat-msg-actions,
+.chat-msg-actions.force-visible {
   opacity: 1;
 }
 .chat-msg-act {
@@ -701,6 +702,151 @@
   font-size: 10px;
   color: var(--text-3);
   margin-left: 6px;
+}
+
+/* ---- 답장 인용 미리보기(버블 안, 본문 위) ---- */
+.chat-reply-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border-left: 2px solid var(--steel);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+  cursor: pointer;
+}
+.chat-reply-quote:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.chat-reply-quote-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--steel-hover);
+}
+.chat-reply-quote-text {
+  font-size: 12px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ---- 공감(reaction) 팝오버 + 알약 ---- */
+.chat-react-popover {
+  position: relative;
+}
+.chat-react-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  padding: 5px;
+  background: var(--glass-3);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  box-shadow: var(--shadow-pop);
+  z-index: 10;
+}
+.chat-react-menu-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  font-size: 15px;
+  cursor: pointer;
+  transition: transform 0.12s var(--ease-spring), background 0.12s ease;
+}
+.chat-react-menu-btn:hover {
+  background: var(--bg-3);
+  transform: scale(1.15);
+}
+.chat-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 3px 2px 0;
+}
+.chat-msg-row.mine .chat-reactions {
+  justify-content: flex-end;
+}
+.chat-reaction-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chat-reaction-pill:hover {
+  border-color: var(--border-2);
+}
+.chat-reaction-pill.active {
+  color: var(--steel-hover);
+  background: rgba(79, 124, 172, 0.15);
+  border-color: var(--steel);
+}
+
+/* ---- 컴포저 답장 배너 ---- */
+.chat-reply-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 20px 0;
+  padding: 6px 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-left: 2px solid var(--steel);
+  border-radius: var(--radius);
+}
+.chat-reply-banner-name {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--steel-hover);
+}
+.chat-reply-banner-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-reply-banner-close {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+}
+.chat-reply-banner-close:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
 }
 .chat-edit {
   display: flex;
@@ -869,7 +1015,7 @@
   right: 0;
   bottom: 0;
   z-index: 85;
-  width: min(460px, 100vw);
+  width: min(560px, 100vw);
   display: flex;
   flex-direction: column;
   /* 반투명 + 블러 — 뒤 레이어가 은은히 비치는 유리 패널 */
@@ -928,6 +1074,9 @@
 .chat-shell.float .chat-input-bar {
   margin: 8px 12px 10px;
 }
+.chat-shell.float .chat-reply-banner {
+  margin: 8px 12px 0;
+}
 .chat-shell.float .chat-fmt-bar {
   padding: 6px 12px 0;
 }
@@ -950,6 +1099,9 @@
   }
   .chat-input-bar {
     margin: 8px 12px 12px;
+  }
+  .chat-reply-banner {
+    margin: 8px 12px 0;
   }
   .chat-attach-menu {
     width: min(320px, calc(100vw - 28px));
