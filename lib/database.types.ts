@@ -131,6 +131,8 @@ export interface Database {
           updated_at: string;
           yjs_state: string | null;
           repository_id: string | null;
+          code_repository_id: string | null;
+          path: string | null;
         };
         Insert: {
           id?: string;
@@ -140,6 +142,8 @@ export interface Database {
           content?: string;
           is_public?: boolean;
           yjs_state?: string | null;
+          code_repository_id?: string | null;
+          path?: string | null;
         };
         Update: {
           name?: string;
@@ -148,6 +152,37 @@ export interface Database {
           is_public?: boolean;
           yjs_state?: string | null;
           repository_id?: string | null;
+          code_repository_id?: string | null;
+          path?: string | null;
+        };
+        Relationships: [];
+      };
+      code_repositories: {
+        Row: {
+          id: string;
+          owner_id: string;
+          name: string;
+          github_owner: string | null;
+          github_repo: string | null;
+          github_ref: string | null;
+          imported_at: string | null;
+          created_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          name: string;
+          github_owner?: string | null;
+          github_repo?: string | null;
+          github_ref?: string | null;
+          imported_at?: string | null;
+        };
+        Update: {
+          name?: string;
+          github_ref?: string | null;
+          imported_at?: string | null;
+          deleted_at?: string | null;
         };
         Relationships: [];
       };
