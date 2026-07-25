@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { SOPHIA_TOOLS, executeSophiaTool } from "@/app/(app)/sophia/tools";
+import { runBigBrotherGemini, toGeminiTools } from "@/lib/big-brother-gemini";
 
 // Llama 70B 완성 전체를 기다리면 서버리스 함수 기본 제한 시간(대개 10초)을
 // 넘기기 쉬워 "응답이 아예 안 옴" 증상으로 이어진다. 스트리밍으로 바꿔도
@@ -13,6 +14,12 @@ const NVIDIA_MODEL = "meta/llama-3.3-70b-instruct";
 // 도구 호출이 계속 이어지는 걸 막기 위한 최대 라운드 수 — 마지막 라운드는
 // tools 를 아예 안 붙여서 반드시 텍스트 답으로 마무리되게 한다.
 const MAX_TOOL_ROUNDS = 4;
+
+// 토큰 절약: 오래된 턴은 답변 품질보다 비용에 훨씬 크게 기여하므로 최근 것만
+// 보내고, 도구 결과도 모델이 판단하기에 충분한 만큼만 남긴다(검색 결과 하나가
+// 수만 자로 돌아오는 경우가 있다).
+const MAX_HISTORY_TURNS = 20;
+const MAX_TOOL_RESULT_CHARS = 6_000;
 
 // 요청 전체 예산(ms). NVIDIA fetch 에 타임아웃이 없으면 응답이 멈춘(hang)
 // 순간 함수가 maxDuration(60s)까지 대기하다 Vercel 에 강제 종료되어
@@ -240,7 +247,7 @@ async function consumeJson(
 type ToolsMode = "stream" | "nonstream" | "off";
 
 export async function POST(req: Request) {
-  let body: { conversationId?: string; content?: string };
+  let body: { conversationId?: string; content?: string; provider?: "gemini" | "nvidia" };
   try {
     body = await req.json();
   } catch {
@@ -321,6 +328,53 @@ export async function POST(req: Request) {
       isFirstMessage && conv.title === "New chat" ? trimmed.slice(0, 60) : conv.title;
     await supabase.from("ai_conversations").update({ title: nextTitle }).eq("id", conversationId);
   };
+
+  // ---- Gemini 경로 ----
+  // NVIDIA 는 이 배포 리전(icn1)에서 응답이 오지 않는 상태가 계속돼 사실상
+  // 못 쓴다. Gemini 키가 있으면 그쪽이 기본이고, NVIDIA 는 명시 요청 시에만.
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const wantsNvidia = body.provider === "nvidia";
+  if (geminiKey && !wantsNvidia) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const forward = (chunk: string) =>
+          controller.enqueue(encoder.encode(chunk));
+        let result: Awaited<ReturnType<typeof runBigBrotherGemini>>;
+        try {
+          result = await runBigBrotherGemini({
+            apiKey: geminiKey,
+            system: SYSTEM_PROMPT,
+            history: (history ?? []) as { role: string; content: string | null }[],
+            tools: toGeminiTools(SOPHIA_TOOLS),
+            execute: (name, args) => executeSophiaTool(name, args),
+            forward,
+            maxRounds: MAX_TOOL_ROUNDS,
+            maxHistoryTurns: MAX_HISTORY_TURNS,
+            maxToolResultChars: MAX_TOOL_RESULT_CHARS,
+            deadline,
+          });
+        } catch (e) {
+          result = {
+            text: "",
+            error: e instanceof Error ? e.message : "Big Brother failed.",
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+          };
+        }
+        const finalContent =
+          result.error && !result.text ? result.error : result.text || "…";
+        if (result.error && !result.text) forward(result.error);
+        await saveAssistant(finalContent);
+        controller.close();
+      },
+      cancel() {},
+    });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
 
   const isTimeout = (r: NvidiaCallResult) =>
     !r.ok && r.upstreamStatus === null && r.detail.includes("timed out");

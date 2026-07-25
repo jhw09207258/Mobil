@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SophiaChat } from "../sophia/sophia-chat";
 import type { ConversationRow } from "../sophia/actions";
 import { BigBrotherSearch } from "./big-brother-search";
+import { VibeConsole } from "./vibe-console";
 import "./big-brother.css";
 
 /**
@@ -17,7 +18,7 @@ export function BigBrotherShell({
 }: {
   initialConversations: ConversationRow[];
 }) {
-  const [mode, setMode] = useState<"assistant" | "search">("assistant");
+  const [mode, setMode] = useState<"assistant" | "vibe" | "search">("assistant");
 
   return (
     <>
@@ -29,6 +30,12 @@ export function BigBrotherShell({
           Assistant
         </button>
         <button
+          className={`category-tab ${mode === "vibe" ? "active" : ""}`}
+          onClick={() => setMode("vibe")}
+        >
+          Vibe coding
+        </button>
+        <button
           className={`category-tab ${mode === "search" ? "active" : ""}`}
           onClick={() => setMode("search")}
         >
@@ -37,6 +44,8 @@ export function BigBrotherShell({
       </div>
       {mode === "assistant" ? (
         <SophiaChat initialConversations={initialConversations} />
+      ) : mode === "vibe" ? (
+        <VibeConsole />
       ) : (
         <div className="content">
           <BigBrotherSearch />

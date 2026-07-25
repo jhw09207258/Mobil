@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import type { MonacoApi } from "@/components/monaco/monaco-editor";
 import { isLangKey, type LangKey } from "@/lib/languages";
 import { Modal } from "@/components/modal";
-import { AgentConsole } from "./agent-console";
 import {
   addCodeFileToRepo,
   createSpaceFile,
@@ -278,6 +277,11 @@ export function CodeSpaceWorkspace({
           <button className="btn btn-sm" onClick={() => uploadRef.current?.click()} disabled={uploading}>
             {uploading ? "Adding…" : "Add files"}
           </button>
+          {/* 에이전트는 Big Brother 쪽에서 도는데 파일은 여기에 쌓인다 —
+              그 사이 바뀐 것을 가져오는 수동 새로고침. */}
+          <button className="btn btn-sm" onClick={onFilesChanged} title="Reload files changed by the agent">
+            Refresh
+          </button>
           <button className="btn btn-sm" onClick={() => setDialog("github")}>
             Push to GitHub
           </button>
@@ -344,18 +348,6 @@ export function CodeSpaceWorkspace({
             )}
           </div>
 
-          <AgentConsole
-            spaceId={spaceId}
-            spaceName={spaceName}
-            files={files.map((f) => ({ path: f.path || f.name }))}
-            onOpenFile={(path) => {
-              const hit = files.find((f) => (f.path || f.name) === path);
-              if (hit) openFile(hit);
-            }}
-            onFilesChanged={onFilesChanged}
-            onGithub={() => setDialog("github")}
-            onDeploy={() => setDialog("deploy")}
-          />
         </div>
       </div>
 

@@ -61,10 +61,11 @@ export function AgentConsole({
   spaceId: string;
   spaceName: string;
   files: { path: string }[];
-  onOpenFile: (path: string) => void;
+  /** 에디터가 있는 화면에서만 준다 — Big Brother 에는 편집 창이 없다. */
+  onOpenFile?: (path: string) => void;
   onFilesChanged: () => void;
-  onGithub: () => void;
-  onDeploy: () => void;
+  onGithub?: () => void;
+  onDeploy?: () => void;
 }) {
   const [lines, setLines] = useState<Line[]>([
     { kind: "system", text: `Antigravity agent ready — ${spaceName}` },
@@ -297,9 +298,14 @@ export function AgentConsole({
           files.find((f) => f.path.endsWith(`/${cmd.path}`)) ||
           files.find((f) => f.path.includes(cmd.path));
         if (!hit) push({ kind: "error", text: `No file matching "${cmd.path}".` });
-        else {
+        else if (onOpenFile) {
           onOpenFile(hit.path);
           push({ kind: "system", text: `Opened ${hit.path}` });
+        } else {
+          push({
+            kind: "system",
+            text: `${hit.path} — open it in Codespace to edit (this console has no editor).`,
+          });
         }
         return;
       }
@@ -328,10 +334,12 @@ export function AgentConsole({
         });
         return;
       case "github":
-        onGithub();
+        if (onGithub) onGithub();
+        else push({ kind: "system", text: "Open this Code Space in Codespace to push to GitHub." });
         return;
       case "deploy":
-        onDeploy();
+        if (onDeploy) onDeploy();
+        else push({ kind: "system", text: "Open this Code Space in Codespace to deploy." });
         return;
       case "error":
         push({ kind: "error", text: cmd.message });
