@@ -94,15 +94,20 @@
 .dash-share-id {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 .dash-share-id .label {
   white-space: nowrap;
 }
-/* 대시보드에서는 전체 ID 를 다 보여줄 필요 없다 — 절반 두께의 짧은 칩으로 */
+/* 대시보드에서는 전체 ID 를 다 보여줄 필요 없다 — 절반 두께의 짧은 칩으로.
+   폭은 vw 기반 상한을 둬 좁은 화면에서도 카드 밖으로 넘치지 않게 한다
+   (모바일에서 카드를 넘어가던 버그의 원인 — 고정 130px 이 줄어들 수 없었음). */
 .dash-share-id .code-block {
   display: block !important;
-  width: 130px !important;
+  width: min(130px, 34vw) !important;
   padding: 3px 10px;
   font-size: 11px;
   overflow: hidden;
