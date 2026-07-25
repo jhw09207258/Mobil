@@ -318,9 +318,17 @@ export async function pollTurn(opts: {
           result,
         });
       }
+      // environment 는 필수 필드다 — 빈 문자열을 보내면 400 이 난다. 여기까지
+      // 왔는데 환경 ID 가 없으면 이어갈 곳이 없으므로 분명하게 실패시킨다.
+      const envId = res.environment_id ?? opts.environmentId;
+      if (!envId) {
+        throw new Error(
+          "The sandbox environment was lost — start a new agent session with /reset."
+        );
+      }
       const next = await ai.interactions.create({
         ...BASE(opts.model),
-        environment: res.environment_id ?? opts.environmentId ?? "",
+        environment: envId,
         previous_interaction_id: res.id,
         input: results,
       });

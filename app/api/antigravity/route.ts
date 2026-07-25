@@ -199,11 +199,11 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
-    if (/NOT_FOUND|not found|unsupported|INVALID_ARGUMENT/i.test(msg)) {
+    if (/NOT_FOUND|not found|unsupported|is not available/i.test(msg)) {
       return NextResponse.json(
         {
           error:
-            "The Antigravity agent rejected this request — it is in preview and may not be enabled on this API key yet. " +
+            "The Antigravity agent is not available on this API key — it is in preview. " +
             msg.slice(0, 200),
         },
         { status: 400 }

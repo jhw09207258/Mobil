@@ -21,9 +21,12 @@ const MODEL = "gemini-3.5-flash";
 async function probeAntigravity(ai: GoogleGenAI) {
   const t = Date.now();
   try {
+    // environment 는 이 에이전트의 필수 필드다(빼면 400). 빈 sources 로 최소
+    // 샌드박스만 띄운다 — preview 동안 컴퓨트는 과금되지 않는다.
     const res = await ai.interactions.create({
       agent: ANTIGRAVITY_AGENT,
       agent_config: { type: "antigravity", model: AGENT_MODELS[0] },
+      environment: { type: "remote", sources: [] },
       input: "Reply with the single word OK. Do not use any tools.",
       store: false,
     });
@@ -41,12 +44,16 @@ async function probeAntigravity(ai: GoogleGenAI) {
       available: false,
       agent: ANTIGRAVITY_AGENT,
       elapsedMs: Date.now() - t,
-      reason: /NOT_FOUND|not found|unsupported|INVALID_ARGUMENT/i.test(detail)
+      // "키에 접근 권한이 없다"와 "요청을 잘못 만들었다"를 섞으면 안 된다 —
+      // 전자는 사용자가, 후자는 우리가 고쳐야 하는 문제다. 400 대부분은 후자다.
+      reason: /NOT_FOUND|not found|unsupported|is not available/i.test(detail)
         ? "agent-not-available-on-this-key"
         : /PERMISSION_DENIED/i.test(detail)
         ? "permission-denied"
         : /RESOURCE_EXHAUSTED|quota|429/i.test(detail)
         ? "quota"
+        : /^4\d\d|INVALID_ARGUMENT|Missing required|invalid/i.test(detail)
+        ? "bad-request-our-bug"
         : "request-failed",
       detail: detail.slice(0, 300),
     };
