@@ -60,7 +60,7 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <div className="panel dash-mega">
+        <div className="dash-mega">
           <div className="dash-mega-stats">
             <div className="stat">
               <div className="stat-val">{docCount}</div>
@@ -89,26 +89,29 @@ export default async function DashboardPage() {
           </div>
 
           <div className="dash-mega-grid">
-            <div className="dash-mega-cell dash-mega-storage">
-              <span className="label cell-label">MY STORAGE USAGE</span>
-              <StorageBreakdownChart rows={myUsage} />
+            <div className="dash-mega-col">
+              <div className="dash-card dash-mega-storage">
+                <span className="label cell-label">MY STORAGE USAGE</span>
+                <StorageBreakdownChart rows={myUsage} />
+              </div>
+              <div className="dash-card dash-mega-share">
+                <span className="label cell-label">SHARE OF PLATFORM TOTAL</span>
+                <StorageShareBar myBytes={myBytes} platformBytes={platformBytes} />
+              </div>
             </div>
-            <div className="dash-mega-cell dash-mega-share">
-              <span className="label cell-label">SHARE OF PLATFORM TOTAL</span>
-              <StorageShareBar myBytes={myBytes} platformBytes={platformBytes} />
-            </div>
-            <div className="dash-mega-cell dash-mega-live">
-              <span className="label cell-label">LIVE DATA THROUGHPUT</span>
+
+            <div className="dash-card dash-mega-live">
+              <div className="dash-mega-live-head">
+                <span className="label cell-label">LIVE DATA THROUGHPUT</span>
+                <div
+                  className="dash-share-id"
+                  title="Others paste this ID into their Share dialog to share items with you."
+                >
+                  <span className="label">MY SHARE ID</span>
+                  <Copyable value={userId} secret />
+                </div>
+              </div>
               <NetMonitor />
-            </div>
-            <div className="dash-mega-cell dash-mega-id">
-              <span
-                className="label cell-label"
-                title="Others paste this ID into their Share dialog to share items with you."
-              >
-                MY SHARE ID
-              </span>
-              <Copyable value={userId} secret />
             </div>
           </div>
         </div>

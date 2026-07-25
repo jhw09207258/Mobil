@@ -23,30 +23,26 @@
   font-weight: 500;
 }
 
-/* 통계 + 사용량 + 실시간 처리량 + 공유 ID 를 하나로 합친 대형 카드 */
+/* 통계 + 사용량 + 실시간 처리량 + 공유 ID — 하나의 테두리 상자에 가두는 대신
+   개별 카드를 여백으로만 구분해 잇는다(선으로 나누지 않는다). Live Data
+   Throughput(파티클 시각화)을 시각적 중심으로 두고 나머지를 주변에 배치. */
 .dash-mega {
   display: flex;
   flex-direction: column;
-  padding: 0;
-  gap: 0;
+  gap: 10px;
   flex: none;
-  overflow: hidden;
 }
 
 .dash-mega-stats {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  border-bottom: 1px solid var(--border-1);
+  gap: 8px;
 }
 .dash-mega-stats .stat {
-  border-radius: 0;
   border: none;
-  border-right: 1px solid var(--border-1);
-  background: transparent;
+  background: var(--bg-2);
+  border-radius: var(--radius);
   padding: 10px 12px;
-}
-.dash-mega-stats .stat:last-child {
-  border-right: none;
 }
 .dash-mega-stats .stat-val {
   font-size: 18px;
@@ -57,28 +53,55 @@
 
 .dash-mega-grid {
   display: grid;
-  grid-template-columns: 1.05fr 0.85fr 1.35fr 0.75fr;
+  grid-template-columns: 0.8fr 1.4fr;
+  gap: 10px;
   min-height: 0;
 }
-.dash-mega-cell {
-  padding: 12px 14px;
-  border-right: 1px solid var(--border-1);
+.dash-mega-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.dash-card {
+  background: var(--bg-2);
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
   min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: auto;
-  max-height: 210px;
 }
-.dash-mega-cell:last-child {
-  border-right: none;
+.dash-mega-storage,
+.dash-mega-share {
+  flex: 1;
+  max-height: 175px;
+}
+.dash-mega-live {
+  min-height: 0;
+  position: relative;
+}
+.dash-mega-live-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.dash-share-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dash-share-id .label {
+  white-space: nowrap;
 }
 .cell-label {
   display: block;
   margin-bottom: 8px;
   flex: none;
-}
-.dash-mega-live {
-  position: relative;
 }
 
 /* 네트워크 모니터 — 카드 폭 전체 사용, 벡터 파티클 캔버스 */
@@ -147,14 +170,11 @@
   .dash-mega-stats {
     grid-template-columns: repeat(3, 1fr);
   }
-  .dash-mega-stats .stat:nth-child(3) {
-    border-right: none;
-  }
   .dash-mega-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
-  .dash-mega-cell {
-    border-bottom: 1px solid var(--border-1);
+  .dash-mega-storage,
+  .dash-mega-share {
     max-height: none;
   }
   .dash-recent {
@@ -167,14 +187,5 @@
 @media (max-width: 640px) {
   .dash-mega-stats {
     grid-template-columns: repeat(2, 1fr);
-  }
-  .dash-mega-stats .stat:nth-child(2n) {
-    border-right: none;
-  }
-  .dash-mega-grid {
-    grid-template-columns: 1fr;
-  }
-  .dash-mega-cell {
-    border-right: none;
   }
 }

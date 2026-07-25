@@ -137,12 +137,16 @@
 .login-screen .auth-brand {
   margin-bottom: 6px;
 }
-.login-screen .brand-logo {
+.login-screen .brand-logo-lg {
+  font-family: "Avenir Next", "Avenir", var(--font-sans);
+  font-weight: 100; /* Ultra Light */
+  letter-spacing: -0.05em; /* Character Spacing -5% */
+  font-size: 45px; /* 기존 30px 대비 150% */
   color: #f2f2f2;
 }
 .auth-tagline {
   text-align: center;
-  font-size: 12px; /* Possion 로고(30px) 대비 60% 감소 */
+  font-size: 18px; /* 로고(45px) 대비 60% 감소 비율 유지 */
   color: rgba(255, 255, 255, 0.42);
   margin: 0 0 24px;
 }
@@ -150,8 +154,20 @@
   letter-spacing: 1.25px;
 }
 
+/* 입력칸 뒤로 파티클 배경이 그대로 비치면 타이핑 중 글자 가독성이 떨어져
+   블러를 얹는다 — 그룹 컨테이너 하나에만 적용해 두 입력이 함께 블러된다. */
+.auth-input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+  overflow: hidden;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
 .login-screen .input {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.16);
   color: #f0f0f0;
 }
@@ -164,16 +180,15 @@
 .login-screen .auth-foot a {
   color: rgba(255, 255, 255, 0.75);
 }
-
-/* 이메일/비밀번호 입력 — 간격 없이 하나로 합치고 radius 를 없앤다 */
-.auth-input-group {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 0;
-  overflow: hidden;
+/* Sign in 버튼 — 로그인 화면 전용으로 살짝 투명하게 */
+.login-screen .btn-primary {
+  background: color-mix(in srgb, var(--create) 82%, transparent);
+  border-color: color-mix(in srgb, var(--create-dim) 82%, transparent);
 }
+.login-screen .btn-primary:hover {
+  background: color-mix(in srgb, var(--create-hover) 88%, transparent);
+}
+
 .auth-input-group .input {
   border: none;
   border-radius: 0 !important;
@@ -184,7 +199,7 @@
 }
 .auth-input-group .input:focus {
   box-shadow: none;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 /* Mac/Windows 설치 옵션 — 옅은 그레이의 보조 옵션 */

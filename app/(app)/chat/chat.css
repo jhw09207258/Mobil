@@ -209,7 +209,7 @@
   color: var(--text-3);
 }
 .chat-msg {
-  max-width: min(640px, 85%);
+  max-width: min(720px, 94%);
   padding: 8px 12px;
   border-radius: var(--radius-lg);
   font-size: 13.5px;
@@ -367,7 +367,7 @@
   align-items: flex-end;
   gap: 6px;
   margin: 10px 20px 14px;
-  padding: 5px;
+  padding: 3px;
   background: var(--bg-0);
   border: 1px solid var(--border-1);
   border-radius: 22px;
@@ -874,7 +874,7 @@
   right: 0;
   bottom: 0;
   z-index: 85;
-  width: min(420px, 100vw);
+  width: min(460px, 100vw);
   display: flex;
   flex-direction: column;
   /* 반투명 + 블러 — 뒤 레이어가 은은히 비치는 유리 패널 */
