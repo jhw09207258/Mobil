@@ -131,8 +131,9 @@ export interface Database {
           updated_at: string;
           yjs_state: string | null;
           repository_id: string | null;
-          code_repository_id: string | null;
-          path: string | null;
+          // 코드 파일은 Code Space 안에서만 존재한다(0055).
+          code_repository_id: string;
+          path: string;
         };
         Insert: {
           id?: string;
@@ -142,8 +143,8 @@ export interface Database {
           content?: string;
           is_public?: boolean;
           yjs_state?: string | null;
-          code_repository_id?: string | null;
-          path?: string | null;
+          code_repository_id: string;
+          path: string;
         };
         Update: {
           name?: string;

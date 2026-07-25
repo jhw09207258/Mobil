@@ -9,54 +9,6 @@ import { syncObjectEmbedding } from "@/lib/embeddings";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
-/** 탭 시스템용: 리다이렉트 없이 새 코드 파일을 만들고 id/name 만 반환. */
-export async function createCodeFileTab(): Promise<{
-  id: string;
-  title: string;
-  seed: unknown;
-}> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Authentication required.");
-
-  const { data, error } = await supabase
-    .from("code_files")
-    .insert({ owner_id: user.id, name: "untitled.txt", language: "plaintext" })
-    .select("id, name, language, content")
-    .single();
-
-  if (error || !data) throw new Error("Failed to create code file.");
-
-  after(() =>
-    supabase.from("audit_logs").insert({
-      user_id: user.id,
-      target_type: "code",
-      target_id: data.id,
-      action: "create",
-    })
-  );
-
-  return {
-    id: data.id,
-    title: data.name,
-    seed: {
-      id: data.id,
-      name: data.name,
-      language: data.language,
-      content: data.content,
-      initialYjsState: null,
-      isPublic: false,
-      canEdit: true,
-      isOwner: true,
-      myShareId: user.id,
-      myName: user.email ?? "",
-      myAvatarUrl: null,
-    },
-  };
-}
-
 /** 탭 시스템용: 코드 파일 데이터 + 편집 가능 여부를 한 번에 조회. */
 export async function getCodeFileForTab(id: string) {
   const { userId, profile } = await requireUser();

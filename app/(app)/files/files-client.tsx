@@ -43,7 +43,6 @@ import {
 import { OpenItemButton } from "../workspace/open-item-button";
 import { useWorkspace } from "../workspace/workspace-context";
 import { createDocumentTab } from "../documents/actions";
-import { createCodeFileTab } from "../code/actions";
 import { createSheetTab } from "../sheets/actions";
 import { createMindMapTab } from "../mindmap/actions";
 
@@ -206,8 +205,9 @@ export function FilesClient({
         const r = await createSheetTab();
         id = r.id; title = r.title; seed = r.seed;
       } else if (kind === "code") {
-        const r = await createCodeFileTab();
-        id = r.id; title = r.title; seed = r.seed;
+        // 코드 파일은 Code Space 없이 만들 수 없다(0055).
+        setError("Code files live inside a Code Space — create one from Codespace.");
+        return;
       } else {
         const r = await createMindMapTab();
         id = r.id; title = r.title; seed = r.seed;
@@ -433,7 +433,7 @@ export function FilesClient({
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("document")}>+ Doc</button>
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("sheet")}>+ Table</button>
-              <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("code")}>+ Code</button>
+              {/* 코드는 Code Space 안에서만 만들 수 있다(0055) — Codespace 페이지로 보낸다. */}
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("mindmap")}>+ Link Graph</button>
               {repoView !== "null" && (
                 <select

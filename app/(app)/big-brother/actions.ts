@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { extractTagsFromText } from "@/lib/tags";
 import { detectLanguage } from "@/lib/languages";
+import { ensureCodeSpace, uniquePath } from "@/lib/code-space";
 import type { Json } from "@/lib/database.types";
 
 // ============================================================================
@@ -341,9 +342,21 @@ export async function addGithubResultToCode(
   const fileName = result.path.split("/").pop() || "imported.txt";
   const language = detectLanguage(fileName);
 
+  // 코드 파일은 Code Space 안에서만 존재한다 — 출처 저장소 이름으로 모아둔다.
+  const spaceId = await ensureCodeSpace(supabase, user.id, `${result.owner}/${result.repo}`);
+  if (!spaceId) return { error: "Could not create a Code Space for this file." };
+  const path = await uniquePath(supabase, spaceId, result.path);
+
   const { data, error } = await supabase
     .from("code_files")
-    .insert({ owner_id: user.id, name: fileName, language, content })
+    .insert({
+      owner_id: user.id,
+      name: fileName,
+      language,
+      content,
+      code_repository_id: spaceId,
+      path,
+    })
     .select("id, name, language, content")
     .single();
   if (error || !data) return { error: "Failed to create code file." };

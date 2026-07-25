@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 import { extractTagsFromText } from "@/lib/tags";
 import { detectLanguage, isLangKey } from "@/lib/languages";
+import { ensureCodeSpace, uniquePath } from "@/lib/code-space";
 import { markdownToTiptapDoc, tiptapToPlainText, tiptapToMarkdown } from "@/lib/doc-convert";
 import { importFileToSheetData, exportSheetToCsv } from "@/lib/sheet-convert";
 import { sheetRowsToMindmapData, type SheetCell } from "@/lib/outline-convert";
@@ -123,13 +124,23 @@ export const SOPHIA_TOOLS = [
     type: "function",
     function: {
       name: "create_code_file",
-      description: "Create a brand-new code file.",
+      description:
+        "Create a brand-new code file inside a Code Space. Code files cannot exist outside one.",
       parameters: {
         type: "object",
         properties: {
-          name: { type: "string", description: "File name including extension, e.g. 'utils.ts'." },
+          name: {
+            type: "string",
+            description:
+              "Path inside the Code Space including extension, e.g. 'src/utils.ts'.",
+          },
           content: { type: "string" },
           language: { type: "string", description: "Optional; auto-detected from the file name if omitted." },
+          code_space: {
+            type: "string",
+            description:
+              "Name of the Code Space to put this in. Created if it doesn't exist. Defaults to 'Big Brother'.",
+          },
         },
         required: ["name", "content"],
       },
@@ -349,15 +360,29 @@ async function toolCreateCodeFile(args: {
   name?: string;
   content?: string;
   language?: string;
+  code_space?: string;
 }): Promise<ToolResult> {
   const { userId } = await requireUser();
   const supabase = await createClient();
-  const name = String(args.name ?? "untitled.txt").trim() || "untitled.txt";
+  const rawPath = String(args.name ?? "untitled.txt").trim() || "untitled.txt";
+  const name = rawPath.split("/").pop() || "untitled.txt";
   const language = args.language && isLangKey(args.language) ? args.language : detectLanguage(name);
+
+  // 코드 파일은 Code Space 안에서만 존재한다 — 지정이 없으면 기본 Space 에 모은다.
+  const spaceId = await ensureCodeSpace(supabase, userId, args.code_space || undefined);
+  if (!spaceId) return { error: "Could not create a Code Space for this file." };
+  const path = await uniquePath(supabase, spaceId, rawPath);
 
   const { data, error } = await supabase
     .from("code_files")
-    .insert({ owner_id: userId, name, language, content: String(args.content ?? "") })
+    .insert({
+      owner_id: userId,
+      name,
+      language,
+      content: String(args.content ?? ""),
+      code_repository_id: spaceId,
+      path,
+    })
     .select("id, name")
     .single();
   if (error || !data) return { error: "Failed to create code file." };
