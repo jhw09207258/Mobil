@@ -1,4 +1,5 @@
 import { Extension } from "@tiptap/core";
+import { PluginKey } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
 import { MentionMenu, type MentionMenuRef } from "./mention-menu";
@@ -8,6 +9,12 @@ import { searchOntology, type SearchResult } from "../../search/actions";
 // 삽입한다. 위치/키보드 처리는 slash-command.ts 와 동일한 패턴.
 const TAB_KINDS = new Set(["document", "code", "sheet", "mindmap"]);
 
+// Suggestion 은 pluginKey 를 주지 않으면 전부 공용 기본 키(suggestion)를 쓴다.
+// 그러면 같은 에디터에 붙는 두 번째 Suggestion(여기 @ 멘션 + slash-command 의 /)
+// 에서 ProseMirror 가 "Adding different instances of a keyed plugin
+// (suggestion$)" 로 죽어 에디터 전체가 뜨지 않는다 — 반드시 서로 다른 키를 준다.
+const mentionPluginKey = new PluginKey("workspaceMention");
+
 export const WorkspaceMention = Extension.create({
   name: "workspaceMention",
 
@@ -15,6 +22,7 @@ export const WorkspaceMention = Extension.create({
     return [
       Suggestion<SearchResult, SearchResult>({
         editor: this.editor,
+        pluginKey: mentionPluginKey,
         char: "@",
         startOfLine: false,
         command: ({ editor, range, props }) => {

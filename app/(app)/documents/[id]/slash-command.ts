@@ -1,7 +1,12 @@
 import { Extension } from "@tiptap/core";
+import { PluginKey } from "@tiptap/pm/state";
 import Suggestion from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
 import { SlashMenu, type SlashItem, type SlashMenuRef } from "./slash-menu";
+
+// 기본 키(suggestion)를 그대로 쓰면 같은 에디터의 다른 Suggestion(@ 멘션)과
+// 키가 충돌해 ProseMirror 가 에디터 생성 자체를 거부한다 — 전용 키를 준다.
+const slashPluginKey = new PluginKey("slashCommand");
 
 // Notion 류 "/" 명령 메뉴. tippy.js 등 포지셔닝 라이브러리 없이 ProseMirror
 // 좌표(coordsAtPos)를 직접 읽어 고정 위치 팝업을 붙인다.
@@ -85,6 +90,7 @@ export const SlashCommand = Extension.create({
     return [
       Suggestion<SlashItem, SlashItem>({
         editor: this.editor,
+        pluginKey: slashPluginKey,
         char: "/",
         startOfLine: false,
         command: ({ editor, range, props }) => {
