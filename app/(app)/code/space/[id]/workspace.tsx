@@ -9,73 +9,52 @@ import { Modal } from "@/components/modal";
 import {
   addCodeFileToRepo,
   createSpaceFile,
+  deleteSpaceFile,
   listCodeRepoFiles,
   readSpaceFile,
+  renameSpaceFile,
+  renameSpaceFolder,
   writeSpaceFile,
   type CodeRepoFile,
 } from "../../repo-actions";
 import { GithubPushDialog, VercelDeployDialog } from "./ship-dialogs";
+import { buildTree, fuzzyMatch, type TreeNode } from "./tree-utils";
+
+// ============================================================================
+// Code Space 워크스페이스 — VS Code 식 편집기.
+//
+// 갖춘 것: 여러 파일 탭, 빠른 열기(Cmd+P), 트리에서 파일 만들기/이름변경/삭제,
+// 저장 전 diff 검토, Cmd+S 저장. 찾기·바꾸기(Cmd+F/H), 명령 팔레트(F1),
+// 멀티커서, 코드 접기, 자동완성은 Monaco 가 그대로 제공한다.
+//
+// 폴더는 실체가 없다 — 경로에 내포돼 있을 뿐이다. 그래서 "빈 폴더 만들기"는
+// 없고, 폴더 이름 변경은 그 아래 파일들의 경로 접두사를 바꾸는 일이다.
+// ============================================================================
 
 /** 텍스트 소스만 다루므로 큰 파일은 거른다(바이너리 방지). */
 const MAX_UPLOAD_BYTES = 200 * 1024;
 
 // Monaco 는 1MB 가 넘는다. 정적으로 import 하면 Code Space 를 열기도 전에
-// 전부 받아야 하므로, 낱개 편집기와 같이 파일을 열 때만 지연 로딩한다.
+// 전부 받아야 하므로, 파일을 열 때만 지연 로딩한다.
 const MonacoCodeEditor = dynamic(
   () => import("@/components/monaco/monaco-editor").then((m) => m.MonacoCodeEditor),
-  {
-    ssr: false,
-    loading: () => <div className="empty">Loading editor…</div>,
-  }
+  { ssr: false, loading: () => <div className="empty">Loading editor…</div> }
+);
+const MonacoDiff = dynamic(
+  () => import("@/components/monaco/monaco-editor").then((m) => m.MonacoDiff),
+  { ssr: false, loading: () => <div className="empty">Loading diff…</div> }
 );
 
-// ============================================================================
-// Code Space 워크스페이스 — 파일 트리 + 에디터 + Antigravity 콘솔.
-//
-// 낱개 파일 편집기(/code/[id])와 달리 여기서는 Code Space 전체가 대상이다.
-// 에이전트가 여러 파일을 한 번에 고치므로, 커밋이 끝나면 트리와 열린 파일을
-// 다시 읽어온다.
-// ============================================================================
+type Node = TreeNode<CodeRepoFile>;
 
-type Node = {
-  name: string;
+/** 열려 있는 탭. saved 는 디스크 상태 — dirty 판정과 diff 의 기준이다. */
+type Tab = {
+  id: string;
   path: string;
-  file?: CodeRepoFile;
-  children: Node[];
+  content: string;
+  saved: string;
+  language: LangKey;
 };
-
-function buildTree(files: CodeRepoFile[]): Node[] {
-  const root: Node = { name: "", path: "", children: [] };
-  for (const f of files) {
-    const parts = (f.path || f.name).split("/").filter(Boolean);
-    let node = root;
-    parts.forEach((part, i) => {
-      const isLeaf = i === parts.length - 1;
-      let child = node.children.find((c) => c.name === part && !!c.file === isLeaf);
-      if (!child) {
-        child = {
-          name: part,
-          path: parts.slice(0, i + 1).join("/"),
-          children: [],
-          ...(isLeaf ? { file: f } : {}),
-        };
-        node.children.push(child);
-      }
-      node = child;
-    });
-  }
-  const sort = (n: Node) => {
-    // 폴더 먼저, 그 다음 이름순 — 파일 탐색기의 관례.
-    n.children.sort((a, b) => {
-      const af = a.file ? 1 : 0;
-      const bf = b.file ? 1 : 0;
-      return af - bf || a.name.localeCompare(b.name);
-    });
-    n.children.forEach(sort);
-  };
-  sort(root);
-  return root.children;
-}
 
 export function CodeSpaceWorkspace({
   spaceId,
@@ -90,23 +69,32 @@ export function CodeSpaceWorkspace({
 }) {
   const router = useRouter();
   const [files, setFiles] = useState(initialFiles);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [openName, setOpenName] = useState("");
-  const [content, setContent] = useState("");
-  const [language, setLanguage] = useState<LangKey>("plaintext");
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [dirty, setDirty] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [dialog, setDialog] = useState<"new" | "github" | "deploy" | null>(null);
+  const [dialog, setDialog] = useState<
+    | { kind: "new"; prefix?: string }
+    | { kind: "rename"; file: CodeRepoFile }
+    | { kind: "renameFolder"; path: string }
+    | { kind: "github" }
+    | { kind: "deploy" }
+    | null
+  >(null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const apiRef = useRef<MonacoApi | null>(null);
-  const contentRef = useRef("");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const tabsRef = useRef<Tab[]>([]);
+  tabsRef.current = tabs;
 
   const tree = useMemo(() => buildTree(files), [files]);
+  const active = tabs.find((t) => t.id === activeId) ?? null;
+  const dirtyCount = tabs.filter((t) => t.content !== t.saved).length;
 
   const refreshFiles = useCallback(async () => {
     const next = await listCodeRepoFiles(spaceId);
@@ -114,43 +102,142 @@ export function CodeSpaceWorkspace({
     return next;
   }, [spaceId]);
 
-  const openFile = useCallback(async (file: CodeRepoFile) => {
-    setLoading(true);
-    setOpenId(file.id);
-    setOpenName(file.path || file.name);
-    setDirty(false);
-    const res = await readSpaceFile(file.id);
-    setLoading(false);
-    if ("error" in res) {
-      setError(res.error);
-      return;
-    }
-    contentRef.current = res.content;
-    setContent(res.content);
-    setLanguage(isLangKey(res.language) ? res.language : "plaintext");
+  // ---- 탭 ----
+  const openFile = useCallback(
+    async (file: CodeRepoFile) => {
+      const path = file.path || file.name;
+      if (tabsRef.current.some((t) => t.id === file.id)) {
+        setActiveId(file.id);
+        setShowDiff(false);
+        return;
+      }
+      setLoading(true);
+      const res = await readSpaceFile(file.id);
+      setLoading(false);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      const lang = isLangKey(res.language) ? res.language : "plaintext";
+      setTabs((prev) => [
+        ...prev,
+        { id: file.id, path, content: res.content, saved: res.content, language: lang },
+      ]);
+      setActiveId(file.id);
+      setShowDiff(false);
+    },
+    []
+  );
+
+  const save = useCallback(async (id: string) => {
+    const tab = tabsRef.current.find((t) => t.id === id);
+    if (!tab || tab.content === tab.saved) return;
+    const body = tab.content;
+    const res = await writeSpaceFile(id, body);
+    if ("error" in res) setError(res.error);
+    // 저장 중에 더 타이핑했을 수 있으므로, 저장한 내용만 saved 로 승격한다.
+    else setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, saved: body } : t)));
   }, []);
 
-  // 에이전트가 파일을 고치면 트리를 갱신하고, 열려 있던 파일은 다시 읽는다.
+  const saveAll = useCallback(async () => {
+    for (const t of tabsRef.current) {
+      if (t.content !== t.saved) await save(t.id);
+    }
+  }, [save]);
+
+  const closeTab = useCallback(
+    async (id: string) => {
+      const tab = tabsRef.current.find((t) => t.id === id);
+      if (tab && tab.content !== tab.saved) {
+        if (!confirm(`${tab.path} has unsaved changes. Close anyway?`)) return;
+      }
+      const timer = saveTimers.current.get(id);
+      if (timer) {
+        clearTimeout(timer);
+        saveTimers.current.delete(id);
+      }
+      setTabs((prev) => {
+        const next = prev.filter((t) => t.id !== id);
+        setActiveId((cur) => (cur === id ? next[next.length - 1]?.id ?? null : cur));
+        return next;
+      });
+    },
+    []
+  );
+
+  const onChange = useCallback(
+    (v: string) => {
+      const id = activeId;
+      if (!id) return;
+      setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, content: v } : t)));
+      const existing = saveTimers.current.get(id);
+      if (existing) clearTimeout(existing);
+      saveTimers.current.set(
+        id,
+        setTimeout(() => {
+          saveTimers.current.delete(id);
+          save(id);
+        }, 1200)
+      );
+    },
+    [activeId, save]
+  );
+
+  useEffect(() => {
+    const timers = saveTimers.current;
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, []);
+
+  // 에이전트가 Big Brother 쪽에서 파일을 고치므로, 여기서 다시 읽어온다.
   const onFilesChanged = useCallback(async () => {
     const next = await refreshFiles();
-    if (openId) {
-      const still = next.find((f) => f.id === openId);
-      if (still) {
-        const res = await readSpaceFile(openId);
-        if (!("error" in res)) {
-          contentRef.current = res.content;
-          setContent(res.content);
-          apiRef.current?.applyContent(res.content);
-          setDirty(false);
-        }
-      } else {
-        setOpenId(null);
-        setContent("");
+    for (const tab of tabsRef.current) {
+      const still = next.find((f) => f.id === tab.id);
+      if (!still) {
+        setTabs((prev) => prev.filter((t) => t.id !== tab.id));
+        setActiveId((cur) => (cur === tab.id ? null : cur));
+        continue;
       }
+      const res = await readSpaceFile(tab.id);
+      if ("error" in res) continue;
+      // 편집 중이던 내용을 말없이 덮어쓰지 않는다 — 저장된 것과 같을 때만 갱신.
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === tab.id && t.content === t.saved
+            ? { ...t, content: res.content, saved: res.content, path: still.path || still.name }
+            : t.id === tab.id
+            ? { ...t, saved: res.content }
+            : t
+        )
+      );
+      if (tab.id === activeId && tab.content === tab.saved) apiRef.current?.applyContent(res.content);
     }
     router.refresh();
-  }, [openId, refreshFiles, router]);
+  }, [refreshFiles, router, activeId]);
 
+  // ---- 단축키 ----
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        if (e.shiftKey) saveAll();
+        else if (activeId) save(activeId);
+      } else if (mod && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setQuickOpen(true);
+      } else if (mod && e.key.toLowerCase() === "w" && activeId) {
+        e.preventDefault();
+        closeTab(activeId);
+      } else if (e.key === "Escape") {
+        setQuickOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeId, save, saveAll, closeTab]);
+
+  // ---- 파일 조작 ----
   const onUpload = useCallback(
     async (list: FileList | null) => {
       if (!list?.length) return;
@@ -163,7 +250,6 @@ export function CodeSpaceWorkspace({
         }
         try {
           const text = await f.text();
-          // 폴더째로 올리면 webkitRelativePath 에 구조가 들어 있다.
           const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
           const res = await addCodeFileToRepo(spaceId, rel || f.name, text);
           if ("error" in res) failed++;
@@ -180,40 +266,19 @@ export function CodeSpaceWorkspace({
     [spaceId, refreshFiles, router]
   );
 
-  const save = useCallback(async () => {
-    if (!openId) return;
-    const res = await writeSpaceFile(openId, contentRef.current);
-    if ("error" in res) setError(res.error);
-    else setDirty(false);
-  }, [openId]);
-
-  const onChange = useCallback(
-    (v: string) => {
-      contentRef.current = v;
-      setDirty(true);
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(save, 1200);
-    },
-    [save]
-  );
-
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, []);
-
-  // Cmd/Ctrl+S 로 즉시 저장.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        save();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [save]);
+  const onDelete = async (file: CodeRepoFile) => {
+    const path = file.path || file.name;
+    if (!confirm(`Move ${path} to the Trash?`)) return;
+    const res = await deleteSpaceFile(file.id);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    setTabs((prev) => prev.filter((t) => t.id !== file.id));
+    setActiveId((cur) => (cur === file.id ? null : cur));
+    await refreshFiles();
+    router.refresh();
+  };
 
   const toggle = (path: string) =>
     setCollapsed((prev) => {
@@ -226,25 +291,47 @@ export function CodeSpaceWorkspace({
   const renderNodes = (nodes: Node[], depth = 0): React.ReactNode =>
     nodes.map((n) =>
       n.file ? (
-        <button
-          key={n.path}
-          className={`tree-row file ${openId === n.file.id ? "active" : ""}`}
-          style={{ paddingLeft: 10 + depth * 12 }}
-          onClick={() => openFile(n.file!)}
-          title={n.path}
-        >
-          {n.name}
-        </button>
+        <div key={n.path} className="tree-item">
+          <button
+            className={`tree-row file ${activeId === n.file.id ? "active" : ""}`}
+            style={{ paddingLeft: 10 + depth * 12 }}
+            onClick={() => openFile(n.file!)}
+            title={n.path}
+          >
+            {n.name}
+            {tabs.some((t) => t.id === n.file!.id && t.content !== t.saved) && (
+              <span className="tree-dirty">●</span>
+            )}
+          </button>
+          <span className="tree-actions">
+            <button title="Rename" onClick={() => setDialog({ kind: "rename", file: n.file! })}>
+              ✎
+            </button>
+            <button title="Delete" onClick={() => onDelete(n.file!)}>
+              ✕
+            </button>
+          </span>
+        </div>
       ) : (
         <div key={n.path}>
-          <button
-            className="tree-row dir"
-            style={{ paddingLeft: 10 + depth * 12 }}
-            onClick={() => toggle(n.path)}
-          >
-            <span className="tree-caret">{collapsed.has(n.path) ? "▸" : "▾"}</span>
-            {n.name}
-          </button>
+          <div className="tree-item">
+            <button
+              className="tree-row dir"
+              style={{ paddingLeft: 10 + depth * 12 }}
+              onClick={() => toggle(n.path)}
+            >
+              <span className="tree-caret">{collapsed.has(n.path) ? "▸" : "▾"}</span>
+              {n.name}
+            </button>
+            <span className="tree-actions">
+              <button title="New file here" onClick={() => setDialog({ kind: "new", prefix: n.path })}>
+                +
+              </button>
+              <button title="Rename folder" onClick={() => setDialog({ kind: "renameFolder", path: n.path })}>
+                ✎
+              </button>
+            </span>
+          </div>
           {!collapsed.has(n.path) && renderNodes(n.children, depth + 1)}
         </div>
       )
@@ -269,37 +356,37 @@ export function CodeSpaceWorkspace({
         )}
         <div className="row" style={{ gap: 6, marginLeft: "auto" }}>
           <span className="mono muted" style={{ fontSize: 11 }}>
-            {files.length} files
+            {files.length} files{dirtyCount > 0 && ` · ${dirtyCount} unsaved`}
           </span>
-          <button className="btn btn-sm" onClick={() => setDialog("new")}>
+          <button className="btn btn-sm" onClick={() => setQuickOpen(true)} title="Cmd/Ctrl+P">
+            Go to file
+          </button>
+          <button className="btn btn-sm" onClick={() => setDialog({ kind: "new" })}>
             New file
           </button>
           <button className="btn btn-sm" onClick={() => uploadRef.current?.click()} disabled={uploading}>
             {uploading ? "Adding…" : "Add files"}
           </button>
-          {/* 에이전트는 Big Brother 쪽에서 도는데 파일은 여기에 쌓인다 —
-              그 사이 바뀐 것을 가져오는 수동 새로고침. */}
           <button className="btn btn-sm" onClick={onFilesChanged} title="Reload files changed by the agent">
             Refresh
           </button>
-          <button className="btn btn-sm" onClick={() => setDialog("github")}>
+          {dirtyCount > 0 && (
+            <button className="btn btn-sm btn-primary" onClick={saveAll} title="Cmd/Ctrl+Shift+S">
+              Save all
+            </button>
+          )}
+          <button className="btn btn-sm" onClick={() => setDialog({ kind: "github" })}>
             Push to GitHub
           </button>
-          <button className="btn btn-sm" onClick={() => setDialog("deploy")}>
+          <button className="btn btn-sm" onClick={() => setDialog({ kind: "deploy" })}>
             Deploy
           </button>
         </div>
       </div>
-      <input
-        ref={uploadRef}
-        type="file"
-        multiple
-        hidden
-        onChange={(e) => onUpload(e.target.files)}
-      />
+      <input ref={uploadRef} type="file" multiple hidden onChange={(e) => onUpload(e.target.files)} />
 
       {error && (
-        <div className="notice notice-error" style={{ margin: "0 0 0 0" }}>
+        <div className="notice notice-error" style={{ margin: 0 }}>
           {error}
           <button className="btn btn-sm" style={{ marginLeft: 10 }} onClick={() => setError(null)}>
             Dismiss
@@ -311,7 +398,8 @@ export function CodeSpaceWorkspace({
         <aside className="space-tree hscroll">
           {files.length === 0 ? (
             <p className="tree-empty">
-              Empty Code Space. Ask the agent below to build something, or add a file.
+              Empty Code Space. Add a file here, or build it with the agent in Big Brother →
+              Vibe coding.
             </p>
           ) : (
             renderNodes(tree)
@@ -319,22 +407,67 @@ export function CodeSpaceWorkspace({
         </aside>
 
         <div className="space-main">
+          {tabs.length > 0 && (
+            <div className="tab-strip hscroll">
+              {tabs.map((t) => (
+                <div
+                  key={t.id}
+                  className={`tab ${t.id === activeId ? "active" : ""}`}
+                  onClick={() => {
+                    setActiveId(t.id);
+                    setShowDiff(false);
+                  }}
+                >
+                  <span className="tab-name">{t.path.split("/").pop()}</span>
+                  {t.content !== t.saved && <span className="tab-dot">●</span>}
+                  <button
+                    className="tab-close"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(t.id);
+                    }}
+                    aria-label={`Close ${t.path}`}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="space-editor">
-            {openId ? (
+            {active ? (
               <>
                 <div className="editor-tab">
-                  <span className="mono">{openName}</span>
-                  <span className={`save-state ${dirty ? "dirty" : "saved"}`}>
-                    {dirty ? "UNSAVED" : "SAVED"}
-                  </span>
+                  <span className="mono breadcrumb">{active.path.split("/").join(" › ")}</span>
+                  <div className="row" style={{ gap: 8 }}>
+                    {active.content !== active.saved && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setShowDiff((v) => !v)}
+                        title="Compare with the saved version"
+                      >
+                        {showDiff ? "Edit" : "Review changes"}
+                      </button>
+                    )}
+                    <span className={`save-state ${active.content !== active.saved ? "dirty" : "saved"}`}>
+                      {active.content !== active.saved ? "UNSAVED" : "SAVED"}
+                    </span>
+                  </div>
                 </div>
                 {loading ? (
                   <div className="empty">Loading…</div>
+                ) : showDiff ? (
+                  <MonacoDiff
+                    original={active.saved}
+                    modified={active.content}
+                    language={active.language}
+                  />
                 ) : (
                   <MonacoCodeEditor
-                    key={openId}
-                    value={content}
-                    language={language}
+                    key={active.id}
+                    value={active.content}
+                    language={active.language}
                     editable
                     onChange={onChange}
                     onReady={(api) => (apiRef.current = api)}
@@ -343,79 +476,227 @@ export function CodeSpaceWorkspace({
               </>
             ) : (
               <div className="empty">
-                Select a file, or just tell the agent what you want — it can create files itself.
+                <div style={{ textAlign: "center", lineHeight: 1.8 }}>
+                  Select a file, or press <kbd>Cmd/Ctrl</kbd> + <kbd>P</kbd> to jump to one.
+                  <br />
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Cmd+S save · Cmd+Shift+S save all · Cmd+W close tab · Cmd+F find · F1 command
+                    palette
+                  </span>
+                </div>
               </div>
             )}
           </div>
-
         </div>
       </div>
 
-      {dialog === "new" && (
-        <NewFileDialog
-          spaceId={spaceId}
-          onClose={() => setDialog(null)}
-          onDone={async (id) => {
-            setDialog(null);
-            const next = await refreshFiles();
-            const hit = next.find((f) => f.id === id);
-            if (hit) openFile(hit);
+      {quickOpen && (
+        <QuickOpen
+          files={files}
+          onClose={() => setQuickOpen(false)}
+          onPick={(f) => {
+            setQuickOpen(false);
+            openFile(f);
           }}
         />
       )}
-      {dialog === "github" && (
-        <GithubPushDialog spaceId={spaceId} spaceName={spaceName} github={github} onClose={() => setDialog(null)} />
+
+      {dialog?.kind === "new" && (
+        <PathDialog
+          title="New file"
+          initial={dialog.prefix ? `${dialog.prefix}/` : ""}
+          placeholder="src/index.ts"
+          hint="Use slashes to put the file in a folder — folders are created as needed."
+          confirmLabel="Create"
+          onClose={() => setDialog(null)}
+          onSubmit={async (path) => {
+            const res = await createSpaceFile(spaceId, path);
+            if ("error" in res) return res.error;
+            setDialog(null);
+            const next = await refreshFiles();
+            const hit = next.find((f) => f.id === res.id);
+            if (hit) openFile(hit);
+            return null;
+          }}
+        />
       )}
-      {dialog === "deploy" && (
+      {dialog?.kind === "rename" && (
+        <PathDialog
+          title="Rename file"
+          initial={dialog.file.path || dialog.file.name}
+          placeholder="src/index.ts"
+          hint="Changing the folder part moves the file."
+          confirmLabel="Rename"
+          onClose={() => setDialog(null)}
+          onSubmit={async (path) => {
+            const res = await renameSpaceFile(dialog.file.id, path);
+            if ("error" in res) return res.error;
+            setDialog(null);
+            setTabs((prev) =>
+              prev.map((t) => (t.id === dialog.file.id ? { ...t, path: res.path } : t))
+            );
+            await refreshFiles();
+            return null;
+          }}
+        />
+      )}
+      {dialog?.kind === "renameFolder" && (
+        <PathDialog
+          title="Rename folder"
+          initial={dialog.path}
+          placeholder="src/components"
+          hint="Every file under this folder moves with it."
+          confirmLabel="Rename"
+          onClose={() => setDialog(null)}
+          onSubmit={async (path) => {
+            const res = await renameSpaceFolder(spaceId, dialog.path, path);
+            if ("error" in res) return res.error;
+            setDialog(null);
+            const next = await refreshFiles();
+            setTabs((prev) =>
+              prev.map((t) => {
+                const f = next.find((n) => n.id === t.id);
+                return f ? { ...t, path: f.path || f.name } : t;
+              })
+            );
+            return null;
+          }}
+        />
+      )}
+      {dialog?.kind === "github" && (
+        <GithubPushDialog
+          spaceId={spaceId}
+          spaceName={spaceName}
+          github={github}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "deploy" && (
         <VercelDeployDialog spaceId={spaceId} spaceName={spaceName} onClose={() => setDialog(null)} />
       )}
     </div>
   );
 }
 
-function NewFileDialog({
-  spaceId,
+/** Cmd+P — 경로를 흐릿하게 쳐도 찾아준다. */
+function QuickOpen({
+  files,
   onClose,
-  onDone,
+  onPick,
 }: {
-  spaceId: string;
+  files: CodeRepoFile[];
   onClose: () => void;
-  onDone: (id: string) => void;
+  onPick: (f: CodeRepoFile) => void;
 }) {
-  const [path, setPath] = useState("");
+  const [query, setQuery] = useState("");
+  const [index, setIndex] = useState(0);
+  const matches = useMemo(
+    () => files.filter((f) => fuzzyMatch(f.path || f.name, query)).slice(0, 50),
+    [files, query]
+  );
+
+  useEffect(() => setIndex(0), [query]);
+
+  return (
+    <div className="quick-open-backdrop" onClick={onClose}>
+      <div className="quick-open" onClick={(e) => e.stopPropagation()}>
+        <input
+          className="quick-open-input mono"
+          placeholder="Go to file…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+          spellCheck={false}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setIndex((i) => Math.min(i + 1, matches.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setIndex((i) => Math.max(i - 1, 0));
+            } else if (e.key === "Enter" && matches[index]) {
+              e.preventDefault();
+              onPick(matches[index]);
+            } else if (e.key === "Escape") {
+              onClose();
+            }
+          }}
+        />
+        <div className="quick-open-list">
+          {matches.length === 0 ? (
+            <div className="quick-open-empty">No matching files</div>
+          ) : (
+            matches.map((f, i) => (
+              <button
+                key={f.id}
+                className={`quick-open-row mono ${i === index ? "active" : ""}`}
+                onMouseEnter={() => setIndex(i)}
+                onClick={() => onPick(f)}
+              >
+                {f.path || f.name}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 경로 하나를 받는 공용 다이얼로그(만들기 / 이름변경 / 폴더 이름변경). */
+function PathDialog({
+  title,
+  initial,
+  placeholder,
+  hint,
+  confirmLabel,
+  onClose,
+  onSubmit,
+}: {
+  title: string;
+  initial: string;
+  placeholder: string;
+  hint: string;
+  confirmLabel: string;
+  /** 오류 문구를 돌려주면 다이얼로그를 열어둔 채 보여준다. */
+  onSubmit: (path: string) => Promise<string | null>;
+  onClose: () => void;
+}) {
+  const [path, setPath] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (!path.trim() || busy) return;
+    setBusy(true);
+    setError(await onSubmit(path));
+    setBusy(false);
+  };
+
   return (
-    <Modal title="New file" onClose={onClose} width={440}>
+    <Modal title={title} onClose={onClose} width={460}>
       {error && <div className="notice notice-error">{error}</div>}
       <input
         className="input mono"
         style={{ width: "100%" }}
-        placeholder="src/index.ts"
+        placeholder={placeholder}
         value={path}
         onChange={(e) => setPath(e.target.value)}
         autoFocus
-        onKeyDown={(e) => e.key === "Enter" && !busy && path.trim() && submit()}
+        spellCheck={false}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
       />
       <p className="page-sub" style={{ marginTop: 6, fontSize: 11.5 }}>
-        Use a path with slashes to put the file in a folder.
+        {hint}
       </p>
       <div className="row" style={{ gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
         <button className="btn btn-sm" onClick={onClose}>
           Cancel
         </button>
         <button className="btn btn-sm btn-primary" disabled={!path.trim() || busy} onClick={submit}>
-          {busy ? "Creating…" : "Create"}
+          {busy ? "Working…" : confirmLabel}
         </button>
       </div>
     </Modal>
   );
-
-  async function submit() {
-    setBusy(true);
-    const res = await createSpaceFile(spaceId, path);
-    setBusy(false);
-    if ("error" in res) setError(res.error);
-    else onDone(res.id);
-  }
 }

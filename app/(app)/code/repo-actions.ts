@@ -163,6 +163,96 @@ export async function writeSpaceFile(
   return { ok: true };
 }
 
+/** 경로 변경 = VS Code 의 rename/move. 폴더는 경로에 내포돼 있으므로 둘이 같은 동작이다. */
+export async function renameSpaceFile(
+  fileId: string,
+  nextPath: string
+): Promise<{ ok: true; path: string; name: string } | { error: string }> {
+  await requireUser();
+  const clean = nextPath.trim().replace(/^\/+/, "");
+  if (!clean) return { error: "Give the file a path." };
+  const supabase = await createClient();
+
+  const { data: file } = await supabase
+    .from("code_files")
+    .select("code_repository_id")
+    .eq("id", fileId)
+    .single();
+  if (!file) return { error: "File not found." };
+
+  const { data: clash } = await supabase
+    .from("code_files")
+    .select("id")
+    .eq("code_repository_id", file.code_repository_id)
+    .eq("path", clean)
+    .neq("id", fileId)
+    .maybeSingle();
+  if (clash) return { error: `${clean} already exists.` };
+
+  const name = clean.split("/").pop() || "untitled";
+  const { error } = await supabase
+    .from("code_files")
+    .update({ path: clean, name, language: detectLanguage(name) })
+    .eq("id", fileId);
+  if (error) return { error: "Rename failed." };
+  return { ok: true, path: clean, name };
+}
+
+/** 파일을 휴지통으로(18시간 뒤 자동 삭제) — 다른 삭제와 같은 규칙. */
+export async function deleteSpaceFile(
+  fileId: string
+): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("move_to_trash", { p_kind: "code", p_id: fileId });
+  if (error) return { error: "Delete failed." };
+  return { ok: true };
+}
+
+/** 폴더 이름 변경 = 그 아래 모든 파일의 경로 접두사 교체. */
+export async function renameSpaceFolder(
+  spaceId: string,
+  fromPrefix: string,
+  toPrefix: string
+): Promise<{ ok: true; moved: number } | { error: string }> {
+  await requireUser();
+  const from = fromPrefix.replace(/^\/+|\/+$/g, "");
+  const to = toPrefix.trim().replace(/^\/+|\/+$/g, "");
+  if (!from || !to) return { error: "Give the folder a name." };
+  if (from === to) return { ok: true, moved: 0 };
+
+  const supabase = await createClient();
+  const { data: files } = await supabase
+    .from("code_files")
+    .select("id, path")
+    .eq("code_repository_id", spaceId)
+    .like("path", `${from}/%`);
+  if (!files?.length) return { ok: true, moved: 0 };
+
+  const existing = new Set(
+    (
+      await supabase.from("code_files").select("path").eq("code_repository_id", spaceId)
+    ).data?.map((r) => r.path) ?? []
+  );
+  // 옮긴 자리에 이미 파일이 있으면 조용히 덮어쓰지 않고 멈춘다.
+  for (const f of files) {
+    const next = `${to}/${f.path.slice(from.length + 1)}`;
+    if (existing.has(next)) return { error: `${next} already exists.` };
+  }
+
+  let moved = 0;
+  for (const f of files) {
+    const next = `${to}/${f.path.slice(from.length + 1)}`;
+    const name = next.split("/").pop() || "untitled";
+    const { error } = await supabase
+      .from("code_files")
+      .update({ path: next, name })
+      .eq("id", f.id);
+    if (!error) moved++;
+  }
+  return { ok: true, moved };
+}
+
 /** 빈 파일을 만든다 — 새 Code Space 를 바닥부터 만들 때 쓴다. */
 export async function createSpaceFile(
   spaceId: string,

@@ -261,3 +261,59 @@ export function MonacoCodeEditor({
 
   return <div ref={hostRef} className="monaco-host" />;
 }
+
+/**
+ * 변경 내용 검토용 diff 뷰 — GitHub 의 "Files changed" 와 같은 역할.
+ * 왼쪽이 저장된 내용, 오른쪽이 지금 편집 중인 내용이다.
+ */
+export function MonacoDiff({
+  original,
+  modified,
+  language,
+}: {
+  original: string;
+  modified: string;
+  language: LangKey;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneDiffEditor | null>(null);
+
+  useEffect(() => {
+    if (!hostRef.current) return;
+    const isLight =
+      typeof document !== "undefined" &&
+      document.documentElement.getAttribute("data-theme") === "light";
+    const diff = monaco.editor.createDiffEditor(hostRef.current, {
+      theme: isLight ? "possion-light" : "possion-dark",
+      readOnly: true,
+      automaticLayout: true,
+      fontSize: 13.5,
+      fontFamily: '"JetBrains Mono", "SFMono-Regular", Consolas, monospace',
+      renderSideBySide: true,
+      scrollBeyondLastLine: false,
+      minimap: { enabled: false },
+    });
+    editorRef.current = diff;
+    return () => {
+      diff.getModel()?.original?.dispose();
+      diff.getModel()?.modified?.dispose();
+      diff.dispose();
+      editorRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const diff = editorRef.current;
+    if (!diff) return;
+    const id = LANG_ID[language] ?? "plaintext";
+    const prev = diff.getModel();
+    diff.setModel({
+      original: monaco.editor.createModel(original, id),
+      modified: monaco.editor.createModel(modified, id),
+    });
+    prev?.original?.dispose();
+    prev?.modified?.dispose();
+  }, [original, modified, language]);
+
+  return <div ref={hostRef} className="monaco-host" />;
+}
