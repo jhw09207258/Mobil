@@ -931,3 +931,118 @@ html[data-desktop] .app-header .hsearch {
     opacity: 0;
   }
 }
+
+/* -------------------------------------------------------------------------
+   파일 업로드 진행 토스트 — 채팅 알림과 같은 우측 상단 자리. 업로드는 (app)
+   레이아웃의 UploadProvider 가 들고 있어 화면을 옮겨 다녀도 계속 진행되고,
+   이 카드도 앱 어디서나 그대로 떠 있는다.
+   ------------------------------------------------------------------------- */
+.upload-toasts {
+  position: fixed;
+  top: calc(var(--header-h) + 10px);
+  right: 12px;
+  z-index: 95; /* 채팅 토스트(90) 위 */
+  width: min(340px, calc(100vw - 24px));
+}
+/* 업로드 카드가 떠 있는 동안에는 채팅 토스트를 그 아래로 밀어 겹치지 않게 한다. */
+body:has(.upload-toasts) .chat-toasts {
+  top: calc(var(--header-h) + 10px + 104px);
+}
+.upload-card {
+  padding: 10px 12px;
+  background: var(--glass-2);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  animation: possion-fade-in 0.25s var(--ease-spring) both;
+}
+.upload-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.upload-card-bytes {
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.upload-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.upload-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.upload-item-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.upload-item-pct {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.upload-item.done .upload-item-pct {
+  color: var(--ok);
+}
+.upload-item.error .upload-item-pct {
+  color: var(--danger);
+}
+.upload-item-close {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-3);
+  font-size: 10px;
+  cursor: pointer;
+}
+.upload-item-close:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.upload-bar {
+  height: 4px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: var(--bg-1);
+  overflow: hidden;
+}
+.upload-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--create);
+  transition: width 0.18s linear;
+}
+.upload-item.done .upload-bar-fill {
+  background: var(--ok);
+}
+.upload-item.error .upload-bar-fill {
+  background: var(--danger);
+}
+.upload-item-error {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--danger);
+}

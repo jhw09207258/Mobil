@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { formatBytes, formatDate } from "@/lib/format";
 import { getFileCategory, FILE_CATEGORY_LABEL, type FileCategory } from "@/lib/file-category";
-import { extractTagsFromText } from "@/lib/tags";
+import { useUploads } from "../uploads/upload-context";
 import { ShareDialog } from "@/components/share-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { Modal } from "@/components/modal";
@@ -61,8 +60,6 @@ type FileRow = {
   canEdit: boolean;
 };
 
-const BUCKET = "files";
-
 export function FilesClient({
   initialFiles,
   userId,
@@ -75,9 +72,10 @@ export function FilesClient({
   repositories: Repository[];
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
+  // 업로드는 (app) 레이아웃의 매니저가 담당한다 — 화면을 옮겨도 계속 진행되고
+  // 진행률은 우측 상단 토스트가 보여준다.
+  const { startUploads, uploading, completedTick } = useUploads();
   const [error, setError] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<FileRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileRow | null>(null);
@@ -251,62 +249,23 @@ export function FilesClient({
     }
   };
 
-  const uploadFiles = async (fileList: FileList | File[] | null) => {
+  const uploadFiles = (fileList: FileList | File[] | null) => {
     const files = fileList ? Array.from(fileList) : [];
     if (files.length === 0) return;
     setError(null);
-    setUploading(true);
-
-    try {
-      for (const file of files) {
-        const fileId = crypto.randomUUID();
-        const safeName = file.name.replace(/[^\w.\-() ]+/g, "_");
-        const path = `${userId}/${fileId}/${safeName}`;
-
-        const { error: upErr } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, file, {
-            contentType: file.type || undefined,
-            upsert: false,
-          });
-        if (upErr) throw new Error(`Upload failed: ${file.name}`);
-
-        const { error: metaErr } = await supabase.from("files").insert({
-          id: fileId,
-          owner_id: userId,
-          storage_path: path,
-          file_name: file.name,
-          mime_type: file.type || null,
-          size_bytes: file.size,
-          // 저장소 상세에서 업로드하면 그 저장소로 바로 귀속된다.
-          repository_id: repoView && repoView !== "null" ? repoView : null,
-        });
-        setRepoRows((m) => new Map(m).set(fileId, repoView && repoView !== "null" ? repoView : null));
-
-        if (metaErr) {
-          await supabase.storage.from(BUCKET).remove([path]);
-          throw new Error(`Failed to record metadata: ${file.name}`);
-        }
-
-        // 감사 로그는 화면 갱신을 막을 이유가 없다 — 응답을 기다리지 않는다
-        // (브라우저 요청이라 페이지가 열려 있는 한 백그라운드에서 계속 전송된다).
-        supabase.from("audit_logs").insert({
-          user_id: userId,
-          target_type: "file",
-          target_id: fileId,
-          action: "create",
-        });
-        const tags = extractTagsFromText(file.name);
-        supabase.rpc("sync_object_tags", { p_kind: "file", p_id: fileId, p_tag_names: tags });
-      }
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed.");
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
+    // 저장소 상세에서 업로드하면 그 저장소로 바로 귀속된다 — 업로드가 끝나기
+    // 전에 다른 화면으로 이동해도 시작 시점의 저장소가 그대로 적용되게 넘긴다.
+    startUploads(files, {
+      repositoryId: repoView && repoView !== "null" ? repoView : null,
+    });
+    if (inputRef.current) inputRef.current.value = "";
   };
+
+  // 업로드가 하나 끝날 때마다 목록을 갱신한다(이 화면을 보고 있을 때만 의미가
+  // 있으므로 매니저가 아니라 여기서 처리한다).
+  useEffect(() => {
+    if (completedTick > 0) router.refresh();
+  }, [completedTick, router]);
 
   // ---- 드래그 앤 드롭 ----
   const onDragEnter = (e: React.DragEvent) => {
