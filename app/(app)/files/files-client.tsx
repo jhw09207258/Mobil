@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatBytes, formatDate } from "@/lib/format";
 import { getFileCategory, FILE_CATEGORY_LABEL, type FileCategory } from "@/lib/file-category";
-import { useUploads } from "../uploads/upload-context";
+import { startUploads, useUploads } from "../uploads/upload-store";
 import { ShareDialog } from "@/components/share-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { Modal } from "@/components/modal";
@@ -73,9 +73,9 @@ export function FilesClient({
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  // 업로드는 (app) 레이아웃의 매니저가 담당한다 — 화면을 옮겨도 계속 진행되고
-  // 진행률은 우측 상단 토스트가 보여준다.
-  const { startUploads, uploading, completedTick } = useUploads();
+  // 업로드는 React 트리 밖의 upload-store 가 담당한다 — 화면을 옮겨도 계속
+  // 진행되고 진행률은 우측 상단 토스트가 보여준다.
+  const { uploading, completedTick } = useUploads();
   const [error, setError] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<FileRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileRow | null>(null);
@@ -256,16 +256,17 @@ export function FilesClient({
     // 저장소 상세에서 업로드하면 그 저장소로 바로 귀속된다 — 업로드가 끝나기
     // 전에 다른 화면으로 이동해도 시작 시점의 저장소가 그대로 적용되게 넘긴다.
     startUploads(files, {
+      userId,
       repositoryId: repoView && repoView !== "null" ? repoView : null,
     });
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  // 업로드가 하나 끝날 때마다 목록을 갱신한다(이 화면을 보고 있을 때만 의미가
-  // 있으므로 매니저가 아니라 여기서 처리한다).
+  // 배치가 전부 끝났을 때 한 번만 목록을 갱신한다 — 파일마다 refresh 를 걸면
+  // 업로드 도중 화면이 계속 새로고침돼 깜빡이고 조작이 끊긴다.
   useEffect(() => {
-    if (completedTick > 0) router.refresh();
-  }, [completedTick, router]);
+    if (completedTick > 0 && !uploading) router.refresh();
+  }, [completedTick, uploading, router]);
 
   // ---- 드래그 앤 드롭 ----
   const onDragEnter = (e: React.DragEvent) => {

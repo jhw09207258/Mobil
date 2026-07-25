@@ -9,7 +9,7 @@ import { WorkspaceShell } from "./workspace/workspace-shell";
 import { MobileNavProvider } from "./mobile-nav-context";
 import { ReconnectTracker } from "./reconnect-tracker";
 import { NoZoom } from "./no-zoom";
-import { UploadProvider } from "./uploads/upload-context";
+import { UploadToasts } from "./uploads/upload-toasts";
 
 export default async function AppLayout({
   children,
@@ -30,9 +30,6 @@ export default async function AppLayout({
       {/* key={userId} — 같은 브라우저에서 다른 계정으로 로그인하면 워크스페이스
           provider 를 통째로 리마운트해 이전 사용자의 탭 상태가 남지 않게 한다. */}
       <WorkspaceProvider key={userId} userId={userId}>
-        {/* 업로드 상태는 레이아웃에 둔다 — 페이지를 옮겨 다녀도 이 레이아웃은
-            리마운트되지 않으므로 업로드가 계속 진행된다. */}
-        <UploadProvider userId={userId}>
         <div className="app">
           <NoZoom />
           <ReconnectTracker />
@@ -49,8 +46,10 @@ export default async function AppLayout({
             </main>
           </div>
           <Shortcuts />
+          {/* 진행률 토스트 — 실제 업로드 상태는 React 트리 밖(upload-store)에
+              있어 화면을 옮기거나 이 컴포넌트가 다시 마운트돼도 유지된다. */}
+          <UploadToasts />
         </div>
-        </UploadProvider>
       </WorkspaceProvider>
     </MobileNavProvider>
   );
