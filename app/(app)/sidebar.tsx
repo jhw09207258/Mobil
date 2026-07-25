@@ -14,6 +14,7 @@ import {
   IconEye,
   IconKey,
   IconConsole,
+  IconTrash,
 } from "./icons";
 import { useWorkspace } from "./workspace/workspace-context";
 import { useMobileNav } from "./mobile-nav-context";
@@ -68,6 +69,16 @@ export function Sidebar({ role }: { role: "user" | "admin" }) {
           </Link>
         ))}
         <div className="rail-sep" />
+        <Link
+          href="/trash"
+          className={`rail-link ${isActive("/trash") ? "active" : ""}`}
+          title="Trash"
+          aria-label="Trash"
+          onClick={onNavigate}
+        >
+          <IconTrash />
+          <span className="rail-label">Trash</span>
+        </Link>
         <Link
           href="/admin/redeem"
           className={`rail-link ${isActive("/admin/redeem") ? "active" : ""}`}

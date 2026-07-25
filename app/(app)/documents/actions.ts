@@ -322,19 +322,13 @@ export async function saveDocument(
 }
 
 export async function deleteDocument(id: string): Promise<ActionResult> {
+  // 영구 삭제가 아니라 휴지통으로 이동한다(18시간 뒤 자동 삭제).
+  // 링크·태그·임베딩은 여기서 지우지 않는다 — 복원했을 때 그대로 살아 있어야
+  // 하므로, 정리는 영구 삭제 시점(purge_expired_trash / purge_trash_item)에
+  // 한 번만 이루어진다.
   const supabase = await createClient();
-  const { error } = await supabase.from("documents").delete().eq("id", id);
+  const { error } = await supabase.rpc("move_to_trash", { p_kind: "document", p_id: id });
   if (error) return { ok: false, error: "Delete failed." };
-  after(async () => {
-    await supabase.rpc("cleanup_object_links", { p_kind: "document", p_id: id }).then(
-      () => {},
-      () => {}
-    );
-    await supabase.rpc("cleanup_object_tags", { p_kind: "document", p_id: id }).then(
-      () => {},
-      () => {}
-    );
-  });
   return { ok: true };
 }
 

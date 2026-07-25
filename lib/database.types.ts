@@ -697,6 +697,29 @@ export interface Database {
         Args: { p_message: string; p_emoji: string };
         Returns: boolean;
       };
+      move_to_trash: {
+        Args: { p_kind: string; p_id: string };
+        Returns: undefined;
+      };
+      restore_from_trash: {
+        Args: { p_kind: string; p_id: string };
+        Returns: undefined;
+      };
+      purge_trash_item: {
+        Args: { p_kind: string; p_id: string };
+        Returns: undefined;
+      };
+      list_trash: {
+        Args: Record<string, never>;
+        Returns: {
+          kind: string;
+          id: string;
+          title: string;
+          deleted_at: string;
+          expires_at: string;
+          storage_path: string | null;
+        }[];
+      };
       mark_chat_read: {
         Args: { p_conversation: string };
         Returns: undefined;

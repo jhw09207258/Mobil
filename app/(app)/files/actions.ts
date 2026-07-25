@@ -75,44 +75,22 @@ export async function renameFile(
 
 /** 스토리지 객체와 메타데이터 행을 함께 삭제. */
 export async function deleteFile(fileId: string): Promise<ActionResult> {
+  // 휴지통으로 이동 — 스토리지 객체와 링크·태그는 그대로 둔다. 복원하면
+  // 파일이 다시 온전해야 하기 때문이며, 실제 삭제는 18시간 뒤
+  // purge_expired_trash() 가 스토리지 객체까지 함께 정리한다.
   const supabase = await createClient();
 
-  const { data: file, error } = await supabase
-    .from("files")
-    .select("storage_path")
-    .eq("id", fileId)
-    .single();
-
-  if (error || !file) return { ok: false, error: "File not found." };
-
-  const { error: storageErr } = await supabase.storage
-    .from(BUCKET)
-    .remove([file.storage_path]);
-
-  if (storageErr) {
-    return { ok: false, error: "Storage delete failed." };
-  }
-
-  const { error: rowErr } = await supabase
-    .from("files")
-    .delete()
-    .eq("id", fileId);
-
-  if (rowErr) return { ok: false, error: "Failed to delete metadata." };
+  const { error } = await supabase.rpc("move_to_trash", {
+    p_kind: "file",
+    p_id: fileId,
+  });
+  if (error) return { ok: false, error: "Delete failed." };
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   after(async () => {
-    await supabase.rpc("cleanup_object_links", { p_kind: "file", p_id: fileId }).then(
-      () => {},
-      () => {}
-    );
-    await supabase.rpc("cleanup_object_tags", { p_kind: "file", p_id: fileId }).then(
-      () => {},
-      () => {}
-    );
     if (user) {
       await supabase.from("audit_logs").insert({
         user_id: user.id,

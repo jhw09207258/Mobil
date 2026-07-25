@@ -6,12 +6,10 @@ import { Modal } from "./modal";
 type Result = { ok: true } | { ok: false; error: string };
 
 /**
- * GitHub 저장소 삭제처럼, 대상의 정확한 이름을 사용자가 직접 입력해야만 삭제
- * 버튼이 활성화되는 확인 다이얼로그. 실수로 지우는 것을 막는다.
- *
- * onConfirm 은 삭제 서버 액션을 호출하고 성공/실패를 반환한다. 성공하면
- * 다이얼로그가 스스로 닫히고 onDeleted 콜백(탭 닫기·네비게이션·목록 새로고침
- * 등)이 실행된다.
+ * 삭제 확인 다이얼로그. 예전에는 GitHub 처럼 대상 이름을 그대로 입력해야
+ * 버튼이 활성화됐는데, 이제 삭제가 영구 삭제가 아니라 휴지통 이동이라
+ * (18시간 뒤 자동 삭제, 그 전에는 복원 가능) 그런 마찰이 필요 없다 —
+ * 실수해도 되돌릴 수 있으므로 확인 한 번으로 충분하다.
  */
 export function DeleteConfirmDialog({
   itemLabel,
@@ -26,14 +24,10 @@ export function DeleteConfirmDialog({
   onDeleted: () => void;
   onClose: () => void;
 }) {
-  const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
-  const matches = typed === itemLabel;
-
   const submit = () => {
-    if (!matches) return;
     setError(null);
     start(async () => {
       const res = await onConfirm();
@@ -47,41 +41,24 @@ export function DeleteConfirmDialog({
   };
 
   return (
-    <Modal title={`Delete ${itemKind}`} onClose={onClose} width={480}>
+    <Modal title={`Delete ${itemKind}`} onClose={onClose} width={440}>
       {error && <div className="notice notice-error">{error}</div>}
 
-      <p className="page-sub" style={{ margin: "0 0 14px" }}>
-        This action <strong>cannot be undone</strong>. This will permanently
-        delete the {itemKind}.
+      <p className="page-sub" style={{ margin: "0 0 4px" }}>
+        Move <strong style={{ color: "var(--text-0)" }}>{itemLabel}</strong> to the
+        Trash?
       </p>
-
-      <div className="label" style={{ marginBottom: 6 }}>
-        Type <span className="mono" style={{ color: "var(--text-1)" }}>{itemLabel}</span> to confirm
-      </div>
-      <input
-        className="input"
-        style={{ width: "100%" }}
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && matches) submit();
-        }}
-        placeholder={itemLabel}
-        autoFocus
-        autoComplete="off"
-        spellCheck={false}
-      />
+      <p className="page-sub" style={{ margin: 0 }}>
+        You can restore it from the Trash for the next 18 hours, after which it is
+        deleted permanently.
+      </p>
 
       <div className="row" style={{ gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
         <button className="btn btn-sm" onClick={onClose} disabled={pending}>
           Cancel
         </button>
-        <button
-          className="btn btn-sm btn-danger"
-          onClick={submit}
-          disabled={!matches || pending}
-        >
-          {pending ? "Deleting…" : `Delete this ${itemKind}`}
+        <button className="btn btn-sm btn-danger" onClick={submit} disabled={pending} autoFocus>
+          {pending ? "Moving…" : "Move to Trash"}
         </button>
       </div>
     </Modal>
