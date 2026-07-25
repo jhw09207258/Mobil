@@ -13,7 +13,7 @@ const notoSans = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: "Mobil",
+  title: "Possion",
   description: "A private idea vault for personal and security work — files, documents and code in one place",
 };
 
@@ -57,7 +57,7 @@ export default function RootLayout({
             기본(다크) 테마가 잠깐 보이는 깜빡임을 막는다. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem("mobil.theme.v2")==="light")document.documentElement.dataset.theme="light"}catch(e){}`,
+            __html: `try{if(localStorage.getItem("possion.theme.v2")==="light")document.documentElement.dataset.theme="light"}catch(e){}`,
           }}
         />
       </head>

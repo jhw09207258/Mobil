@@ -537,7 +537,7 @@ export async function tiptapToDocxBuffer(content: Json, title: string): Promise<
         );
       } else if (node.type === "orderedList") {
         paragraphs.push(
-          new Paragraph({ children: runs, numbering: { reference: "mobil-numbered-list", level } })
+          new Paragraph({ children: runs, numbering: { reference: "possion-numbered-list", level } })
         );
       } else {
         paragraphs.push(new Paragraph({ children: runs, bullet: { level } }));
@@ -598,7 +598,7 @@ export async function tiptapToDocxBuffer(content: Json, title: string): Promise<
     numbering: {
       config: [
         {
-          reference: "mobil-numbered-list",
+          reference: "possion-numbered-list",
           // level 0 은 top-level, 1-3 은 중첩된 orderedList 용.
           levels: [0, 1, 2, 3].map((level) => ({
             level,

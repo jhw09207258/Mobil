@@ -1,5 +1,5 @@
 import "../auth.css";
-import { LoginForm } from "./login-form";
+import { LoginScreen } from "./login-screen";
 
 export default async function LoginPage({
   searchParams,
@@ -8,9 +8,5 @@ export default async function LoginPage({
 }) {
   const { redirect } = await searchParams;
 
-  return (
-    <div className="auth-wrap auth-wrap-noscroll">
-      <LoginForm redirectTo={redirect} />
-    </div>
-  );
+  return <LoginScreen redirectTo={redirect} />;
 }

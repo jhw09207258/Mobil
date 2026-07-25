@@ -20,6 +20,12 @@
      를 hidden 으로 명시해 위아래 스크롤을 막는다. */
   overflow-x: auto;
   overflow-y: hidden;
+  /* 좌우 스크롤은 유지하되 스크롤바는 숨긴다. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.wk-bar::-webkit-scrollbar {
+  display: none;
 }
 .wk-tabs {
   display: flex;
@@ -29,7 +35,12 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
+  /* 좌우 스크롤은 유지하되 스크롤바는 숨긴다. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.wk-tabs::-webkit-scrollbar {
+  display: none;
 }
 .wk-tab {
   display: flex;

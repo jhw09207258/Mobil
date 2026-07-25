@@ -23,7 +23,7 @@
   overflow-y: hidden;
 }
 .auth-wrap {
-  animation: mobil-fade-in 0.4s ease both;
+  animation: possion-fade-in 0.4s ease both;
 }
 .auth-card {
   width: 100%;
@@ -46,7 +46,7 @@
   border-radius: 50%;
   border: 2px solid rgba(234, 250, 239, 0.35);
   border-top-color: #eafaef;
-  animation: mobil-spin 0.7s linear infinite;
+  animation: possion-spin 0.7s linear infinite;
 }
 .auth-brand {
   display: flex;
@@ -85,4 +85,221 @@
   margin-top: 18px;
   font-size: 13px;
   color: var(--text-2);
+}
+
+/* ==========================================================================
+   로그인 화면 — 벡터 파티클 배경 위에 뜨는 카드. 사용자 라이트/다크 테마와
+   무관하게 항상 검정 배경 기준의 색을 쓴다(브랜드 연출 화면이라 테마를
+   따르지 않음) — 아래 .login-screen 스코프 안에서만 색을 하드코딩해
+   덮어쓰고, 다른 화면(가입 등)에서 쓰는 공용 클래스는 그대로 둔다.
+   ========================================================================== */
+.login-screen {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #000;
+}
+.login-particles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.login-view {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.login-fade-in {
+  animation: possion-fade-in 0.35s ease both;
+}
+.login-fade-out {
+  animation: possion-fade-out 0.2s ease both;
+}
+.login-screen .auth-wrap {
+  background: none;
+}
+.login-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  z-index: 1;
+  text-align: center;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.16);
+  pointer-events: none;
+}
+
+.login-screen .auth-brand {
+  margin-bottom: 6px;
+}
+.login-screen .brand-logo {
+  color: #f2f2f2;
+}
+.auth-tagline {
+  text-align: center;
+  font-size: 12px; /* Possion 로고(30px) 대비 60% 감소 */
+  color: rgba(255, 255, 255, 0.42);
+  margin: 0 0 24px;
+}
+.tagline-emphasis {
+  letter-spacing: 1.25px;
+}
+
+.login-screen .input {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #f0f0f0;
+}
+.login-screen .input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.login-screen .auth-foot {
+  color: rgba(255, 255, 255, 0.4);
+}
+.login-screen .auth-foot a {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* 이메일/비밀번호 입력 — 간격 없이 하나로 합치고 radius 를 없앤다 */
+.auth-input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+  overflow: hidden;
+}
+.auth-input-group .input {
+  border: none;
+  border-radius: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.auth-input-group .input:last-child {
+  border-bottom: none;
+}
+.auth-input-group .input:focus {
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Mac/Windows 설치 옵션 — 옅은 그레이의 보조 옵션 */
+.install-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.install-opt {
+  flex: 1;
+  height: 30px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.install-opt:hover {
+  color: rgba(255, 255, 255, 0.75);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* 설치 안내 화면 — 완전한 검정 배경의 터미널 스타일 */
+.install-panel {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: #000;
+}
+.back-to-login {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.18s ease;
+}
+.back-to-login:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+.install-heading {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  letter-spacing: 0.01em;
+}
+.terminal {
+  width: 100%;
+  max-width: 460px;
+  background: #0a0a0a;
+  border: 1px solid #232323;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  background: #141414;
+  border-bottom: 1px solid #232323;
+}
+.terminal-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #333;
+}
+.terminal-body {
+  padding: 16px 18px 18px;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+.terminal-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.terminal-prompt {
+  color: #f2f2f2;
+}
+.terminal-output {
+  color: #767676;
+  padding-left: 14px;
+}
+.terminal-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-top: 4px;
+  background: #e6e6e6;
+  animation: possion-cursor-blink 1s step-end infinite;
+}
+@keyframes possion-cursor-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }

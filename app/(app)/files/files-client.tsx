@@ -192,7 +192,7 @@ export function FilesClient({
     else router.refresh();
   };
 
-  // 이 저장소 안에서 새 Mobil 아이템 생성 → 저장소 귀속 → 에디터 탭으로 열기
+  // 이 저장소 안에서 새 Possion 아이템 생성 → 저장소 귀속 → 에디터 탭으로 열기
   const onNewItem = async (kind: "document" | "sheet" | "code" | "mindmap") => {
     if (creating) return;
     setCreating(true);
@@ -520,7 +520,7 @@ export function FilesClient({
             return (
               <div className="panel" style={{ marginBottom: 14 }}>
                 <div className="panel-header">
-                  <span className="label">MOBIL ITEMS ({items.length})</span>
+                  <span className="label">ALL ITEMS ({items.length})</span>
                 </div>
                 {items.length === 0 ? (
                   <div className="empty">

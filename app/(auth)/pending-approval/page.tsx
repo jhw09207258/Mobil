@@ -17,14 +17,14 @@ export default async function PendingApprovalPage() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-brand">
-          <span className="brand-logo brand-logo-lg">Mobil</span>
+          <span className="brand-logo brand-logo-lg">Possion</span>
         </div>
         <div className="auth-panel">
           <h1 className="auth-h">{rejected ? "Access denied" : "Awaiting approval"}</h1>
           <p className="auth-desc">
             {rejected
               ? "An administrator has declined this account. If you believe this is a mistake, contact your administrator."
-              : "Your account was created but hasn't been approved by an administrator yet. You'll be able to use Mobil as soon as it's approved."}
+              : "Your account was created but hasn't been approved by an administrator yet. You'll be able to use Possion as soon as it's approved."}
           </p>
           <form action="/auth/signout" method="post">
             <button type="submit" className="btn btn-ghost" style={{ width: "100%" }}>

@@ -23,51 +23,72 @@
   font-weight: 500;
 }
 
-/* 통계 타일 — 기본보다 훨씬 촘촘하게 */
-.dash-content .stat-grid {
-  grid-template-columns: repeat(6, 1fr);
-  gap: 10px;
-  margin-bottom: 0;
+/* 통계 + 사용량 + 실시간 처리량 + 공유 ID 를 하나로 합친 대형 카드 */
+.dash-mega {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
   flex: none;
+  overflow: hidden;
 }
-.dash-content .stat {
+
+.dash-mega-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border-bottom: 1px solid var(--border-1);
+}
+.dash-mega-stats .stat {
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--border-1);
+  background: transparent;
   padding: 10px 12px;
 }
-.dash-content .stat-val {
+.dash-mega-stats .stat:last-child {
+  border-right: none;
+}
+.dash-mega-stats .stat-val {
   font-size: 18px;
 }
-.dash-content .stat-label {
+.dash-mega-stats .stat-label {
   margin-top: 4px;
 }
 
-/* 중간 카드 행 */
-.dash-mid {
+.dash-mega-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  flex: none;
+  grid-template-columns: 1.05fr 0.85fr 1.35fr 0.75fr;
   min-height: 0;
 }
-.dash-mid .panel {
+.dash-mega-cell {
+  padding: 12px 14px;
+  border-right: 1px solid var(--border-1);
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-}
-.dash-mid .panel-header {
-  padding: 8px 12px;
-}
-.dash-mid .panel-body {
-  padding: 10px 12px;
   overflow: auto;
-  max-height: 190px;
+  max-height: 210px;
+}
+.dash-mega-cell:last-child {
+  border-right: none;
+}
+.cell-label {
+  display: block;
+  margin-bottom: 8px;
+  flex: none;
+}
+.dash-mega-live {
+  position: relative;
 }
 
-/* 네트워크 모니터 — 카드 폭 전체 사용 */
+/* 네트워크 모니터 — 카드 폭 전체 사용, 벡터 파티클 캔버스 */
 .netmon {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .netmon-top {
   display: flex;
@@ -81,10 +102,13 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.netmon-spark {
-  display: block;
-  width: 100%;
-  height: 44px;
+.netmon-particles {
+  flex: 1;
+  min-height: 90px;
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: radial-gradient(120% 140% at 50% 100%, rgba(74, 134, 221, 0.08), transparent 70%);
 }
 .netmon-meta {
   font-size: 9.5px;
@@ -120,11 +144,18 @@
   .dash-content {
     overflow-y: auto;
   }
-  .dash-content .stat-grid {
+  .dash-mega-stats {
     grid-template-columns: repeat(3, 1fr);
   }
-  .dash-mid {
+  .dash-mega-stats .stat:nth-child(3) {
+    border-right: none;
+  }
+  .dash-mega-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-mega-cell {
+    border-bottom: 1px solid var(--border-1);
+    max-height: none;
   }
   .dash-recent {
     flex: none;
@@ -134,7 +165,16 @@
   }
 }
 @media (max-width: 640px) {
-  .dash-mid {
+  .dash-mega-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-mega-stats .stat:nth-child(2n) {
+    border-right: none;
+  }
+  .dash-mega-grid {
     grid-template-columns: 1fr;
+  }
+  .dash-mega-cell {
+    border-right: none;
   }
 }

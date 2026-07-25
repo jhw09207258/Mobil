@@ -138,6 +138,10 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     setClosing(false);
     ensureData();
+    // 재오픈 시 대화 목록이 오래된 스냅샷으로 남지 않게 최신으로 갱신.
+    listChatConversations().then((conversations) =>
+      setData((d) => (d ? { ...d, conversations } : d))
+    );
     setOpen(true);
     refreshUnread();
   }, [ensureData, refreshUnread]);

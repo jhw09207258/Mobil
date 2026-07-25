@@ -92,7 +92,7 @@ export default async function SettingsPage() {
         <ConnectedSystems />
 
         <div className="acct-license" style={{ marginTop: 24, border: "none", padding: 0 }}>
-          <div className="acct-license-title">Mobil 1.0</div>
+          <div className="acct-license-title">Possion 1.0</div>
           <div className="acct-license-line">Developed by Haewon Jeong</div>
           <div className="acct-license-line">Apache License 2.0</div>
         </div>

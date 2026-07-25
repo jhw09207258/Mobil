@@ -28,9 +28,9 @@ export const SOPHIA_TOOLS = [
   {
     type: "function",
     function: {
-      name: "search_mobil",
+      name: "search_possion",
       description:
-        "Search the user's Mobil workspace (documents, code files, sheets, mind maps) by title/content, or by #tag. Use this before reading or editing something to find its id.",
+        "Search the user's Possion workspace (documents, code files, sheets, mind maps) by title/content, or by #tag. Use this before reading or editing something to find its id.",
       parameters: {
         type: "object",
         properties: {
@@ -45,7 +45,7 @@ export const SOPHIA_TOOLS = [
     function: {
       name: "semantic_search",
       description:
-        "Find workspace items related to a concept by MEANING (vector similarity), even when the words don't match. Use this when keyword search (search_mobil) finds nothing, or when the user asks about a topic/idea rather than an exact title.",
+        "Find workspace items related to a concept by MEANING (vector similarity), even when the words don't match. Use this when keyword search (search_possion) finds nothing, or when the user asks about a topic/idea rather than an exact title.",
       parameters: {
         type: "object",
         properties: {
@@ -244,7 +244,7 @@ function outlineTextToSheetCells(outline: string): SheetCell[] {
 
 type ToolResult = Record<string, unknown>;
 
-async function toolSearchMobil(args: { query?: string }): Promise<ToolResult> {
+async function toolSearchPossion(args: { query?: string }): Promise<ToolResult> {
   const query = String(args.query ?? "").trim();
   if (!query) return { error: "query is required." };
   const results = await searchOntology(query);
@@ -510,7 +510,7 @@ async function toolSearchPapersAndCode(args: { query?: string }): Promise<ToolRe
 }
 
 const HANDLERS: Record<string, (args: Record<string, unknown>) => Promise<ToolResult>> = {
-  search_mobil: toolSearchMobil,
+  search_possion: toolSearchPossion,
   semantic_search: toolSemanticSearch,
   read_document: toolReadDocument,
   read_code_file: toolReadCodeFile,

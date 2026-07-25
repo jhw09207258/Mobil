@@ -75,7 +75,7 @@ export function extractMindmapLinks(data: Json): LinkTarget[] {
 }
 
 /**
- * Tiptap 문서 JSON에서 다른 Mobil 항목을 가리키는 링크 마크(href)를 찾는다.
+ * Tiptap 문서 JSON에서 다른 Possion 항목을 가리키는 링크 마크(href)를 찾는다.
  * 에디터의 링크 버튼으로 /documents/{id}, /code/{id}, /sheets/{id},
  * /mindmap/{id} 형태의 내부 URL을 걸었을 때만 인식한다.
  */

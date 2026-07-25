@@ -1,16 +1,16 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Mobil",
+  "productName": "Possion",
   "version": "0.1.0",
-  "identifier": "com.mobil.app",
+  "identifier": "com.possion.app",
   "build": {
-    "frontendDist": "https://mobil-three.vercel.app",
+    "frontendDist": "https://possion.app",
     "devUrl": "http://localhost:3000"
   },
   "app": {
     "windows": [
       {
-        "title": "Mobil",
+        "title": "Possion",
         "width": 1280,
         "height": 800,
         "resizable": true,
@@ -20,7 +20,7 @@
         "trafficLightPosition": { "x": 16, "y": 19 },
         "transparent": true,
         "windowEffects": { "effects": ["underWindowBackground"], "state": "active" },
-        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) MobilDesktop/1.0"
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) PossionDesktop/1.0"
       }
     ],
     "security": {

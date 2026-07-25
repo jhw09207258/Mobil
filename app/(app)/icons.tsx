@@ -162,6 +162,13 @@ export function IconLink({ size }: P) {
     </svg>
   );
 }
+export function IconSend({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M12 19V5M6 11l6-6 6 6" />
+    </svg>
+  );
+}
 export function IconSearch({ size }: P) {
   return (
     <svg {...base(size)}>

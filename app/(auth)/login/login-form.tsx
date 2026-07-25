@@ -5,7 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { login, type AuthState } from "./actions";
 
-export function LoginForm({ redirectTo }: { redirectTo?: string }) {
+export function LoginForm({
+  redirectTo,
+  onInstall,
+}: {
+  redirectTo?: string;
+  onInstall: (os: "mac" | "windows") => void;
+}) {
   const [state, formAction, pending] = useActionState<AuthState, FormData>(
     login,
     null
@@ -29,39 +35,34 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   return (
     <div className={`auth-card ${success ? "auth-card-leaving" : ""}`}>
       <div className="auth-brand">
-        <span className="brand-logo brand-logo-lg">Mobil</span>
+        <span className="brand-logo brand-logo-lg">Possion</span>
+      </div>
+      <div className="auth-tagline">
+        Possess Your <span className="tagline-emphasis">PASSION</span>.
       </div>
       <form action={formAction}>
         {state && "error" in state && (
           <div className="notice notice-error">{state.error}</div>
         )}
         <input type="hidden" name="redirect" value={redirectTo || "/dashboard"} />
-        <div className="field">
-          <label className="label" htmlFor="email">
-            Email
-          </label>
+        <div className="auth-input-group">
           <input
             id="email"
             name="email"
             type="email"
             className="input"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder="Email"
             required
             disabled={busy}
           />
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="password">
-            Password
-          </label>
           <input
             id="password"
             name="password"
             type="password"
             className="input"
             autoComplete="current-password"
-            placeholder="••••••••"
+            placeholder="Password"
             required
             disabled={busy}
           />
@@ -79,6 +80,14 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
       </form>
       <div className="auth-foot">
         No account? <Link href="/signup">Sign up</Link>
+      </div>
+      <div className="install-options">
+        <button type="button" className="install-opt" onClick={() => onInstall("mac")}>
+          Install for Mac OS
+        </button>
+        <button type="button" className="install-opt" onClick={() => onInstall("windows")}>
+          Install for Windows
+        </button>
       </div>
     </div>
   );

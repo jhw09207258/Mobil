@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { useIsMobile } from "@/lib/use-media-query";
-import { IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat } from "../icons";
+import { IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat, IconSend } from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import {
   addMembers,
@@ -408,6 +408,33 @@ export function ChatShell({
       setActiveConversation(null);
     };
   }, [activeId, selfId, announceRead]);
+
+  // 열려 있는 대화의 메시지를 4초마다 다시 불러오는 보장 동기화(폴링).
+  // 실시간 브로드캐스트(chat:<id>)나 개인 fanout(user:<id>)이 구독 타이밍·
+  // 토큰 지연·네트워크로 유실돼도, 이 폴링이 있으면 헤더 미니 채팅을 포함해
+  // 모든 곳에서 대화 내용이 확실히 맞춰진다. 변화가 없으면 상태를 갱신하지
+  // 않아 리렌더/스크롤 튐이 없다.
+  useEffect(() => {
+    if (!activeId) return;
+    let cancelled = false;
+    const poll = async () => {
+      const rows = await getChatMessages(activeId);
+      if (cancelled) return;
+      setMessages((prev) => {
+        const a = prev[prev.length - 1];
+        const b = rows[rows.length - 1];
+        if (prev.length === rows.length && a?.id === b?.id && a?.content === b?.content && a?.edited_at === b?.edited_at) {
+          return prev; // 변화 없음
+        }
+        return rows;
+      });
+    };
+    const t = setInterval(poll, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [activeId]);
 
   // 만료된 타이핑 표시 제거(1초 틱, 표시 중일 때만).
   useEffect(() => {
@@ -1082,18 +1109,20 @@ export function ChatShell({
                 <textarea
                   ref={inputRef}
                   className="chat-textarea"
-                  placeholder="Message… (Enter to send, Shift+Enter for a new line)"
+                  placeholder="Message"
                   value={input}
                   onChange={(e) => onInputChange(e.target.value)}
                   onKeyDown={onKeyDown}
                   disabled={sending}
                 />
                 <button
-                  className="btn btn-primary"
+                  className="chat-send-btn"
                   onClick={onSend}
                   disabled={sending || !input.trim()}
+                  aria-label="Send message"
+                  title="Send (Enter)"
                 >
-                  {sending ? "Sending…" : "Send"}
+                  <IconSend size={17} />
                 </button>
               </div>
             </div>

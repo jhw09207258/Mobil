@@ -38,16 +38,20 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-1);
+  /* 헤더/사이드바(둘 다 배경이 transparent 라 이 값이 그대로 비쳐 보인다)를
+     은은한 유리 질감으로 — 완전 불투명보다 살짝 투명하게. */
+  background: color-mix(in srgb, var(--bg-1) 88%, transparent);
+  backdrop-filter: saturate(1.4) blur(18px);
+  -webkit-backdrop-filter: saturate(1.4) blur(18px);
   /* AppLayout 이 새로 마운트될 때(콜드 진입 · Reconnecting 화면 다음)만
      재생된다 — (app) 세그먼트 내부 탭 이동은 이 레이아웃을 리마운트하지
      않으므로 평소 화면 전환에서는 반복되지 않는다. */
-  animation: mobil-fade-in 0.4s ease both;
+  animation: possion-fade-in 0.4s ease both;
 }
 
 /* ---- 데스크톱(Tauri) 전용 — macOS 신호등 오버레이 대응 ----
    Teams 스타일: 신호등이 차지하는 상단 띠(28px)를 헤더 위쪽 여백으로 비우고,
-   Mobil 로고·검색창·채팅·프로필은 그 "아래" 줄에 일직선으로 내려온다.
+   Possion 로고·검색창·채팅·프로필은 그 "아래" 줄에 일직선으로 내려온다.
    헤더 빈 영역 드래그로 창 이동, 내부 컨트롤은 no-drag. 브라우저에선 무시. */
 html[data-desktop] {
   /* Safari 통합 툴바처럼 — 헤더 콘텐츠를 세로 중앙 정렬하고 신호등을 같은
@@ -66,10 +70,18 @@ html[data-desktop] body {
   background: transparent;
 }
 html[data-desktop] .app {
-  /* 크롬은 42% 불투명 유리(더 투명하게), 콘텐츠 아일랜드만 완전 불투명 */
-  background: color-mix(in srgb, var(--bg-1) 42%, transparent);
+  /* 크롬은 36% 불투명 유리(더 투명하게), 콘텐츠 아일랜드만 완전 불투명 */
+  background: color-mix(in srgb, var(--bg-1) 36%, transparent);
   -webkit-backdrop-filter: blur(42px) saturate(1.7);
   backdrop-filter: blur(42px) saturate(1.7);
+}
+/* 버그: macOS 의 underWindowBackground vibrancy 는 앱 내부 라이트/다크 토글과
+   무관하게 시스템 외관(대개 다크)을 따른다 — 라이트 모드에서 크롬을 36%로
+   두면 그 뒤에 비치는 어두운 OS 재질과 옅은 회색 아이콘(--text-2)이 섞여
+   아이콘 가시성이 크게 떨어진다. 라이트일 때만 불투명도를 높여 앱 테마
+   색이 OS 재질을 확실히 이기게 해서 대비를 회복한다. */
+html[data-theme="light"][data-desktop] .app {
+  background: color-mix(in srgb, var(--bg-1) 78%, transparent);
 }
 html[data-desktop] .app-header a,
 html[data-desktop] .app-header button,

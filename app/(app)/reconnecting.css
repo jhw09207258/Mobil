@@ -19,7 +19,7 @@
   border-radius: 50%;
   border: 2.5px solid var(--border-1);
   border-top-color: var(--steel);
-  animation: mobil-spin 0.8s linear infinite;
+  animation: possion-spin 0.8s linear infinite;
 }
 .reconnect-text {
   font-family: var(--font-sans);

@@ -31,7 +31,7 @@ type StoredState = {
   open: boolean;
 };
 
-const STORAGE_PREFIX = "mobil.workspace.v1";
+const STORAGE_PREFIX = "possion.workspace.v1";
 const LEGACY_STORAGE_KEY = "mobil.workspace.v1";
 const MIN_SPLIT = 20;
 const MAX_SPLIT = 80;

@@ -1,10 +1,10 @@
 # Supabase 연결 정보
 
-Mobil 전용 Supabase 프로젝트가 생성되고 마이그레이션 0001–0007 이 모두 적용되었습니다.
+Possion 전용 Supabase 프로젝트가 생성되고 마이그레이션 0001–0007 이 모두 적용되었습니다.
 
 | 항목 | 값 |
 | --- | --- |
-| 프로젝트 이름 | `Mobil` |
+| 프로젝트 이름 | `Possion` |
 | 프로젝트 Ref | `qsdplbzhpzidkjmxmqug` |
 | 리전 | `ap-northeast-2` (Seoul) |
 | API URL | `https://qsdplbzhpzidkjmxmqug.supabase.co` |

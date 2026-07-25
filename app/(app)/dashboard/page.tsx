@@ -55,70 +55,59 @@ export default async function DashboardPage() {
           {profile.role === "admin" && (
             <>
               {" · "}
-              <Link href="/admin/users">Manage all Mobil users →</Link>
+              <Link href="/admin/users">Manage all Possion users →</Link>
             </>
           )}
         </div>
 
-        <div className="stat-grid">
-          <div className="stat">
-            <div className="stat-val">{docCount}</div>
-            <div className="stat-label label">DOCS +</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val">{codeCount}</div>
-            <div className="stat-label label">CODE FILES</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val">{fileCount}</div>
-            <div className="stat-label label">REPOSITORY</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val">{sheetCount}</div>
-            <div className="stat-label label">TABLE</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val">{mapCount}</div>
-            <div className="stat-label label">LINK GRAPH</div>
-          </div>
-          <div className="stat">
-            <div className="stat-val">{profile.role === "admin" ? "ADMIN" : "USER"}</div>
-            <div className="stat-label label">ACCESS LEVEL</div>
-          </div>
-        </div>
-
-        <div className="dash-mid">
-          <div className="panel">
-            <div className="panel-header">
-              <span className="label">MY STORAGE USAGE</span>
+        <div className="panel dash-mega">
+          <div className="dash-mega-stats">
+            <div className="stat">
+              <div className="stat-val">{docCount}</div>
+              <div className="stat-label label">DOCS +</div>
             </div>
-            <div className="panel-body">
+            <div className="stat">
+              <div className="stat-val">{codeCount}</div>
+              <div className="stat-label label">CODE FILES</div>
+            </div>
+            <div className="stat">
+              <div className="stat-val">{fileCount}</div>
+              <div className="stat-label label">REPOSITORY</div>
+            </div>
+            <div className="stat">
+              <div className="stat-val">{sheetCount}</div>
+              <div className="stat-label label">TABLE</div>
+            </div>
+            <div className="stat">
+              <div className="stat-val">{mapCount}</div>
+              <div className="stat-label label">LINK GRAPH</div>
+            </div>
+            <div className="stat">
+              <div className="stat-val">{profile.role === "admin" ? "ADMIN" : "USER"}</div>
+              <div className="stat-label label">ACCESS LEVEL</div>
+            </div>
+          </div>
+
+          <div className="dash-mega-grid">
+            <div className="dash-mega-cell dash-mega-storage">
+              <span className="label cell-label">MY STORAGE USAGE</span>
               <StorageBreakdownChart rows={myUsage} />
             </div>
-          </div>
-          <div className="panel">
-            <div className="panel-header">
-              <span className="label">SHARE OF PLATFORM TOTAL</span>
-            </div>
-            <div className="panel-body">
+            <div className="dash-mega-cell dash-mega-share">
+              <span className="label cell-label">SHARE OF PLATFORM TOTAL</span>
               <StorageShareBar myBytes={myBytes} platformBytes={platformBytes} />
             </div>
-          </div>
-          <div className="panel">
-            <div className="panel-header">
-              <span className="label">LIVE DATA THROUGHPUT</span>
-            </div>
-            <div className="panel-body">
+            <div className="dash-mega-cell dash-mega-live">
+              <span className="label cell-label">LIVE DATA THROUGHPUT</span>
               <NetMonitor />
             </div>
-          </div>
-          <div className="panel">
-            <div className="panel-header">
-              <span className="label" title="Others paste this ID into their Share dialog to share items with you.">
+            <div className="dash-mega-cell dash-mega-id">
+              <span
+                className="label cell-label"
+                title="Others paste this ID into their Share dialog to share items with you."
+              >
                 MY SHARE ID
               </span>
-            </div>
-            <div className="panel-body">
               <Copyable value={userId} secret />
             </div>
           </div>

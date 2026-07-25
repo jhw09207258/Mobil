@@ -7,7 +7,7 @@
 // 첫 페인트 전에 적용해 깜빡임(FOUC)을 막는다.
 // ============================================================================
 
-export const THEME_KEY = "mobil.theme.v2";
+export const THEME_KEY = "possion.theme.v2";
 // 구버전(자유 색상 팔레트) 저장분 — 발견 시 정리한다.
 const LEGACY_THEME_KEY = "mobil.theme.v1";
 

@@ -3,10 +3,10 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 
 /**
- * Mobil 다크 테마 — 블랙/다크그레이 기반. 구문 강조는 GitHub 다크 계열의
+ * Possion 다크 테마 — 블랙/다크그레이 기반. 구문 강조는 GitHub 다크 계열의
  * 채도를 낮춘 색을 사용하며 네온/글로우는 배제한다.
  */
-export const mobilEditorTheme = EditorView.theme(
+export const possionEditorTheme = EditorView.theme(
   {
     "&": {
       color: "var(--text-1)",
@@ -64,7 +64,7 @@ export const mobilEditorTheme = EditorView.theme(
   { dark: true }
 );
 
-export const mobilHighlightStyle = HighlightStyle.define([
+export const possionHighlightStyle = HighlightStyle.define([
   { tag: [t.comment, t.lineComment, t.blockComment], color: "#6a7280", fontStyle: "italic" },
   { tag: [t.keyword, t.modifier, t.controlKeyword, t.operatorKeyword], color: "#cf8a7d" },
   { tag: [t.string, t.special(t.string), t.regexp], color: "#8fb573" },
@@ -85,7 +85,7 @@ export const mobilHighlightStyle = HighlightStyle.define([
   { tag: [t.invalid], color: "#e7a79d" },
 ]);
 
-export const mobilTheme = [
-  mobilEditorTheme,
-  syntaxHighlighting(mobilHighlightStyle),
+export const possionTheme = [
+  possionEditorTheme,
+  syntaxHighlighting(possionHighlightStyle),
 ];

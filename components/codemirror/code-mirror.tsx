@@ -17,7 +17,7 @@ import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 import type * as Y from "yjs";
 import type { LangKey } from "@/lib/languages";
 import { languageExtension } from "./languages";
-import { mobilTheme } from "./theme";
+import { possionTheme } from "./theme";
 
 /**
  * CodeMirror 6 React 래퍼. EditorView 를 명령형으로 생성/정리하고, 언어와
@@ -94,7 +94,7 @@ export function CodeMirror({
         indentWithTab,
       ]),
       EditorView.lineWrapping,
-      mobilTheme,
+      possionTheme,
       langComp.current.of(languageExtension(language)),
       editComp.current.of([
         EditorView.editable.of(editable),

@@ -138,7 +138,7 @@ export function StorageShareBar({
       </div>
       <p className="page-sub" style={{ margin: "10px 0 0" }}>
         You are using <strong style={{ color: "var(--text-0)" }}>{formatBytes(myBytes)}</strong> of
-        the shared Mobil storage pool.
+        the shared Possion storage pool.
       </p>
       <p className="card-source">
         Source · Supabase Storage — project-wide bucket usage (files, documents,
