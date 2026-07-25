@@ -5,6 +5,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
+import { useIsMobile } from "@/lib/use-media-query";
 import { IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat } from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import {
@@ -240,6 +241,7 @@ export function ChatShell({
   variant?: "page" | "float";
 }) {
   const { openTab } = useWorkspace();
+  const isMobile = useIsMobile();
   const [conversations, setConversations] = useState(initialConversations);
   const [activeId, setActiveId] = useState<string | null>(
     variant === "float" ? null : (initialConversations[0]?.id ?? null)
@@ -286,6 +288,13 @@ export function ChatShell({
   }, [menu]);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
+
+  // activeId 를 ref 로도 들고 있어, 오래 살아있는 콜백(전역 알림 버스)에서
+  // 최신 값을 참조할 수 있게 한다.
+  const activeIdRef = useRef<string | null>(activeId);
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
   const refreshList = useCallback(() => {
     listChatConversations().then(setConversations);
@@ -415,9 +424,21 @@ export function ChatShell({
     return () => clearInterval(t);
   }, [typing]);
 
-  // 전역 알림(개인 topic fanout) → 목록 갱신. 토스트 클릭 → 해당 대화 열기.
+  // 전역 알림(개인 topic fanout, DB 트리거가 확실히 보냄) → 목록 갱신 +
+  // "열려 있는 대화"라면 메시지를 다시 불러온다. 클라이언트 브로드캐스트
+  // (chat:<id>)가 구독 타이밍/네트워크로 유실돼도 이 경로로 확실히 동기화된다
+  // — 미니(플로팅) 채팅이 안 맞던 문제의 근본 시정.
   useEffect(() => {
-    const offNotify = onMessageNotify(() => refreshList());
+    const offNotify = onMessageNotify((conversationId) => {
+      refreshList();
+      if (conversationId === activeIdRef.current) {
+        getChatMessages(conversationId).then((rows) => {
+          // 최신 활성 대화가 그대로일 때만 반영(빠른 전환 시 경쟁 방지).
+          if (conversationId === activeIdRef.current) setMessages(rows);
+        });
+        markChatRead(conversationId);
+      }
+    });
     const offOpen = onOpenConversation((id) => {
       setActiveId(id);
       setError(null);
@@ -675,11 +696,14 @@ export function ChatShell({
 
   const typingNames = Object.values(typing).map((t) => t.name);
 
-  const showList = variant === "page" || !activeId;
-  const showThread = variant === "page" || !!activeId;
+  // 플로팅 위젯이거나 모바일 화면에서는 목록/스레드를 한 번에 하나만 보여준다
+  // (좁은 화면에서 둘을 동시에 쌓으면 입력창이 잘리고 조작이 불편).
+  const single = variant === "float" || isMobile;
+  const showList = !single || !activeId;
+  const showThread = !single || !!activeId;
 
   return (
-    <div className={`chat-shell ${variant === "float" ? "float" : ""}`}>
+    <div className={`chat-shell ${variant === "float" ? "float" : ""} ${single ? "single" : ""}`}>
       {/* ------------------------------------------------ conversation list */}
       {showList && (
         <div className="chat-list">
@@ -738,7 +762,7 @@ export function ChatShell({
           {active && (
             <div className="chat-thread-head">
               <div className="row" style={{ minWidth: 0 }}>
-                {variant === "float" && (
+                {single && (
                   <button
                     className="btn btn-ghost btn-sm"
                     onClick={() => setActiveId(null)}

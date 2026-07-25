@@ -60,6 +60,9 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
   const pathname = usePathname();
   const { openTab } = useWorkspace();
   const [open, setOpen] = useState(false);
+  // 닫는 동안 패널을 잠깐 더 마운트해 슬라이드아웃 애니메이션을 보여준다.
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [unread, setUnread] = useState(0);
@@ -132,10 +135,29 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
   }, [data]);
 
   const openPanel = useCallback(() => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setClosing(false);
     ensureData();
     setOpen(true);
     refreshUnread();
   }, [ensureData, refreshUnread]);
+
+  // 슬라이드아웃 애니메이션 후 언마운트.
+  const closePanel = useCallback(() => {
+    setClosing(true);
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => {
+      setOpen(false);
+      setClosing(false);
+      refreshUnread();
+    }, 240);
+  }, [refreshUnread]);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
 
   const onToastClick = (t: Toast) => {
     setToasts((prev) => prev.filter((x) => x.id !== t.id));
@@ -176,15 +198,15 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
       </div>
 
       {/* --------------------------------- 우측 슬라이드 오버 채팅 패널 */}
-      {open && (
-        <div className={`chat-float-panel ${expanded ? "expanded" : ""}`}>
+      {(open || closing) && (
+        <div className={`chat-float-panel ${expanded ? "expanded" : ""} ${closing ? "closing" : ""}`}>
           <div className="chat-float-head">
             <span className="label">CHAT</span>
             <div className="row" style={{ gap: 2 }}>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => {
-                  setOpen(false);
+                  closePanel();
                   openTab("chat", "comms", "Chat");
                 }}
                 title="Open as workspace tab (split view)"
@@ -202,10 +224,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
               </button>
               <button
                 className="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setOpen(false);
-                  refreshUnread();
-                }}
+                onClick={closePanel}
                 title="Minimize"
                 aria-label="Minimize chat panel"
               >
@@ -231,8 +250,8 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
 
       {/* ------------------------------------ 헤더 트리거(프로필 옆 아이콘) */}
       <button
-        className={`chat-header-btn ${open ? "active" : ""}`}
-        onClick={() => (open ? setOpen(false) : openPanel())}
+        className={`chat-header-btn ${open && !closing ? "active" : ""}`}
+        onClick={() => (open && !closing ? closePanel() : openPanel())}
         aria-label={`${open ? "Close" : "Open"} chat${unread > 0 ? ` (${unread} unread)` : ""}`}
         title="Chat"
       >

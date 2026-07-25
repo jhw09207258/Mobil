@@ -40,6 +40,7 @@ import { downloadBase64File } from "@/lib/download-file";
 import { useWorkspace, tabId } from "../../workspace/workspace-context";
 import { ContributorBadges } from "../../contributors/contributor-badges";
 import { RepositoryPicker } from "../../repositories/repository-picker";
+import { ActivityPanel } from "./activity-panel";
 import { createMindmapFromDocument } from "../../convert-actions";
 import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
@@ -120,6 +121,7 @@ export function DocumentEditor({
   const [error, setError] = useState<string | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [converting, setConverting] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -398,6 +400,13 @@ export function DocumentEditor({
               </div>
             )}
           </div>
+          <button
+            className={`btn btn-sm ${showActivity ? "chat-tool-active" : ""}`}
+            onClick={() => setShowActivity((v) => !v)}
+            title="Show edit activity (who changed what, when)"
+          >
+            Activity
+          </button>
           {canEdit && (
             <button
               className="btn btn-primary btn-sm"
@@ -422,10 +431,18 @@ export function DocumentEditor({
         </div>
       )}
 
-      <div className="editor-scroll">
-        <div className="editor-doc">
-          <EditorContent editor={editor} />
+      <div className="editor-main">
+        <div className="editor-scroll">
+          <div className="editor-doc">
+            <EditorContent editor={editor} />
+          </div>
         </div>
+        <ActivityPanel
+          docId={docId}
+          open={showActivity}
+          onClose={() => setShowActivity(false)}
+          refreshToken={saveState}
+        />
       </div>
 
       {showShare && (

@@ -17,16 +17,29 @@ export function Modal({
   width?: number;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // onClose 를 ref 로 담아 setup 이펙트가 단 한 번만(마운트/언마운트) 돌게 한다.
+  // 전엔 이펙트가 [onClose] 에 의존했는데, 호출부가 인라인 화살표(() => setX(null))
+  // 를 넘기면 렌더마다 새 함수가 되어 이펙트가 재실행됐고, 그때마다 cleanup 의
+  // previouslyFocused.focus() 가 입력창에서 포커스를 훔쳐가 "한 글자 치면 입력이
+  // 꺼지는" 버그가 났다.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
+    // 닫기(✕) 버튼보다 본문의 첫 입력 요소에 우선 포커스한다.
+    const firstField = panel?.querySelector<HTMLElement>(
+      ".panel-body input:not([disabled]), .panel-body textarea:not([disabled]), .panel-body select:not([disabled])"
+    );
     const firstFocusable = panel?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-    (firstFocusable ?? panel)?.focus();
+    (firstField ?? firstFocusable ?? panel)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !panel) return;
@@ -53,7 +66,8 @@ export function Modal({
       document.body.style.overflow = "";
       previouslyFocused?.focus();
     };
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
@@ -83,10 +97,13 @@ export function Modal({
 const modalCss = `
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 100;
-  background: rgba(0, 0, 0, 0.66);
+  background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: flex-start; justify-content: center;
   padding: 80px 20px 20px;
-  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: modal-backdrop-in 0.2s ease;
 }
-.modal { width: 100%; background: var(--bg-2); }
+@keyframes modal-backdrop-in { from { opacity: 0 } to { opacity: 1 } }
+.modal { width: 100%; }
 `;

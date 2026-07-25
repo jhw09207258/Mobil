@@ -10,6 +10,20 @@ import { ShareDialog } from "@/components/share-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { Modal } from "@/components/modal";
 import { StarButton } from "../star-button";
+import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles } from "../icons";
+
+const KIND_ICON = {
+  document: IconDocuments,
+  code: IconCode,
+  sheet: IconSheet,
+  mindmap: IconMindmap,
+} as const;
+const KIND_LABEL = {
+  document: "Doc",
+  code: "Code",
+  sheet: "Table",
+  mindmap: "Link Graph",
+} as const;
 import {
   deleteFile,
   getSignedUrl,
@@ -377,50 +391,69 @@ export function FilesClient({
               + New repository
             </button>
           </div>
-          <div className="repo-grid">
-            <div
-              className="repo-card"
-              role="button"
-              tabIndex={0}
-              onClick={() => openRepo("null")}
-              onKeyDown={(e) => e.key === "Enter" && openRepo("null")}
-            >
-              <span className="repo-card-name">Null Repository</span>
-              <span className="repo-card-sub">Unfiled items</span>
+          <div className="panel">
+            <div className="panel-header">
+              <span className="label">REPOSITORIES ({repositories.length + 1})</span>
             </div>
-            {repositories.map((r) => (
-              <div
-                key={r.id}
-                className="repo-card"
-                role="button"
-                tabIndex={0}
-                onClick={() => openRepo(r.id)}
-                onKeyDown={(e) => e.key === "Enter" && openRepo(r.id)}
-              >
-                <span className="repo-card-name">{r.name}</span>
-                <span className="repo-card-sub">Open →</span>
-                <div className="repo-card-actions">
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRepoDialog({ mode: "rename", id: r.id, name: r.name });
-                    }}
-                  >
-                    Rename
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm btn-danger"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteRepo(r.id, r.name);
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
+            <div className="table-scroll">
+              <table className="table drive-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 34 }}></th>
+                    <th>Name</th>
+                    <th style={{ width: 200 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="drive-row clickable" onClick={() => openRepo("null")}>
+                    <td>
+                      <span className="drive-icon folder">
+                        <IconFiles size={16} />
+                      </span>
+                    </td>
+                    <td>
+                      <span className="drive-name">Null Repository</span>
+                      <span className="drive-sub">Unfiled items</span>
+                    </td>
+                    <td></td>
+                  </tr>
+                  {repositories.map((r) => (
+                    <tr key={r.id} className="drive-row" onClick={() => openRepo(r.id)}>
+                      <td>
+                        <span className="drive-icon folder">
+                          <IconFiles size={16} />
+                        </span>
+                      </td>
+                      <td>
+                        <span className="drive-name">{r.name}</span>
+                      </td>
+                      <td>
+                        <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRepoDialog({ mode: "rename", id: r.id, name: r.name });
+                            }}
+                          >
+                            Rename
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm btn-danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteRepo(r.id, r.name);
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       ) : (
@@ -477,56 +510,77 @@ export function FilesClient({
             </div>
           </div>
 
-          {repoContents && (
-            <div className="panel" style={{ marginBottom: 14 }}>
-              <div className="panel-header">
-                <span className="label">MOBIL ITEMS</span>
-              </div>
-              <div className="panel-body repo-contents">
-                {(["documents", "code", "sheets", "mindmaps"] as const).map((group) => {
-                  const rows =
-                    group === "documents" ? repoContents.documents.map((d) => ({ id: d.id, label: d.title, kind: "document" as const }))
-                    : group === "code" ? repoContents.code.map((c) => ({ id: c.id, label: c.name, kind: "code" as const }))
-                    : group === "sheets" ? repoContents.sheets.map((sh) => ({ id: sh.id, label: sh.title, kind: "sheet" as const }))
-                    : repoContents.mindmaps.map((m) => ({ id: m.id, label: m.title, kind: "mindmap" as const }));
-                  if (rows.length === 0) return null;
-                  return (
-                    <div key={group} className="repo-group">
-                      <span className="label">{group.toUpperCase()}</span>
-                      <div className="repo-items">
-                        {rows.map((item) => (
-                          <span key={item.id} className="repo-item">
-                            <OpenItemButton
-                              kind={item.kind}
-                              id={item.id}
-                              title={item.label}
-                              className="btn btn-ghost btn-sm"
-                            >
-                              {item.label}
-                            </OpenItemButton>
-                            {repoView !== "null" && (
-                              <button
-                                className="repo-item-remove"
-                                title="Remove from this repository (moves to Null Repository)"
-                                onClick={() => removeItemFromRepo(item.kind, item.id)}
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-                {repoContents.documents.length + repoContents.code.length + repoContents.sheets.length + repoContents.mindmaps.length === 0 && (
-                  <span className="muted" style={{ fontSize: 12.5 }}>
+          {repoContents && (() => {
+            const items = [
+              ...repoContents.documents.map((d) => ({ id: d.id, label: d.title, kind: "document" as const })),
+              ...repoContents.sheets.map((sh) => ({ id: sh.id, label: sh.title, kind: "sheet" as const })),
+              ...repoContents.code.map((c) => ({ id: c.id, label: c.name, kind: "code" as const })),
+              ...repoContents.mindmaps.map((m) => ({ id: m.id, label: m.title, kind: "mindmap" as const })),
+            ];
+            return (
+              <div className="panel" style={{ marginBottom: 14 }}>
+                <div className="panel-header">
+                  <span className="label">MOBIL ITEMS ({items.length})</span>
+                </div>
+                {items.length === 0 ? (
+                  <div className="empty">
                     No docs, tables, code or link graphs yet — create one above, or add from Unfiled.
-                  </span>
+                  </div>
+                ) : (
+                  <div className="table-scroll">
+                    <table className="table drive-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: 34 }}></th>
+                          <th>Name</th>
+                          <th style={{ width: 90 }}>Type</th>
+                          <th style={{ width: 150 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((item) => {
+                          const Icon = KIND_ICON[item.kind];
+                          return (
+                            <tr key={`${item.kind}:${item.id}`} className="drive-row">
+                              <td>
+                                <span className={`drive-icon ${item.kind}`}>
+                                  <Icon size={16} />
+                                </span>
+                              </td>
+                              <td>
+                                <OpenItemButton kind={item.kind} id={item.id} title={item.label} className="link-btn">
+                                  {item.label || "Untitled"}
+                                </OpenItemButton>
+                              </td>
+                              <td>
+                                <span className="badge">{KIND_LABEL[item.kind]}</span>
+                              </td>
+                              <td>
+                                <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
+                                  <OpenItemButton kind={item.kind} id={item.id} title={item.label} className="btn btn-ghost btn-sm">
+                                    Open
+                                  </OpenItemButton>
+                                  {repoView !== "null" && (
+                                    <button
+                                      className="btn btn-ghost btn-sm"
+                                      title="Remove from this repository (moves to Null Repository)"
+                                      onClick={() => removeItemFromRepo(item.kind, item.id)}
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
       <div className="category-tabs">
         <button

@@ -59,13 +59,20 @@
   --font-mono: "SFMono-Regular", "JetBrains Mono", "Consolas", "Liberation Mono",
     monospace;
 
-  /* 부드러운 곡률 — Slack/Teams 계열의 친근한 라운딩 */
-  --radius: 8px;
-  --radius-lg: 12px;
+  /* 곡률 — 애플 계열의 넉넉한 라운딩(Liquid Glass) */
+  --radius: 10px;
+  --radius-lg: 18px;
 
-  /* 레이어드 그림자 — 카드가 배경 위에 떠 보이게 */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.18);
-  --shadow-pop: 0 8px 20px rgba(0, 0, 0, 0.35), 0 20px 48px rgba(0, 0, 0, 0.3);
+  /* 레이어드 그림자 — 부드럽고 넓게 퍼지는 애플식 그림자 */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.22), 0 8px 24px rgba(0, 0, 0, 0.16);
+  --shadow-pop: 0 12px 28px rgba(0, 0, 0, 0.38), 0 28px 64px rgba(0, 0, 0, 0.32);
+
+  /* 유리 표면(오버레이용) — 반투명 + 블러 */
+  --glass-2: color-mix(in srgb, var(--bg-2) 80%, transparent);
+  --glass-3: color-mix(in srgb, var(--bg-3) 78%, transparent);
+  --glass-blur: saturate(1.7) blur(30px);
+  /* 애플식 부드러운 모션 커브 */
+  --ease-spring: cubic-bezier(0.32, 0.72, 0.25, 1);
 
   color-scheme: dark;
 }
@@ -303,7 +310,9 @@ img {
   border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.1s, border-color 0.1s;
+  /* 애플식 부드러운 전환 + 누를 때 살짝 눌리는 모션 */
+  transition: background 0.18s var(--ease-spring), border-color 0.18s var(--ease-spring),
+    transform 0.12s var(--ease-spring), box-shadow 0.18s var(--ease-spring);
 }
 .btn:hover {
   background: var(--bg-4);
@@ -311,6 +320,7 @@ img {
 }
 .btn:active {
   background: var(--bg-2);
+  transform: scale(0.97);
 }
 .btn:disabled {
   opacity: 0.5;
@@ -377,7 +387,7 @@ img {
   border: 1px solid var(--border-1);
   border-radius: var(--radius);
   outline: none;
-  transition: border-color 0.1s, box-shadow 0.1s;
+  transition: border-color 0.18s var(--ease-spring), box-shadow 0.18s var(--ease-spring);
 }
 .textarea {
   height: auto;
@@ -388,8 +398,8 @@ img {
 .input:focus,
 .textarea:focus,
 .select:focus {
-  border-color: var(--steel);
-  box-shadow: 0 0 0 1px var(--steel);
+  border-color: var(--create);
+  box-shadow: 0 0 0 3px var(--create-ghost);
 }
 .input::placeholder,
 .textarea::placeholder {
@@ -583,12 +593,41 @@ button:focus-visible {
 .panel,
 .stat {
   box-shadow: var(--shadow-card);
+  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring),
+    border-color 0.2s var(--ease-spring);
 }
+/* 통계·저장소 카드는 hover 시 살짝 떠오른다(애플식 리프트) */
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-pop);
+}
+
+/* Liquid Glass 오버레이 — 반투명 유리 + 블러. 뒤 레이어가 은은히 비친다. */
 .acct-menu,
 .hsearch-dropdown,
-.modal,
-.chat-attach-menu {
+.chat-attach-menu,
+.chat-attach-menu.chat-plus-menu {
+  background: var(--glass-2) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-pop) !important;
+}
+.modal {
+  background: var(--glass-2) !important;
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-pop) !important;
+  animation: modal-pop 0.22s var(--ease-spring);
+}
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .btn {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -645,6 +684,49 @@ html[data-theme="light"] .btn {
 .repo-item-remove:hover {
   background: var(--accent-ghost);
   color: var(--accent-hover);
+}
+
+/* Google Drive 풍 목록 테이블 (저장소·항목 공통) */
+.drive-table td {
+  vertical-align: middle;
+}
+.drive-row.clickable {
+  cursor: pointer;
+}
+.drive-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #fff;
+}
+.drive-icon.folder {
+  background: var(--steel);
+}
+.drive-icon.document {
+  background: #3a86c8;
+}
+.drive-icon.sheet {
+  background: #2e9e6b;
+}
+.drive-icon.code {
+  background: #b0689e;
+}
+.drive-icon.mindmap {
+  background: #c98a3e;
+}
+.drive-name {
+  display: block;
+  color: var(--text-0);
+  font-size: 13.5px;
+}
+.drive-sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 1px;
 }
 
 /* 저장소 랜딩 카드 그리드 */

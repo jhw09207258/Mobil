@@ -218,6 +218,23 @@ export async function getDocumentForTab(id: string) {
 /** 제목/콘텐츠 저장. content 는 Tiptap JSON. yjsState 는 실시간 동시편집용
  * Yjs 스냅샷(base64, Y.encodeStateAsUpdate) — 다음 접속자가 이 시점부터
  * 이어서 동기화할 수 있도록 저장해둔다. */
+export type DocumentActivity = {
+  id: string;
+  user_id: string;
+  user_name: string;
+  avatar_url: string | null;
+  added: number;
+  removed: number;
+  preview: string | null;
+  created_at: string;
+};
+
+export async function getDocumentActivity(docId: string): Promise<DocumentActivity[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("get_document_activity", { p_doc: docId });
+  return data ?? [];
+}
+
 export async function saveDocument(
   id: string,
   title: string,
@@ -229,6 +246,14 @@ export async function saveDocument(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Authentication required." };
+
+  // 활동 로그용: 업데이트 전의 본문을 미리 읽어 diff(추가/삭제 글자수)를 낸다.
+  const { data: prevRow } = await supabase
+    .from("documents")
+    .select("content")
+    .eq("id", id)
+    .maybeSingle();
+  const prevPlain = prevRow ? extractTiptapPlainText(prevRow.content) : "";
 
   const { error } = await supabase
     .from("documents")
@@ -243,6 +268,28 @@ export async function saveDocument(
 
   // 감사 로그·온톨로지 링크 동기화는 저장 완료 응답을 막지 않도록 응답 이후에 처리한다.
   after(async () => {
+    // 편집 활동(추가/삭제 글자수) 기록 — 공통 접두/접미를 제거한 중간 구간으로
+    // 추정한다(단일 영역 편집에 잘 맞는 저렴한 diff).
+    const newPlain = extractTiptapPlainText(content);
+    if (newPlain !== prevPlain) {
+      let s = 0;
+      while (s < prevPlain.length && s < newPlain.length && prevPlain[s] === newPlain[s]) s++;
+      let eo = prevPlain.length;
+      let en = newPlain.length;
+      while (eo > s && en > s && prevPlain[eo - 1] === newPlain[en - 1]) {
+        eo--;
+        en--;
+      }
+      const removed = eo - s;
+      const added = en - s;
+      const preview = newPlain.slice(s, Math.min(en, s + 80)).trim();
+      await supabase
+        .rpc("log_document_activity", { p_doc: id, p_added: added, p_removed: removed, p_preview: preview })
+        .then(
+          () => {},
+          () => {}
+        );
+    }
     await supabase.from("audit_logs").insert({
       user_id: user.id,
       target_type: "document",

@@ -676,6 +676,23 @@ export interface Database {
         Args: { p_conversation: string };
         Returns: undefined;
       };
+      log_document_activity: {
+        Args: { p_doc: string; p_added: number; p_removed: number; p_preview: string | null };
+        Returns: undefined;
+      };
+      get_document_activity: {
+        Args: { p_doc: string; p_limit?: number };
+        Returns: {
+          id: string;
+          user_id: string;
+          user_name: string;
+          avatar_url: string | null;
+          added: number;
+          removed: number;
+          preview: string | null;
+          created_at: string;
+        }[];
+      };
       get_chat_members: {
         Args: { p_conversation: string };
         Returns: {
