@@ -124,6 +124,10 @@ export type MonacoApi = {
   redo: () => void;
   /** 현재 선택 영역(없으면 전체 내용) — AI 어시스트에 넘길 코드. */
   getSelection: () => string;
+  getValue: () => string;
+  /** 에이전트가 만든 새 내용을 반영한다. Yjs 가 붙어 있으면 공유 문서를 고쳐
+   *  공동 편집자에게도 전파되고 자동 저장까지 이어진다. */
+  applyContent: (next: string) => void;
 };
 
 export function MonacoCodeEditor({
@@ -208,6 +212,31 @@ export function MonacoCodeEditor({
         const sel = editor.getSelection();
         const picked = sel && !sel.isEmpty() ? editor.getModel()?.getValueInRange(sel) : "";
         return picked || editor.getValue();
+      },
+      getValue: () => editor.getValue(),
+      applyContent: (next: string) => {
+        if (next === editor.getValue()) return;
+        if (ytext) {
+          // 통째로 지우고 다시 넣으면 협업 문서의 델타가 불필요하게 커지고
+          // 다른 사람 커서가 튄다 — 앞뒤 공통 부분을 빼고 달라진 구간만 고친다.
+          const cur = ytext.toString();
+          let head = 0;
+          const max = Math.min(cur.length, next.length);
+          while (head < max && cur[head] === next[head]) head++;
+          let tail = 0;
+          while (
+            tail < max - head &&
+            cur[cur.length - 1 - tail] === next[next.length - 1 - tail]
+          ) tail++;
+          const removed = cur.length - head - tail;
+          const inserted = next.slice(head, next.length - tail);
+          ytext.doc?.transact(() => {
+            if (removed > 0) ytext.delete(head, removed);
+            if (inserted) ytext.insert(head, inserted);
+          });
+        } else {
+          editor.setValue(next);
+        }
       },
     });
 

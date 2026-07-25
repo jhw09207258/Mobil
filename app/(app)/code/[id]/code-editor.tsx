@@ -90,6 +90,8 @@ export function CodeEditor({
     undo: () => void;
     redo: () => void;
     getSelection: () => string;
+    getValue: () => string;
+    applyContent: (next: string) => void;
   } | null>(null);
   const [assistOpen, setAssistOpen] = useState(false);
   const nameRef = useRef(name);
@@ -273,9 +275,9 @@ export function CodeEditor({
           <button
             className={`btn btn-sm ${assistOpen ? "chat-tool-active" : ""}`}
             onClick={() => setAssistOpen((v) => !v)}
-            title="Ask Claude about the selected code"
+            title="Chat with the code agent — it can edit this file"
           >
-            Assist
+            Agent
           </button>
           {canEdit && (
             <>
@@ -352,7 +354,8 @@ export function CodeEditor({
         </div>
         {assistOpen && (
           <AssistPanel
-            getSelection={() => cmApiRef.current?.getSelection() ?? ""}
+            getValue={() => cmApiRef.current?.getValue() ?? contentRef.current}
+            applyContent={(next) => cmApiRef.current?.applyContent(next)}
             language={language}
             filename={name || "untitled"}
             onClose={() => setAssistOpen(false)}

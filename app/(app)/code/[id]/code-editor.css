@@ -121,21 +121,69 @@
   line-height: 1.5;
   color: var(--text-3);
 }
-.assist-result {
+/* 대화 로그 */
+.assist-log {
   flex: 1;
   min-height: 0;
-  padding: 10px 12px;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 2px;
+}
+.assist-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.assist-turn-body {
+  padding: 8px 10px;
+  font-size: 12.5px;
   line-height: 1.6;
-  color: var(--text-1);
-  background: var(--bg-0);
-  border: 1px solid var(--border-1);
   border-radius: var(--radius);
   white-space: pre-wrap;
   word-break: break-word;
-  overflow-y: auto;
   user-select: text;
+}
+.assist-turn.user .assist-turn-body {
+  color: var(--text-0);
+  background: var(--create-ghost);
+  border: 1px solid var(--create-dim);
+}
+.assist-turn.model .assist-turn-body {
+  color: var(--text-1);
+  background: var(--bg-0);
+  border: 1px solid var(--border-1);
+}
+/* 실제로 파일에 적용된 편집 목록 */
+.assist-edits {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ok);
+}
+
+/* 입력 */
+.assist-composer {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.assist-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: 7px 9px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-0);
+  background: var(--bg-0);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  outline: none;
 }
 
 /* 좁은 화면에서는 패널을 아래로 쌓는다 */

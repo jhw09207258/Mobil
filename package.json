@@ -30,6 +30,7 @@
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
     "@fortune-sheet/react": "^1.0.4",
+    "@google/genai": "^2.13.0",
     "@lezer/highlight": "^1.2.3",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
