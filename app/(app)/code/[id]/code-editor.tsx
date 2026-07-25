@@ -24,8 +24,10 @@ import {
   listCodeFileShares,
 } from "../actions";
 
+// Monaco(VS Code 에디터 코어)로 교체. 프로퍼티가 기존 CodeMirror 래퍼와 동일해
+// 마운트 지점은 그대로다. 번들이 크므로 탭을 열 때만 지연 로딩한다.
 const CodeMirror = dynamic(
-  () => import("@/components/codemirror/code-mirror").then((m) => m.CodeMirror),
+  () => import("@/components/monaco/monaco-editor").then((m) => m.MonacoCodeEditor),
   {
     ssr: false,
     loading: () => (

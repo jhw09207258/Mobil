@@ -68,6 +68,12 @@
   overflow: hidden;
   background: var(--bg-1);
 }
+/* Monaco 호스트 — 컨테이너 높이를 그대로 채운다(automaticLayout 이 리사이즈를
+   감지하려면 부모가 확정된 높이를 가져야 한다). */
+.monaco-host {
+  height: 100%;
+  width: 100%;
+}
 .cm-host {
   height: 100%;
 }
