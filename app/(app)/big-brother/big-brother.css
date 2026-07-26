@@ -307,3 +307,43 @@
   outline: none;
   cursor: pointer;
 }
+
+/* ============================================================================
+   Agent 콘솔 — 좁은 화면.
+   상태 표시줄은 항목이 여섯이라 그대로 두면 가로로 넘친다. 실행 중 알아야 할
+   것(모델·토큰·샌드박스)만 남기고 나머지는 감춘다 — 파일 수와 턴 수는 콘솔
+   본문에서도 확인할 수 있다.
+   ============================================================================ */
+@media (max-width: 640px) {
+  .agent-bar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .agent-title {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .console-log {
+    padding: 12px 14px 16px;
+    font-size: 12px;
+  }
+  .console-line.text {
+    font-size: 13px;
+  }
+  .console-input-row {
+    padding: 10px 14px;
+  }
+  .console-input {
+    font-size: 16px; /* iOS 는 16px 미만 입력창에서 자동 확대한다. */
+  }
+  .console-status {
+    gap: 10px;
+    padding: 6px 14px;
+  }
+  .console-status .hide-narrow {
+    display: none;
+  }
+}

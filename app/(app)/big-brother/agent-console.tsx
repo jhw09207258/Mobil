@@ -324,13 +324,13 @@ export function AgentConsole({
             </option>
           ))}
         </select>
-        <span className="sep">|</span>
-        <span>{spaceName}</span>
-        <span className="sep">|</span>
-        <span>{files.length} files</span>
-        <span className="sep">|</span>
-        <span>{run?.turns ?? 0} turns</span>
-        <span className="sep">|</span>
+        <span className="sep hide-narrow">|</span>
+        <span className="hide-narrow">{spaceName}</span>
+        <span className="sep hide-narrow">|</span>
+        <span className="hide-narrow">{files.length} files</span>
+        <span className="sep hide-narrow">|</span>
+        <span className="hide-narrow">{run?.turns ?? 0} turns</span>
+        <span className="sep hide-narrow">|</span>
         <span>
           {(run?.totalTokens ?? 0).toLocaleString()} tok
           {(run?.totalTokens ?? 0) > 0 && ` · $${cost.toFixed(3)}`}

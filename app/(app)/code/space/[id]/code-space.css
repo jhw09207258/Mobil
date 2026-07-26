@@ -305,3 +305,72 @@ kbd {
   border: 1px solid var(--border-1);
   border-radius: 4px;
 }
+
+/* ============================================================================
+   좁은 화면 — 편집기는 손가락으로 쓰기 어렵다는 전제로, 파일을 찾고 여는 일이
+   막히지 않는 데 집중한다.
+   ============================================================================ */
+@media (max-width: 640px) {
+  .space-bar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .space-title {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* 제목이 버튼을 밀어내지 않게 — 버튼이 잘리면 아예 누를 수 없다. */
+    min-width: 0;
+  }
+  /* 출처 링크와 파일 수는 좁은 폭에서 자리값을 못 한다. */
+  .space-origin,
+  .space-filecount {
+    display: none;
+  }
+  .space-actions {
+    flex: none;
+  }
+
+  /* 트리는 접힌 상태를 기본으로 — 화면 절반을 목록이 먹으면 편집기가 안 보인다. */
+  .space-tree {
+    max-height: 34vh;
+  }
+  .tree-row {
+    /* 손가락 대상이므로 행을 키운다. */
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 13px;
+  }
+  /* 트리 액션은 hover 가 없는 화면에서는 항상 보여야 누를 수 있다. */
+  .tree-actions {
+    display: flex;
+  }
+  .tree-actions button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .tab {
+    padding: 8px 8px 8px 12px;
+    font-size: 12px;
+  }
+  .tab-close {
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  .editor-tab {
+    padding: 6px 12px;
+  }
+  .breadcrumb {
+    font-size: 11px;
+  }
+
+  .quick-open {
+    width: calc(100vw - 24px);
+    max-height: 70vh;
+  }
+  .quick-open-row {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}

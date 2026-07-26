@@ -469,3 +469,62 @@
 .sophia-input-bar {
   align-items: flex-end;
 }
+
+/* ============================================================================
+   좁은 화면 — Plugin 바·첨부·모델 선택은 기존 640px 블록보다 나중에 생겼다.
+   입력창 위에 바가 셋이나 쌓이면 대화가 보이는 높이가 사라지므로 눌러 담는다.
+   ============================================================================ */
+@media (max-width: 640px) {
+  .sophia-meta-row {
+    gap: 6px;
+    padding-right: 12px;
+  }
+  .plugin-bar {
+    padding: 6px 12px 0;
+    gap: 5px;
+  }
+  /* 안내 문구는 자리만 차지한다 — 좁은 화면에서는 칩과 버튼만 남긴다. */
+  .plugin-hint {
+    display: none;
+  }
+  .plugin-chip {
+    max-width: 150px;
+  }
+  .sophia-model {
+    margin-right: 12px;
+    max-width: 148px;
+    font-size: 11px;
+  }
+  .attach-chips {
+    padding: 6px 12px 0;
+  }
+  .attach-chip {
+    max-width: 160px;
+  }
+  /* + 메뉴가 화면 밖으로 나가지 않게 한다. */
+  .attach-menu {
+    width: calc(100vw - 24px);
+    max-width: 320px;
+  }
+  .attach-menu button {
+    min-height: 46px;
+  }
+  .sophia-input-bar {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  .sophia-textarea {
+    /* iOS 는 16px 미만 입력창에 자동 확대를 건다 — 확대되면 레이아웃이 튄다. */
+    font-size: 16px;
+  }
+  /* 대화 목록 행의 액션은 hover 가 없으므로 항상 보여야 누를 수 있다. */
+  .sophia-conv-action {
+    opacity: 1;
+  }
+  .plugin-list {
+    max-height: 52vh;
+  }
+  .plugin-row {
+    padding: 10px 12px;
+  }
+}

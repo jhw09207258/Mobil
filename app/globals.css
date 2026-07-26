@@ -1035,3 +1035,86 @@ html[data-theme="light"] .btn {
   color: var(--text-0);
   background: var(--bg-3);
 }
+
+/* ============================================================================
+   오버플로 메뉴 — 좁은 화면에서 툴바 버튼을 접어 넣는다.
+   버튼 여러 개를 가로 스크롤에 밀어 넣으면 뒤쪽 항목을 발견할 수 없다.
+   ============================================================================ */
+.more-wrap {
+  position: relative;
+  flex: none;
+}
+.more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  width: max(200px, 56vw);
+  max-width: calc(100vw - 24px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.more-menu button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* 손가락으로 누르는 목록이므로 넉넉한 높이를 준다. */
+  min-height: 44px;
+  justify-content: center;
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-0);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-0);
+  cursor: pointer;
+}
+.more-menu button:last-child {
+  border-bottom: none;
+}
+.more-menu button:hover:not(:disabled) {
+  background: var(--bg-3);
+}
+.more-menu button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.more-menu button.danger {
+  color: var(--danger, #e5484d);
+}
+.more-menu button span {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* 진행 알림은 모바일에서 화면 폭을 꽉 채우는 편이 읽기 쉽다. */
+@media (max-width: 640px) {
+  .agent-toasts {
+    left: 12px;
+    right: 12px;
+    max-width: none;
+  }
+}
+
+/* ============================================================================
+   모바일 입력창 — iOS Safari 는 글자가 16px 미만인 입력에 포커스가 가면 화면을
+   자동으로 확대하고, 확대된 채로 남는다(레이아웃이 어긋난 것처럼 보인다).
+   viewport 로 확대를 잠그는 방식은 핀치 줌까지 없애 접근성을 해치므로,
+   글자 크기로 막는다.
+   ============================================================================ */
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select,
+  .input,
+  .textarea,
+  .select {
+    font-size: 16px;
+  }
+}

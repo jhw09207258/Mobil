@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import type { MonacoApi } from "@/components/monaco/monaco-editor";
 import { isLangKey, type LangKey } from "@/lib/languages";
 import { Modal } from "@/components/modal";
+import { useIsMobile } from "@/lib/use-media-query";
 import {
   addCodeFileToRepo,
   createSpaceFile,
@@ -90,6 +91,9 @@ export function CodeSpaceWorkspace({
   const [showDiff, setShowDiff] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const moreRef = useRef<HTMLDivElement>(null);
 
   const apiRef = useRef<MonacoApi | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -420,33 +424,71 @@ export function CodeSpaceWorkspace({
             {github.owner}/{github.repo} ↗
           </a>
         )}
-        <div className="row" style={{ gap: 6, marginLeft: "auto" }}>
-          <span className="mono muted" style={{ fontSize: 11 }}>
+        <div className="row space-actions" style={{ gap: 6, marginLeft: "auto" }}>
+          <span className="mono muted space-filecount" style={{ fontSize: 11 }}>
             {files.length} files{dirtyCount > 0 && ` · ${dirtyCount} unsaved`}
           </span>
-          <button className="btn btn-sm" onClick={() => setQuickOpen(true)} title="Cmd/Ctrl+P">
-            Go to file
-          </button>
-          <button className="btn btn-sm" onClick={() => setDialog({ kind: "new" })}>
-            New file
-          </button>
-          <button className="btn btn-sm" onClick={() => uploadRef.current?.click()} disabled={uploading}>
-            {uploading ? "Adding…" : "Add files"}
-          </button>
-          <button className="btn btn-sm" onClick={onFilesChanged} title="Reload files changed by the agent">
-            Refresh
-          </button>
           {dirtyCount > 0 && (
             <button className="btn btn-sm btn-primary" onClick={saveAll} title="Cmd/Ctrl+Shift+S">
               Save all
             </button>
           )}
-          <button className="btn btn-sm" onClick={() => setDialog({ kind: "github" })}>
-            Push to GitHub
+          <button className="btn btn-sm" onClick={() => setQuickOpen(true)} title="Cmd/Ctrl+P">
+            Go to file
           </button>
-          <button className="btn btn-sm" onClick={() => setDialog({ kind: "deploy" })}>
-            Deploy
-          </button>
+          {/* 좁은 화면에서는 나머지를 메뉴로 접는다 — 버튼 10개를 가로 스크롤에
+              밀어 넣으면 Deploy 를 보려고 8개를 지나쳐야 한다. */}
+          {isMobile ? (
+            <div className="more-wrap" ref={moreRef}>
+              <button
+                className="btn btn-sm"
+                onClick={() => setMoreOpen((v) => !v)}
+                aria-label="More actions"
+              >
+                ⋯
+              </button>
+              {moreOpen && (
+                <div className="more-menu">
+                  <button onClick={() => { setMoreOpen(false); setDialog({ kind: "new" }); }}>
+                    New file
+                  </button>
+                  <button
+                    onClick={() => { setMoreOpen(false); uploadRef.current?.click(); }}
+                    disabled={uploading}
+                  >
+                    {uploading ? "Adding…" : "Add files"}
+                  </button>
+                  <button onClick={() => { setMoreOpen(false); onFilesChanged(); }}>
+                    Refresh
+                  </button>
+                  <button onClick={() => { setMoreOpen(false); setDialog({ kind: "github" }); }}>
+                    Push to GitHub
+                  </button>
+                  <button onClick={() => { setMoreOpen(false); setDialog({ kind: "deploy" }); }}>
+                    Deploy
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <button className="btn btn-sm" onClick={() => setDialog({ kind: "new" })}>
+                New file
+              </button>
+              <button className="btn btn-sm" onClick={() => uploadRef.current?.click()} disabled={uploading}>
+                {uploading ? "Adding…" : "Add files"}
+              </button>
+              <button className="btn btn-sm" onClick={onFilesChanged} title="Reload files changed by the agent">
+                Refresh
+              </button>
+              <button className="btn btn-sm" onClick={() => setDialog({ kind: "github" })}>
+                Push to GitHub
+              </button>
+              <button className="btn btn-sm" onClick={() => setDialog({ kind: "deploy" })}>
+                Deploy
+              </button>
+            </>
+          )}
         </div>
       </div>
       <input ref={uploadRef} type="file" multiple hidden onChange={(e) => onUpload(e.target.files)} />

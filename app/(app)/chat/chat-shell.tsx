@@ -285,6 +285,8 @@ export function ChatShell({
   // Big Brother 는 @bigbrother 로 부를 때만 답한다 — 상시 감시가 아니다.
   const [bbEnabled, setBbEnabled] = useState(false);
   const [bbThinking, setBbThinking] = useState(false);
+  const [chatMoreOpen, setChatMoreOpen] = useState(false);
+  const chatMoreRef = useRef<HTMLDivElement>(null);
   const [typing, setTyping] = useState<Record<string, { name: string; at: number }>>({});
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
@@ -712,6 +714,15 @@ export function ChatShell({
     setActiveId(id);
   };
 
+  useEffect(() => {
+    if (!chatMoreOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!chatMoreRef.current?.contains(e.target as Node)) setChatMoreOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [chatMoreOpen]);
+
   const onToggleBigBrother = async () => {
     if (!activeId) return;
     const next = !bbEnabled;
@@ -940,31 +951,77 @@ export function ChatShell({
                   </span>
                 </div>
               </div>
-              <div className="row">
-                {/* 1:1 이든 그룹이든 부를 수 있다. 초대해도 @bigbrother 로
-                    부를 때만 답하므로 대화를 상시 읽지 않는다. */}
-                <button
-                  className={`btn btn-sm ${bbEnabled ? "btn-primary" : ""}`}
-                  onClick={onToggleBigBrother}
-                  title={
-                    bbEnabled
-                      ? "Big Brother is in this chat. It only replies when you write @bigbrother."
-                      : "Invite Big Brother. It stays silent until you write @bigbrother."
-                  }
-                >
-                  {bbEnabled ? "Big Brother ✓" : "+ Big Brother"}
-                </button>
-                {active.kind === "group" && (
-                  <>
-                    <button className="btn btn-sm" onClick={() => setDialog("add-members")}>
-                      Add members
-                    </button>
-                    <button className="btn btn-sm btn-danger" onClick={onLeave}>
-                      Leave
-                    </button>
-                  </>
-                )}
-              </div>
+              {/* 좁은 화면에서는 제목이 밀려나므로 메뉴로 접는다. 1:1 이든
+                  그룹이든 부를 수 있고, 초대해도 @bigbrother 로 부를 때만 답한다. */}
+              {isMobile ? (
+                <div className="more-wrap" ref={chatMoreRef}>
+                  <button
+                    className={`btn btn-sm ${bbEnabled ? "btn-primary" : ""}`}
+                    onClick={() => setChatMoreOpen((v) => !v)}
+                    aria-label="Conversation actions"
+                  >
+                    ⋯
+                  </button>
+                  {chatMoreOpen && (
+                    <div className="more-menu">
+                      <button
+                        onClick={() => {
+                          setChatMoreOpen(false);
+                          onToggleBigBrother();
+                        }}
+                      >
+                        {bbEnabled ? "Remove Big Brother" : "Invite Big Brother"}
+                        <span>Replies only when you write @bigbrother</span>
+                      </button>
+                      {active.kind === "group" && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setChatMoreOpen(false);
+                              setDialog("add-members");
+                            }}
+                          >
+                            Add members
+                          </button>
+                          <button
+                            className="danger"
+                            onClick={() => {
+                              setChatMoreOpen(false);
+                              onLeave();
+                            }}
+                          >
+                            Leave conversation
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="row">
+                  <button
+                    className={`btn btn-sm ${bbEnabled ? "btn-primary" : ""}`}
+                    onClick={onToggleBigBrother}
+                    title={
+                      bbEnabled
+                        ? "Big Brother is in this chat. It only replies when you write @bigbrother."
+                        : "Invite Big Brother. It stays silent until you write @bigbrother."
+                    }
+                  >
+                    {bbEnabled ? "Big Brother ✓" : "+ Big Brother"}
+                  </button>
+                  {active.kind === "group" && (
+                    <>
+                      <button className="btn btn-sm" onClick={() => setDialog("add-members")}>
+                        Add members
+                      </button>
+                      <button className="btn btn-sm btn-danger" onClick={onLeave}>
+                        Leave
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
