@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 
 export type Repository = { id: string; name: string };
 export type RepoItemKind = "document" | "code" | "sheet" | "mindmap" | "file";

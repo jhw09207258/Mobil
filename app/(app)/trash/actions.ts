@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 
 export type TrashItem = {
   kind: string;

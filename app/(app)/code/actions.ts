@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 import { detectLanguage, isLangKey } from "@/lib/languages";
 import { extractTagsFromText } from "@/lib/tags";
 import { syncObjectEmbedding } from "@/lib/embeddings";
@@ -65,7 +65,7 @@ export async function saveCodeFile(
   const lang = isLangKey(language) ? language : "plaintext";
   const finalName = name.trim() || "untitled.txt";
 
-  const { error } = await supabase
+  const { data: saved, error } = await supabase
     .from("code_files")
     .update({
       name: finalName,
@@ -73,9 +73,13 @@ export async function saveCodeFile(
       content,
       ...(yjsState !== undefined ? { yjs_state: yjsState } : {}),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
-  if (error) return { ok: false, error: "Save failed." };
+  // RLS 가 조용히 0행을 매칭시킬 수 있다 — select 로 실제로 쓴 행이 있는지
+  // 확인한다. 안 그러면 "저장됨"을 보여주면서 아무것도 저장되지 않는다.
+  if (error || !saved) return { ok: false, error: "Save failed — you may no longer have access." };
 
   after(async () => {
     await supabase.from("audit_logs").insert({

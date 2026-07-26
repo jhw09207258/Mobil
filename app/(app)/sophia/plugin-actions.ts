@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 // 타입·상수는 별도 모듈에 둔다 — "use server" 파일은 export 가 전부 async
 // 함수여야 하고, 상수를 하나라도 내보내면 모듈이 통째로 깨진다.
 import type { Plugin, PluginCandidate, PluginKind } from "./plugin-types";

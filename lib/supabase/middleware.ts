@@ -34,8 +34,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   let user;
+  let supabase: ReturnType<typeof createServerClient<Database>>;
   try {
-    const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+    supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -81,6 +82,40 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // 승인 대기/거절 사용자는 대기 화면 밖 어디도 못 가게 한다.
+  //
+  // app/(app)/layout.tsx 도 같은 검사를 하지만, 그건 "페이지 렌더링"만
+  // 가로막는다. Server Action 은 그 레이아웃을 다시 거치지 않고 클라이언트
+  // 번들에서 곧장 서버로 가는 별도의 POST 라서, 이미 세션을 쥔 대기/거절
+  // 사용자가 브라우저 탭을 새로고침하지 않은 채 액션을 계속 부르면 그
+  // 레이아웃의 리다이렉트를 아예 거치지 않는다 — API 라우트도 마찬가지다.
+  // 미들웨어는 정적 자산을 뺀 모든 요청(페이지·Server Action·API 라우트)을
+  // 거치므로, 여기서 한 번만 막으면 그 경로들이 전부 함께 막힌다.
+  if (user && !isPublicRoute && pathname !== "/pending-approval") {
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("approval_status")
+        .eq("id", user.id)
+        .single();
+      // 프로필 행이 아직 없으면(가입 트리거 복제 지연) 승인 여부를 알 수
+      // 없다 — lib/auth.ts 의 requireUser() 폴백과 같은 원칙으로, 불명확할
+      // 때는 통과시키지 않고 막는 쪽을 택한다.
+      if (profile?.approval_status !== "approved") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/pending-approval";
+        return NextResponse.redirect(url);
+      }
+    } catch (error) {
+      // 이 조회 하나가 실패했다고(네트워크 오류 등) 미들웨어가 죽어 요청마다
+      // 매칭되는 사이트 전체가 500 이 되면 안 된다. 여기서는 이 요청 하나만
+      // 놓치고 지나간다 — 아래 auth.getUser() 실패 시의 fail-closed 와 달리,
+      // 이 경로가 자주 실패하면 이미 승인된 사용자 전원이 오도가도 못 하게
+      // 되는 대가가 더 크다.
+      console.error("[middleware] 승인 상태 확인 실패:", error);
+    }
   }
 
   return response;

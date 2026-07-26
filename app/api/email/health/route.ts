@@ -52,6 +52,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, configured, env, sent: false });
   }
 
+  // send=1 은 실제로 메일을 한 통 내보내는 부수효과가 있는데 GET 이다 — 관리자가
+  // 로그인한 상태로 악성 링크(top-level navigation)를 열면 CSRF 로 임의 주소에
+  // 발송을 강제할 수 있다. Sec-Fetch-Site 는 브라우저가 위조 못 하므로, 주소창에
+  // 직접 붙여넣거나(값 없음/"none") 같은 출처에서 온 요청("same-origin")만 통과시킨다.
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "none" && fetchSite !== "same-origin") {
+    return NextResponse.json({ error: "Cross-site request rejected." }, { status: 403 });
+  }
+
   const to = request.nextUrl.searchParams.get("to")?.trim() || user.email || "";
   if (!EMAIL_RE.test(to)) {
     return NextResponse.json({ error: "`to` is not a valid email address." }, { status: 400 });

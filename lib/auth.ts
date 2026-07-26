@@ -70,3 +70,27 @@ export async function requireUser(): Promise<{
       } as Profile),
   };
 }
+
+/**
+ * requireUser() + 승인 여부까지 강제한다.
+ *
+ * requireUser() 는 세션이 있는지만 본다 — 대기/거절 상태는 지금까지
+ * app/(app)/layout.tsx 하나에서만 걸러 왔는데, 그건 "페이지 렌더링"만
+ * 가로막을 뿐이다. Server Action 은 그 레이아웃을 다시 거치지 않고 클라이언트
+ * 번들에서 직접 서버로 가는 별도의 POST 이므로, 이미 세션을 쥔 대기/거절
+ * 사용자가 브라우저 탭을 새로고침하지 않고 그대로 액션을 계속 부르면
+ * 레이아웃의 리다이렉트를 전혀 거치지 않는다. 모든 Server Action 은 이 함수를
+ * 써야 한다 — 대기 화면 자신은 예외로 requireUser() 를 그대로 쓴다(안 그러면
+ * 대기 화면이 자기 자신으로 리다이렉트를 반복한다).
+ */
+export async function requireApprovedUser(): Promise<{
+  userId: string;
+  email: string;
+  profile: Profile;
+}> {
+  const result = await requireUser();
+  if (result.profile.approval_status !== "approved") {
+    redirect("/pending-approval");
+  }
+  return result;
+}

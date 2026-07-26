@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 
 // Agent 실행 기록 — 브라우저를 닫아도 무엇을 시켰고 무엇을 했는지가 남고,

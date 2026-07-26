@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 import { notifyChatByEmail } from "@/lib/chat-notify";
 import type { Json } from "@/lib/database.types";
 

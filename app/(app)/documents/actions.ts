@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 import { extractDocLinks } from "@/lib/ontology-links";
 import { extractTagsFromText, extractTiptapPlainText } from "@/lib/tags";
@@ -255,16 +255,22 @@ export async function saveDocument(
     .maybeSingle();
   const prevPlain = prevRow ? extractTiptapPlainText(prevRow.content) : "";
 
-  const { error } = await supabase
+  const { data: saved, error } = await supabase
     .from("documents")
     .update({
       title: title.trim() || "Untitled",
       content,
       ...(yjsState !== undefined ? { yjs_state: yjsState } : {}),
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
-  if (error) return { ok: false, error: "Save failed." };
+  // RLS 가 조용히 0행을 매칭시킬 수 있다(권한이 그새 회수됐거나 문서가
+  // 지워진 경우) — PostgREST 는 그걸 에러로 안 주므로, 실제로 쓴 행이
+  // 있는지 select 로 직접 확인해야 한다. 안 그러면 편집기가 "저장됨"을
+  // 보여주면서 아무것도 저장되지 않는다.
+  if (error || !saved) return { ok: false, error: "Save failed — you may no longer have access." };
 
   // 감사 로그·온톨로지 링크 동기화는 저장 완료 응답을 막지 않도록 응답 이후에 처리한다.
   after(async () => {

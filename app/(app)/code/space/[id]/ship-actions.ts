@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 import { pushToGitHub, whoami } from "@/lib/github-push";
 import { deployToVercel, toProjectName, vercelWhoami } from "@/lib/vercel-deploy";
 

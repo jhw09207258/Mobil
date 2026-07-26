@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth";
+import { requireApprovedUser as requireUser } from "@/lib/auth";
 import type { Json } from "@/lib/database.types";
 import type { MindElixirData } from "mind-elixir";
 import { extractMindmapLinks } from "@/lib/ontology-links";
@@ -158,15 +158,19 @@ export async function saveMindMap(
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const finalTitle = title.trim() || "Untitled map";
-  const { error } = await supabase
+  const { data: saved, error } = await supabase
     .from("mind_maps")
     .update({
       title: finalTitle,
       data,
       ...(yjsState !== undefined ? { yjs_state: yjsState } : {}),
     })
-    .eq("id", id);
-  if (error) return { ok: false, error: "Save failed." };
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  // RLS 가 조용히 0행을 매칭시킬 수 있다 — select 로 실제로 쓴 행이 있는지
+  // 확인한다. 안 그러면 "저장됨"을 보여주면서 아무것도 저장되지 않는다.
+  if (error || !saved) return { ok: false, error: "Save failed — you may no longer have access." };
 
   // 온톨로지 링크 그래프 동기화 — 실패해도 저장 자체는 이미 성공했으므로
   // 무시한다(검색·연결 미리보기가 약간 뒤처질 뿐, 데이터 유실 아님).
