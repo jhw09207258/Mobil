@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import "./sophia.css";
 import {
   listConversations,
   createConversation,
   getMessages,
   deleteConversation,
+  renameConversation,
   type ConversationRow,
   type MessageRow,
 } from "./actions";
 import { PluginBar } from "./plugin-bar";
+import { Modal } from "@/components/modal";
+import { ThinkingIndicator } from "@/components/thinking-indicator";
 
 type LocalMessage = MessageRow & { pending?: boolean };
 
@@ -28,7 +32,21 @@ export function SophiaChat({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  // 답을 기다리는 동안 경과 초 — 멈춘 것처럼 보이지 않게 한다.
+  const [thinkSecs, setThinkSecs] = useState(0);
+
+  useEffect(() => {
+    if (!sending) {
+      setThinkSecs(0);
+      return;
+    }
+    const t0 = Date.now();
+    const timer = setInterval(() => setThinkSecs(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [sending]);
 
   useEffect(() => {
     if (!activeId) {
@@ -60,6 +78,7 @@ export function SophiaChat({
     setConversations((prev) => [res, ...prev]);
     setActiveId(res.id);
     setError(null);
+    router.refresh();
   };
 
   const onDelete = async (id: string, e: React.MouseEvent) => {
@@ -70,11 +89,33 @@ export function SophiaChat({
       setError(res.error);
       return;
     }
-    setConversations((prev) => {
-      const next = prev.filter((c) => c.id !== id);
-      if (activeId === id) setActiveId(next[0]?.id ?? null);
-      return next;
-    });
+    // 업데이터 안에서 다른 setState 를 부르면 안 된다(순수해야 한다) —
+    // 다음 활성 대화는 여기서 미리 계산한다.
+    const next = conversations.filter((c) => c.id !== id);
+    setConversations(next);
+    if (activeId === id) setActiveId(next[0]?.id ?? null);
+    // 서버 컴포넌트의 initialConversations 를 갱신한다. 안 하면 이 컴포넌트가
+    // 다시 마운트될 때(모드 전환 등) 지운 대화가 되살아난다.
+    router.refresh();
+  };
+
+  const onRename = async (c: ConversationRow, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenaming({ id: c.id, title: c.title });
+  };
+
+  const submitRename = async () => {
+    if (!renaming) return;
+    const res = await renameConversation(renaming.id, renaming.title);
+    if ("error" in res) {
+      setError(res.error);
+      return;
+    }
+    setConversations((prev) =>
+      prev.map((c) => (c.id === renaming.id ? { ...c, title: res.title } : c))
+    );
+    setRenaming(null);
+    router.refresh();
   };
 
   const onSend = async () => {
@@ -177,6 +218,14 @@ export function SophiaChat({
             >
               <span className="sophia-conv-title">{c.title}</span>
               <button
+                className="sophia-conv-action"
+                onClick={(e) => onRename(c, e)}
+                aria-label="Rename chat"
+                title="Rename chat"
+              >
+                ✎
+              </button>
+              <button
                 className="sophia-conv-delete"
                 onClick={(e) => onDelete(c.id, e)}
                 aria-label="Delete chat"
@@ -188,6 +237,31 @@ export function SophiaChat({
           ))}
         </div>
       </div>
+
+      {renaming && (
+        <Modal title="Rename chat" onClose={() => setRenaming(null)} width={420}>
+          <input
+            className="input"
+            style={{ width: "100%" }}
+            value={renaming.title}
+            onChange={(e) => setRenaming({ ...renaming, title: e.target.value })}
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && submitRename()}
+          />
+          <div className="row" style={{ gap: 8, justifyContent: "flex-end", marginTop: 18 }}>
+            <button className="btn btn-sm" onClick={() => setRenaming(null)}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-sm btn-primary"
+              disabled={!renaming.title.trim()}
+              onClick={submitRename}
+            >
+              Save
+            </button>
+          </div>
+        </Modal>
+      )}
 
       <div className="sophia-chat">
         {error && (
@@ -212,7 +286,11 @@ export function SophiaChat({
                 key={m.id}
                 className={`sophia-msg ${m.role} ${m.pending ? "pending" : ""}`}
               >
-                {m.pending && !m.content ? "…" : m.content}
+                {m.pending && !m.content ? (
+                  <ThinkingIndicator label="Big Brother is thinking" elapsed={thinkSecs} />
+                ) : (
+                  m.content
+                )}
               </div>
             ))}
         </div>

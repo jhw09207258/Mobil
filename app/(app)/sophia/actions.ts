@@ -50,10 +50,36 @@ export async function deleteConversation(
   conversationId: string
 ): Promise<{ ok: true } | { error: string }> {
   const supabase = await createClient();
-  const { error } = await supabase
+  // RLS 로 막히면 delete 는 "0행 삭제 + 에러 없음" 으로 조용히 성공한 척한다.
+  // 지운 행을 돌려받아 실제로 지워졌는지 확인해야 UI 가 거짓말을 안 한다.
+  const { data, error } = await supabase
     .from("ai_conversations")
     .delete()
-    .eq("id", conversationId);
+    .eq("id", conversationId)
+    .select("id");
   if (error) return { error: "Failed to delete chat." };
+  if (!data || data.length === 0) {
+    return { error: "That chat could not be deleted — it may not be yours." };
+  }
   return { ok: true };
+}
+
+/** 대화 이름 변경. */
+export async function renameConversation(
+  conversationId: string,
+  title: string
+): Promise<{ ok: true; title: string } | { error: string }> {
+  const trimmed = title.trim().slice(0, 120);
+  if (!trimmed) return { error: "Give the chat a name." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ai_conversations")
+    .update({ title: trimmed })
+    .eq("id", conversationId)
+    .select("id");
+  if (error) return { error: "Rename failed." };
+  if (!data || data.length === 0) {
+    return { error: "That chat could not be renamed — it may not be yours." };
+  }
+  return { ok: true, title: trimmed };
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AGENT_MODELS, type AgentStep } from "@/lib/antigravity";
 import { commandHelp, estimateCost, parseCommand } from "./console-commands";
+import { ThinkingIndicator } from "@/components/thinking-indicator";
 
 // ============================================================================
 // Antigravity 콘솔 — Code Space 전체를 이해하는 에이전트와 대화하는 터미널.
@@ -377,14 +378,17 @@ export function AgentConsole({
         {lines.map((l, i) => (
           <div key={i} className={`console-line ${l.kind}`}>
             {l.kind === "input" && <span className="console-prompt">›</span>}
-            <span className="console-text">{l.text}</span>
-            {l.detail && <div className="console-detail">{l.detail}</div>}
+            {/* 본문과 detail 은 세로로 쌓여야 한다 — 형제로 두면 flex row 의
+                항목이 되어 옆으로 붙고 상자를 넘친다. */}
+            <div className="console-body">
+              <span className="console-text">{l.text}</span>
+              {l.detail && <div className="console-detail">{l.detail}</div>}
+            </div>
           </div>
         ))}
         {busy && (
           <div className="console-line running">
-            <span className="console-cursor" />
-            <span>working… {elapsed}s</span>
+            <ThinkingIndicator label="working" elapsed={elapsed} compact />
             <button className="console-stop" onClick={() => (cancelRef.current = true)}>
               stop
             </button>

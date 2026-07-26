@@ -305,3 +305,25 @@
   font-size: 11px;
   color: var(--create);
 }
+
+/* 대화 목록 행의 인라인 액션(이름변경) — 삭제 버튼과 같은 규칙으로 보인다. */
+.sophia-conv-action {
+  flex: none;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+}
+.sophia-conv-item:hover .sophia-conv-action,
+.sophia-conv-item.active .sophia-conv-action {
+  opacity: 1;
+}
+.sophia-conv-action:hover {
+  color: var(--text-0);
+  background: var(--bg-3);
+}
