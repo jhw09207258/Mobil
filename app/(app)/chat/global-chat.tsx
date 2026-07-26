@@ -1,5 +1,7 @@
 "use client";
 
+import { IconClose, IconExpand, IconCollapse } from "../icons";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -42,8 +44,8 @@ const MAX_TOASTS = 3;
 // fanout preview 는 원문 앞 140자 — 토스트에는 마크다운/토큰을 걷어내고 보여준다.
 function cleanPreview(raw: string): string {
   return raw
-    .replace(/!\[[^\]\n]*\]\([^)\s]*\)?/g, "🖼 photo")
-    .replace(/\[\[[^\]]*\]?\]?/g, "⛓ attachment")
+    .replace(/!\[[^\]\n]*\]\([^)\s]*\)?/g, "[photo]")
+    .replace(/\[\[[^\]]*\]?\]?/g, "[attachment]")
     .replace(/```/g, "")
     .replace(/[*_~`]/g, "")
     .replace(/\n+/g, " ")
@@ -195,7 +197,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
                 setToasts((prev) => prev.filter((x) => x.id !== t.id));
               }}
             >
-              ✕
+              <IconClose size={11} />
             </span>
           </button>
         ))}
@@ -224,7 +226,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
                 title={expanded ? "Shrink" : "Expand"}
                 aria-label={expanded ? "Shrink chat panel" : "Expand chat panel"}
               >
-                {expanded ? "⤡" : "⤢"}
+                {expanded ? <IconCollapse size={13} /> : <IconExpand size={13} />}
               </button>
               <button
                 className="btn btn-ghost btn-sm"

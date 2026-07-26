@@ -145,3 +145,21 @@ export async function removeAvatar(): Promise<{ ok: true } | { error: string }> 
   }
   return { ok: true };
 }
+
+/** 새 채팅 메시지 이메일 알림 켜기/끄기. 자기 행만 RLS 로 바꿀 수 있다. */
+export async function setChatEmailNotifications(
+  enabled: boolean
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Authentication required." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ email_chat_notifications: enabled })
+    .eq("id", user.id);
+  if (error) return { error: "Failed to save." };
+  return { ok: true };
+}

@@ -1,5 +1,7 @@
 "use client";
 
+import { IconClose } from "../icons";
+
 import { useRouter } from "next/navigation";
 import { dismissNotice, useAgentStore } from "./agent-store";
 
@@ -37,7 +39,7 @@ export function AgentToasts() {
             onClick={() => dismissNotice(n.id)}
             aria-label="Dismiss"
           >
-            ✕
+            <IconClose size={11} />
           </button>
         </div>
       ))}

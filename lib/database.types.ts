@@ -45,6 +45,7 @@ export interface Database {
           age_public: boolean;
           address_public: boolean;
           phone_public: boolean;
+          email_chat_notifications: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -67,6 +68,7 @@ export interface Database {
           age_public?: boolean;
           address_public?: boolean;
           phone_public?: boolean;
+          email_chat_notifications?: boolean;
         };
         Relationships: [];
       };

@@ -1,5 +1,7 @@
 "use client";
 
+import { IconClose } from "../icons";
+
 import { formatBytes } from "@/lib/format";
 import { dismissUpload, useUploads } from "./upload-store";
 
@@ -50,7 +52,7 @@ export function UploadToasts() {
                     onClick={() => dismissUpload(j.id)}
                     aria-label="Dismiss"
                   >
-                    ✕
+                    <IconClose size={11} />
                   </button>
                 </div>
                 <div className="upload-bar">

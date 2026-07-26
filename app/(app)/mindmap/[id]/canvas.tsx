@@ -31,6 +31,7 @@ import { createDocumentFromMindmap, createSheetFromMindmap } from "../../convert
 import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate, seedDeterministically } from "@/lib/yjs-transport";
 import { parseInitialData, type RefKind, type NodeMeta } from "@/lib/mindmap-legacy";
 import { countReferenceNodes } from "@/lib/outline-convert";
+import { IconUndo, IconRedo, IconClose } from "../../icons";
 import { flattenTree, syncFlatToYMap, readFlatFromYMap, reconstructTree, type FlatNode } from "@/lib/mindmap-yjs";
 
 type SaveState = "saved" | "dirty" | "saving";
@@ -632,7 +633,7 @@ function Inner({
                       }}
                       title="Undo (⌘Z)"
                     >
-                      ↩
+                      <IconUndo size={14} />
                     </button>
                     <button
                       className="btn btn-sm"
@@ -642,7 +643,7 @@ function Inner({
                       }}
                       title="Redo (⇧⌘Z)"
                     >
-                      ↪
+                      <IconRedo size={14} />
                     </button>
                   </>
                 )}

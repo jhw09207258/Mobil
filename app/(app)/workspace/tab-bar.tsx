@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IconDocuments, IconCode, IconSheet, IconMindmap, IconChat } from "../icons";
+import { IconDocuments, IconCode, IconSheet, IconMindmap, IconChat, IconClose, IconSplit, IconChevronDown } from "../icons";
 import { useWorkspace, type Tab } from "./workspace-context";
 import { useIsMobile } from "@/lib/use-media-query";
 
@@ -67,7 +67,7 @@ function TabChip({
         }}
         title="Close"
       >
-        ✕
+        <IconClose size={11} />
       </span>
     </div>
   );
@@ -95,7 +95,7 @@ export function TabBar() {
             title="Toggle split view (max 2)"
             aria-label="Toggle split view"
           >
-            ⬓
+            <IconSplit size={15} />
           </button>
         )}
         {open && (
@@ -105,7 +105,7 @@ export function TabBar() {
             title="Hide (browse other pages)"
             aria-label="Hide workspace"
           >
-            ⌄
+            <IconChevronDown size={15} />
           </button>
         )}
       </div>

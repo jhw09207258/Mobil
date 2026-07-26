@@ -1,5 +1,7 @@
 "use client";
 
+import { IconClose, IconRotate } from "../../icons";
+
 import { useEffect, useRef, useState } from "react";
 
 type Turn = {
@@ -94,11 +96,11 @@ export function AssistPanel({
               onClick={() => { setTurns([]); setError(null); }}
               title="Clear conversation"
             >
-              ⟲
+              <IconRotate size={13} />
             </button>
           )}
           <button className="assist-close" onClick={onClose} aria-label="Close">
-            ✕
+            <IconClose size={13} />
           </button>
         </div>
       </div>

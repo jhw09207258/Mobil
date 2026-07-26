@@ -167,10 +167,10 @@ function notify(spaceId: string, spaceName: string, ok: boolean, summary: string
 const STEP_PREFIX: Record<AgentStep["kind"], string> = {
   thought: "·",
   shell: "$",
-  edit: "✎",
-  search: "⌕",
+  edit: "~",
+  search: "?",
   text: " ",
-  tool: "⚙",
+  tool: "*",
 };
 
 const cancelled = new Set<string>();

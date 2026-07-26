@@ -4,6 +4,7 @@ import { SettingsForm } from "./settings-form";
 import { AvatarUpload } from "./avatar-upload";
 import { PasswordForm } from "./password-form";
 import { ThemePicker } from "./theme-picker";
+import { NotificationToggle } from "./notification-toggle";
 import { ConnectedSystems } from "../dashboard/connected-systems";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,15 @@ export default async function SettingsPage() {
         </div>
 
         <ThemePicker />
+
+        <div className="panel" style={{ marginBottom: 24 }}>
+          <div className="panel-header">
+            <span className="label">NOTIFICATIONS</span>
+          </div>
+          <div className="panel-body">
+            <NotificationToggle initial={profile.email_chat_notifications ?? true} />
+          </div>
+        </div>
 
         <div className="panel" style={{ marginBottom: 24 }}>
           <div className="panel-header">

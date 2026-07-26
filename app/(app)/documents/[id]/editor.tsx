@@ -1,7 +1,7 @@
 "use client";
 
 import "./editor.css";
-import { IconUndo } from "../../icons";
+import { IconUndo, IconRedo, IconCheckSquare, IconEdit } from "../../icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
@@ -560,7 +560,7 @@ function Toolbar({
       {/* Undo/Redo — Yjs Collaboration 의 undo manager 를 사용(Cmd/Ctrl+Z,
           Shift+Cmd/Ctrl+Z 단축키는 Collaboration 확장이 이미 바인딩). */}
       <button className={btn(false)} onClick={() => editor.chain().focus().undo().run()} title="Undo (⌘Z)"><IconUndo size={15} /></button>
-      <button className={btn(false)} onClick={() => editor.chain().focus().redo().run()} title="Redo (⇧⌘Z)">↪</button>
+      <button className={btn(false)} onClick={() => editor.chain().focus().redo().run()} title="Redo (⇧⌘Z)"><IconRedo size={15} /></button>
       <span className="tool-sep" />
       <button className={btn(editor.isActive("heading", { level: 1 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1">H1</button>
       <button className={btn(editor.isActive("heading", { level: 2 }))} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">H2</button>
@@ -599,7 +599,7 @@ function Toolbar({
       </label>
       {/* highlight color */}
       <label className="tool-color" title="Highlight">
-        ✎
+        <IconEdit size={13} />
         <span className="tool-swatch" style={{ background: (editor.getAttributes("highlight").color as string) || "var(--warn)" }} />
         <input type="color" defaultValue="#c9922e" onChange={(e) => editor.chain().focus().toggleHighlight({ color: e.target.value }).run()} />
       </label>
@@ -608,7 +608,7 @@ function Toolbar({
       <span className="tool-sep" />
       <button className={btn(editor.isActive("bulletList"))} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list">•</button>
       <button className={btn(editor.isActive("orderedList"))} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list">1.</button>
-      <button className={btn(editor.isActive("taskList"))} onClick={() => editor.chain().focus().toggleTaskList().run()} title="Checklist">☑</button>
+      <button className={btn(editor.isActive("taskList"))} onClick={() => editor.chain().focus().toggleTaskList().run()} title="Checklist"><IconCheckSquare size={15} checked /></button>
       <button className={btn(editor.isActive("blockquote"))} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Quote">❝</button>
       <button className={btn(editor.isActive("codeBlock"))} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code block">{"{ }"}</button>
 

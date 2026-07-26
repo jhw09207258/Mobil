@@ -8,7 +8,8 @@ import { UserAvatar } from "@/components/user-avatar";
 import { useIsMobile } from "@/lib/use-media-query";
 import {
   IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat, IconSend,
-  IconReply, IconEdit, IconTrash, IconMore,
+  IconReply, IconEdit, IconTrash, IconMore, IconClose, IconGroup,
+  IconCheckSquare, IconChevronLeft, IconIndent,
 } from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
@@ -49,7 +50,7 @@ import "./chat.css";
 // ---------------------------------------------------------------------------
 type RefToken = { kind: TabKind; id: string; title: string };
 
-// 대화 목록 미리보기에서 첨부 토큰을 "⛓ attachment" 로 치환.
+// 대화 목록 미리보기에서 첨부 토큰을 "[attachment]" 로 치환.
 const PREVIEW_ATTACH_RE = new RegExp(
   `\\[\\[(?:document|code|sheet|mindmap):${UUID_PATTERN}\\|[^\\]]{1,160}\\]\\]` +
     `|(?:https?://[^\\s]*)?/(?:documents|code|sheets|mindmap)/${UUID_PATTERN}`,
@@ -57,8 +58,8 @@ const PREVIEW_ATTACH_RE = new RegExp(
 );
 function previewText(raw: string): string {
   return raw
-    .replace(/!\[[^\]\n]*\]\(https?:\/\/[^\s)]+\)/g, "🖼 photo")
-    .replace(PREVIEW_ATTACH_RE, "⛓ attachment")
+    .replace(/!\[[^\]\n]*\]\(https?:\/\/[^\s)]+\)/g, "[photo]")
+    .replace(PREVIEW_ATTACH_RE, "[attachment]")
     .replace(/```/g, "")
     .replace(/\n+/g, " ");
 }
@@ -711,6 +712,17 @@ export function ChatShell({
     setMenu(null); // 대화 전환 시 열려 있던 메뉴가 남지 않게.
   };
 
+  // 알림 메일의 링크(/chat?c=…)는 그 대화를 바로 연다. 서버 렌더에는 쿼리가
+  // 반영되지 않으므로 마운트 뒤에 읽는다 — 초기값에서 읽으면 hydration 이
+  // 어긋난다. 이미 나간 대화면 목록에 없으니 그대로 둔다.
+  useEffect(() => {
+    if (variant === "float") return;
+    const wanted = new URLSearchParams(window.location.search).get("c");
+    if (wanted && initialConversations.some((c) => c.id === wanted)) setActiveId(wanted);
+    // 최초 진입에서만 — 이후 사용자가 고른 대화를 덮어쓰면 안 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onStarted = (id: string) => {
     setDialog(null);
     refreshList();
@@ -899,7 +911,7 @@ export function ChatShell({
                 onClick={() => openConversation(c.id)}
               >
                 {c.kind === "group" ? (
-                  <div className="chat-conv-avatar">⌗</div>
+                  <div className="chat-conv-avatar"><IconGroup size={17} /></div>
                 ) : (
                   <UserAvatar url={c.avatar_url} name={c.title} size={34} />
                 )}
@@ -942,7 +954,7 @@ export function ChatShell({
                     aria-label="Back to conversations"
                     title="Back"
                   >
-                    ←
+                    <IconChevronLeft size={17} />
                   </button>
                 )}
                 <div className="chat-thread-title">
@@ -1211,7 +1223,7 @@ export function ChatShell({
                     onClick={() => setReplyTo(null)}
                     aria-label="Cancel reply"
                   >
-                    ✕
+                    <IconClose size={12} />
                   </button>
                 </div>
               )}
@@ -1245,7 +1257,7 @@ export function ChatShell({
                     •
                   </button>
                   <button className="chat-fmt-btn" title="Indent" onClick={() => applyLinePrefix(() => "    ")}>
-                    ⇥
+                    <IconIndent size={14} />
                   </button>
                   <span className="chat-fmt-sep" />
                   <button className="chat-fmt-btn mono" title="Inline code (`code`)" onClick={() => applyWrap("`", "`", "code")}>
@@ -1256,7 +1268,7 @@ export function ChatShell({
                     title="Code block"
                     onClick={() => applyWrap("\n```\n", "\n```\n", "code")}
                   >
-                    ▢
+                    {"{ }"}
                   </button>
                 </div>
               )}
@@ -1314,7 +1326,7 @@ export function ChatShell({
                   {menu === "attach" && (
                     <div className="chat-attach-menu chat-plus-menu">
                       <button className="chat-attach-item chat-menu-back" onClick={() => setMenu("root")}>
-                        ‹ Back
+                        <IconChevronLeft size={13} /> Back
                       </button>
                       <div className="chat-attach-head label">ATTACH WORKSPACE ITEM</div>
                       {!attachables && <div className="chat-empty" style={{ padding: 14 }}>Loading…</div>}
@@ -1336,7 +1348,7 @@ export function ChatShell({
                   {menu === "emoji" && (
                     <div className="chat-attach-menu chat-plus-menu chat-emoji-menu">
                       <button className="chat-attach-item chat-menu-back" onClick={() => setMenu("root")}>
-                        ‹ Back
+                        <IconChevronLeft size={13} /> Back
                       </button>
                       <div className="chat-emoji-grid">
                         {EMOJIS.map((e) => (
@@ -1357,7 +1369,7 @@ export function ChatShell({
                   {menu === "mention" && (
                     <div className="chat-attach-menu chat-plus-menu">
                       <button className="chat-attach-item chat-menu-back" onClick={() => setMenu("root")}>
-                        ‹ Back
+                        <IconChevronLeft size={13} /> Back
                       </button>
                       <div className="chat-attach-head label">MENTION</div>
                       {members
@@ -1573,7 +1585,7 @@ function NewChatDialog({
               <span className="chat-contact-email">{c.email}</span>
             </span>
             {mode === "group" && (
-              <span className="chat-contact-check">{selected.has(c.id) ? "☑" : "☐"}</span>
+              <span className="chat-contact-check"><IconCheckSquare size={15} checked={selected.has(c.id)} /></span>
             )}
           </button>
         ))}
@@ -1648,7 +1660,7 @@ function AddMembersDialog({
               <span className="chat-contact-name">{contactName(c)}</span>
               <span className="chat-contact-email">{c.email}</span>
             </span>
-            <span className="chat-contact-check">{selected.has(c.id) ? "☑" : "☐"}</span>
+            <span className="chat-contact-check"><IconCheckSquare size={15} checked={selected.has(c.id)} /></span>
           </button>
         ))}
       </div>

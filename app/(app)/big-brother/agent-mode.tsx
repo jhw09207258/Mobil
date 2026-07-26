@@ -1,5 +1,7 @@
 "use client";
 
+import { IconChevronLeft } from "../icons";
+
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AgentConsole } from "./agent-console";
@@ -154,7 +156,7 @@ export function AgentMode() {
     <div className="agent-shell">
       <div className="agent-bar">
         <button className="btn btn-sm" onClick={() => setActive(null)}>
-          ‹ Code Spaces
+          <IconChevronLeft size={13} /> Code Spaces
         </button>
         <span className="agent-title">{active.name}</span>
         <span className="mono muted" style={{ fontSize: 11 }}>

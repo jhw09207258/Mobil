@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconSearch } from "./icons";
+import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconSearch, IconChevronDown, IconChevronRight } from "./icons";
 import { useWorkspace, type TabKind } from "./workspace/workspace-context";
 import {
   searchOntology,
@@ -87,7 +87,7 @@ function ResultRow({
           title="Show connected items"
           aria-label="Show connected items"
         >
-          {expanded ? "▾" : "▸"}
+          {expanded ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
         </button>
       </div>
       {expanded && (

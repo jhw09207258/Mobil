@@ -1,7 +1,9 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
+import { notifyChatByEmail } from "@/lib/chat-notify";
 import type { Json } from "@/lib/database.types";
 
 export type ChatConversation = {
@@ -90,7 +92,29 @@ export async function sendChatMessage(
     p_limit: 1,
   });
   if (!rows?.[0]) return { error: "Message sent, but couldn't load it back." };
-  return toChatMessage(rows[0]);
+
+  // 안 보고 있는 멤버에게 메일로 알린다. 응답을 붙잡지 않도록 after() 안에서
+  // 돌리고, 실패해도 메시지 전송 결과에는 손대지 않는다 — 알림은 부가 기능이다.
+  const sent = toChatMessage(rows[0]);
+  after(async () => {
+    try {
+      const { data: conv } = await supabase
+        .from("chat_conversations")
+        .select("kind, title")
+        .eq("id", conversationId)
+        .maybeSingle();
+      await notifyChatByEmail(supabase, {
+        messageId: sent.id,
+        conversationId,
+        senderName: sent.sender_name || "Someone",
+        conversationTitle: conv?.kind === "group" ? conv.title : null,
+      });
+    } catch {
+      /* 알림 실패는 조용히 넘긴다. */
+    }
+  });
+
+  return sent;
 }
 
 export async function toggleReaction(

@@ -53,7 +53,7 @@ const COMMANDS: SlashItem[] = [
   {
     title: "Checklist",
     desc: "Track tasks with checkboxes",
-    icon: "☑",
+    icon: "☑\uFE0E",
     run: (editor, range) => editor.chain().focus().deleteRange(range).toggleTaskList().run(),
   },
   {

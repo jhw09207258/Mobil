@@ -15,6 +15,7 @@ import dynamic from "next/dynamic";
 import { LANGUAGES, isLangKey, detectLanguage, type LangKey } from "@/lib/languages";
 import { ShareDialog } from "@/components/share-dialog";
 import { AssistPanel } from "./assist-panel";
+import { IconUndo, IconRedo, IconRotate, IconClose } from "../../icons";
 import { connectYjsBroadcast, encodeYUpdate, decodeYUpdate, seedDeterministically } from "@/lib/yjs-transport";
 import {
   saveCodeFile,
@@ -282,10 +283,10 @@ export function CodeEditor({
           {canEdit && (
             <>
               <button className="btn btn-sm" onClick={() => cmApiRef.current?.undo()} title="Undo (⌘Z)">
-                ↩
+                <IconUndo size={14} />
               </button>
               <button className="btn btn-sm" onClick={() => cmApiRef.current?.redo()} title="Redo (⇧⌘Z)">
-                ↪
+                <IconRedo size={14} />
               </button>
             </>
           )}

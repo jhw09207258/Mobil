@@ -1,5 +1,7 @@
 "use client";
 
+import { IconClose } from "../../icons";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { UserAvatar } from "@/components/user-avatar";
 import { getDocumentActivity, type DocumentActivity } from "../actions";
@@ -53,7 +55,7 @@ export function ActivityPanel({
       <div className="activity-head">
         <span className="label">EDIT ACTIVITY</span>
         <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Collapse activity" title="Collapse">
-          ✕
+          <IconClose size={12} />
         </button>
       </div>
       <div className="activity-body">

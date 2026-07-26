@@ -7,7 +7,7 @@ import type { MonacoApi } from "@/components/monaco/monaco-editor";
 import { isLangKey, type LangKey } from "@/lib/languages";
 import { Modal } from "@/components/modal";
 import {
-  IconEdit, IconTrash, IconClose, IconMore, IconChevronRight, IconChevronDown,
+  IconEdit, IconTrash, IconClose, IconMore, IconChevronRight, IconChevronDown, IconChevronLeft,
 } from "../../../icons";
 import { useIsMobile } from "@/lib/use-media-query";
 import {
@@ -416,7 +416,7 @@ export function CodeSpaceWorkspace({
     <div className="space-shell">
       <div className="space-bar">
         <button className="btn btn-sm" onClick={() => router.push("/code")}>
-          ‹ Code
+          <IconChevronLeft size={13} /> Code
         </button>
         <h1 className="space-title">{spaceName}</h1>
         {github.owner && (

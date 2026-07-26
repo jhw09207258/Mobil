@@ -9,7 +9,7 @@ import { ShareDialog } from "@/components/share-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { Modal } from "@/components/modal";
 import { StarButton } from "../star-button";
-import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles } from "../icons";
+import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconDownload, IconChevronLeft } from "../icons";
 
 const KIND_ICON = {
   document: IconDocuments,
@@ -422,7 +422,7 @@ export function FilesClient({
           <div className="page-head">
             <div className="row" style={{ gap: 10, minWidth: 0 }}>
               <button className="btn btn-sm" onClick={backToLanding}>
-                ← Repositories
+                <IconChevronLeft size={13} /> Repositories
               </button>
               <h1 className="page-h" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {repoView === "null"
@@ -699,7 +699,7 @@ export function FilesClient({
       {dragOver && (
         <div className="dropzone">
           <div className="dropzone-inner">
-            <div className="dropzone-icon">⬇</div>
+            <div className="dropzone-icon"><IconDownload size={26} /></div>
             Drop to upload
           </div>
         </div>
