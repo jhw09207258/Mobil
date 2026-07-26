@@ -84,7 +84,7 @@ export function Modal({
         <div className="panel-header">
           <span className="topbar-title">{title}</span>
           <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close">
-            ✕
+            <CloseIcon />
           </button>
         </div>
         <div className="panel-body">{children}</div>
@@ -94,16 +94,49 @@ export function Modal({
   );
 }
 
+/** 닫기 아이콘 — app/(app)/icons.tsx 와 같은 규격(24 viewBox, currentColor,
+ *  1.7 두께, 둥근 끝). components/ 는 라우트 그룹 안쪽을 import 하지 않으므로
+ *  여기서는 그리지 직접 그린다. 예전엔 ✕(U+2715) 글자를 썼는데, 폰트에 따라
+ *  컬러 이모지로 그려져 버튼마다 모양이 달라 보였다. */
+function CloseIcon() {
+  return (
+    <svg
+      width={12}
+      height={12}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ display: "block" }}
+    >
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
 const modalCss = `
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 100;
   background: rgba(0, 0, 0, 0.5);
   display: flex; align-items: flex-start; justify-content: center;
   padding: 80px 20px 20px;
+  /* 배경을 스크롤 가능하게 둔다. 목록이 긴 모달(멤버 고르기 등)이나 키보드가
+     아래 절반을 가린 상태에서는, 스크롤이 없으면 하단의 확인/취소 버튼에
+     아예 닿을 수 없다 — iOS 는 키보드가 떠도 레이아웃 뷰포트가 안 줄어들어
+     position:fixed 인 이 상자가 키보드 뒤로 그대로 남기 때문이다. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   animation: modal-backdrop-in 0.2s ease;
 }
 @keyframes modal-backdrop-in { from { opacity: 0 } to { opacity: 1 } }
 .modal { width: 100%; }
+/* 좁은 화면에서 위쪽 80px 여백은 그만큼 모달이 쓸 세로 공간을 잡아먹는다. */
+@media (max-width: 640px) {
+  .modal-backdrop { padding: 20px 12px; }
+}
 `;
