@@ -27,13 +27,18 @@ export const metadata: Metadata = {
 
 // 편집기(문서/코드/시트) 사용 중 핀치·더블탭 확대가 걸려 타이핑을 방해하지
 // 않도록 PC/태블릿/모바일 전부에서 확대를 막는다.
-// 확대를 막지 않는다. maximumScale/userScalable 로 잠그면 핀치 줌까지 사라져
-// 저시력 사용자가 본문을 키울 수 없다(WCAG 1.4.4). 게다가 iOS Safari 는 10부터
-// 이 설정을 무시하므로 "입력창 자동 확대 방지" 효과도 실제로는 없다.
-// 자동 확대는 모바일에서 입력 글자를 16px 이상으로 두어 막는다(globals.css).
+// 제품 결정: 앱 화면은 확대를 잠근다(SaaS UI 라 레이아웃이 확대되면 깨진다).
+// 마인드맵은 자체 확대/축소를 갖고 있으므로 그쪽 라우트에서 따로 푼다.
+//
+// 주의: 이것만으로는 부족하다. iOS Safari 는 10부터 user-scalable 을 무시하고,
+// 글자가 16px 미만인 입력에 포커스가 가면 여전히 화면을 확대한다. 그래서
+// globals.css 에서 입력 글자를 16px 로 올려 두 겹으로 막는다 — 둘 중 하나만
+// 있으면 iOS 에서는 그대로 확대된다.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 // Supabase 오리진에 미리 DNS 조회 + TCP/TLS 핸드셰이크를 걸어두면(preconnect)

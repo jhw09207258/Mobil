@@ -1103,18 +1103,53 @@ html[data-theme="light"] .btn {
 }
 
 /* ============================================================================
-   모바일 입력창 — iOS Safari 는 글자가 16px 미만인 입력에 포커스가 가면 화면을
-   자동으로 확대하고, 확대된 채로 남는다(레이아웃이 어긋난 것처럼 보인다).
-   viewport 로 확대를 잠그는 방식은 핀치 줌까지 없애 접근성을 해치므로,
-   글자 크기로 막는다.
+   입력창 글자 크기 — iOS 자동 확대 방지.
+
+   iOS Safari 는 글자가 16px 미만인 입력에 포커스가 가면 화면을 확대하고, 그대로
+   남긴다. viewport 의 user-scalable=no 로는 막을 수 없다(iOS 10부터 무시한다).
+   유일하게 듣는 방법이 16px 이상으로 두는 것이다.
+
+   :where() 로 감싸 특이도를 0 으로 만들지 않는다 — 반대로 .chat-textarea 같은
+   개별 클래스(0-1-0)를 이기려면 이쪽이 더 높아야 한다. 그래서 클래스 두 개
+   수준(html 태그 + 클래스 목록)으로 올린다. 이전 버전은 요소 선택자(0-0-1)만
+   써서 실제 입력창에 한 번도 적용되지 않았다.
    ============================================================================ */
 @media (max-width: 640px) {
-  input,
-  textarea,
-  select,
-  .input,
-  .textarea,
-  .select {
+  html input,
+  html textarea,
+  html select,
+  html .input,
+  html .textarea,
+  html .select,
+  html .chat-textarea,
+  html .sophia-textarea,
+  html .console-input,
+  html .quick-open-input,
+  html .chat-edit-input {
     font-size: 16px;
+  }
+}
+
+/* ============================================================================
+   키보드가 올라와 있는 동안 — 입력 영역을 확보한다.
+   셸 높이는 이미 visualViewport 에 맞춰 줄어들어 있으므로(app.css),
+   여기서는 좁은 화면에서 부차 요소만 접어 대화가 보일 높이를 남긴다.
+   ============================================================================ */
+@media (max-width: 640px) {
+  .keyboard-open .plugin-bar,
+  .keyboard-open .attach-chips {
+    padding-top: 4px;
+    padding-bottom: 0;
+  }
+  .keyboard-open .plugin-hint,
+  .keyboard-open .sophia-model {
+    display: none;
+  }
+  /* 대화 목록(가로 스트립)은 키보드가 떠 있을 땐 자리만 차지한다. */
+  .keyboard-open .sophia-list {
+    display: none;
+  }
+  .keyboard-open .console-status {
+    display: none;
   }
 }

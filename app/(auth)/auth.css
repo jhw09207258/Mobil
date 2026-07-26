@@ -22,6 +22,18 @@
 .auth-wrap-noscroll {
   overflow-y: hidden;
 }
+/* 키보드가 올라오면 이야기가 달라진다: 스크롤이 막힌 채로 화면이 절반이 되면
+   비밀번호 칸이 키보드 뒤로 숨어 아예 닿을 수 없다. 그때는 스크롤을 되살리고
+   위쪽 정렬로 바꿔 입력이 보이는 영역 안에 들어오게 한다. */
+@media (max-height: 520px) {
+  .auth-wrap,
+  .auth-wrap-noscroll {
+    overflow-y: auto;
+    align-items: flex-start;
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+}
 .auth-wrap {
   animation: possion-fade-in 0.4s ease both;
 }
@@ -347,5 +359,37 @@
   50%,
   100% {
     opacity: 0;
+  }
+}
+
+/* ============================================================================
+   좁은 화면 — auth.css 에는 원래 미디어쿼리가 하나도 없었다.
+   ============================================================================ */
+@media (max-width: 640px) {
+  .auth-wrap {
+    padding: 16px;
+  }
+  /* iOS 는 16px 미만 입력에서 화면을 확대한다(globals.css 와 같은 이유). */
+  .auth-input-group .input {
+    font-size: 16px;
+  }
+  .auth-tagline {
+    font-size: 15px;
+    margin-bottom: 20px;
+  }
+  /* 설치 버튼 두 개는 좁은 폭에서 글자가 뭉개진다 — 세로로 쌓는다. */
+  .install-options {
+    flex-direction: column;
+  }
+  .install-opt {
+    height: 38px;
+  }
+  .terminal,
+  .install-note {
+    max-width: 100%;
+  }
+  .install-panel {
+    padding-left: 14px;
+    padding-right: 14px;
   }
 }

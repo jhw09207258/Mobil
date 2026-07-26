@@ -34,7 +34,11 @@
 /* App shell: fixed header on top, icon rail + main below it. */
 .app {
   height: 100vh; /* dvh 미지원 브라우저 폴백 */
-  height: 100dvh; /* 모바일 URL 바 표시/숨김에 따라 실제 가시 영역에 정확히 맞춘다 */
+  height: 100dvh; /* 모바일 URL 바 표시/숨김 반영 */
+  /* --app-vh 는 visualViewport 높이(components/viewport-fit.tsx). dvh 와 달리
+     키보드가 가린 만큼도 줄어들기 때문에, 키보드가 올라와도 셸이 화면을 넘지
+     않고 브라우저가 화면 전체를 밀어 올리지 않는다. */
+  height: var(--app-vh, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -780,12 +784,12 @@ html[data-desktop] .app-header .hsearch {
                      left/right 8px 여백을 밀어내 화면 밖으로 넘치던 버그 */
     max-width: none;
     transform: none;
-    max-height: calc(100vh - var(--header-h) - 16px);
+    max-height: calc(var(--app-vh, 100vh) - var(--header-h) - 16px);
   }
   /* 모바일 오버레이 입력이 열려 있을 때는 드롭다운을 입력창 아래로 내린다. */
   .hsearch.mobile-open .hsearch-dropdown {
     top: calc(var(--header-h) + 52px);
-    max-height: calc(100dvh - var(--header-h) - 64px);
+    max-height: calc(var(--app-vh, 100dvh) - var(--header-h) - 64px);
   }
 
   .acct-menu {

@@ -10,6 +10,7 @@ import { MobileNavProvider } from "./mobile-nav-context";
 import { ReconnectTracker } from "./reconnect-tracker";
 import { NoZoom } from "./no-zoom";
 import { UploadToasts } from "./uploads/upload-toasts";
+import { ViewportFit } from "@/components/viewport-fit";
 import { AgentToasts } from "./big-brother/agent-toasts";
 
 export default async function AppLayout({
@@ -49,6 +50,7 @@ export default async function AppLayout({
           <Shortcuts />
           {/* 진행률 토스트 — 실제 업로드 상태는 React 트리 밖(upload-store)에
               있어 화면을 옮기거나 이 컴포넌트가 다시 마운트돼도 유지된다. */}
+          <ViewportFit />
           <UploadToasts />
           <AgentToasts />
         </div>
