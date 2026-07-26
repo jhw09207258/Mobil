@@ -11,13 +11,13 @@ import {
 } from "../code/repo-actions";
 
 /**
- * Big Brother 의 바이브 코딩 모드 — Antigravity 에이전트로 Code Space 하나를
+ * Big Brother 의 Agent 모드 — Antigravity 에이전트로 Code Space 하나를
  * 통째로 만들고 고친다.
  *
  * 어느 Code Space 를 대상으로 할지 먼저 고르게 한다(없으면 여기서 새로 만든다).
  * 에이전트는 그 Space 전체를 샌드박스에 올려두고 파일을 가로질러 작업한다.
  */
-export function VibeConsole() {
+export function AgentMode() {
   const router = useRouter();
   const [spaces, setSpaces] = useState<CodeRepository[] | null>(null);
   const [active, setActive] = useState<CodeRepository | null>(null);
@@ -75,7 +75,7 @@ export function VibeConsole() {
       <div className="content">
         <div className="page-head">
           <div>
-            <h1 className="page-h">Vibe coding</h1>
+            <h1 className="page-h">Agent</h1>
             <p className="page-sub">
               Pick a Code Space for the agent to work in. It sees every file in that space
               at once and can create, edit and delete across all of them.
@@ -147,12 +147,12 @@ export function VibeConsole() {
 
   // ---- 콘솔 ----
   return (
-    <div className="vibe-shell">
-      <div className="vibe-bar">
+    <div className="agent-shell">
+      <div className="agent-bar">
         <button className="btn btn-sm" onClick={() => setActive(null)}>
           ‹ Code Spaces
         </button>
-        <span className="vibe-title">{active.name}</span>
+        <span className="agent-title">{active.name}</span>
         <span className="mono muted" style={{ fontSize: 11 }}>
           {files.length} files
         </span>

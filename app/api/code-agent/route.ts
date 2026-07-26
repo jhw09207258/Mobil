@@ -168,10 +168,18 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      // 모델 턴(도구 호출)을 이력에 남기고, 각 호출을 사본에 적용한다.
+      // 모델 턴을 이력에 남긴다 — 파트를 재구성하지 말고 받은 그대로 넣어야 한다.
+      // Gemini 3.x 사고 모델은 functionCall 파트에 thoughtSignature 를 붙여 주고,
+      // 다음 요청에 그게 없으면 400 "Function call is missing a thought_signature"
+      // 로 거절한다.
+      const modelParts = (res.candidates?.[0]?.content?.parts ?? []).filter(
+        (p) => p.functionCall || p.thoughtSignature || p.thought
+      ) as Record<string, unknown>[];
       contents.push({
         role: "model",
-        parts: calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })),
+        parts: modelParts.length
+          ? modelParts
+          : calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })),
       });
 
       const responses: Record<string, unknown>[] = [];

@@ -56,10 +56,21 @@ export function decodeUpdate(b64: string): Uint8Array {
  * 스냅샷이 없거나 깨져 있으면 새 문서를 결정적으로 시드한다(clientID 1) —
  * 두 곳에서 같은 내용을 동시에 시드해도 병합 시 내용이 복제되지 않는다.
  */
+export type SnapshotMerge = {
+  /** 저장할 전체 스냅샷. */
+  snapshot: string;
+  /**
+   * 이 변경만 담은 증분 업데이트. 이전 스냅샷을 들고 있는 클라이언트에
+   * 그대로 브로드캐스트하면 수렴한다(기존 `yupdate` 이벤트와 같은 형식).
+   * 바뀐 게 없으면 null.
+   */
+  update: string | null;
+};
+
 export function mergeContentIntoSnapshot(
   yjsState: string | null,
   nextContent: string
-): string {
+): SnapshotMerge {
   const doc = new Y.Doc();
   let restored = false;
   if (yjsState) {
@@ -70,7 +81,11 @@ export function mergeContentIntoSnapshot(
       // 손상된 스냅샷 — 아래에서 새로 시드한다.
     }
   }
+  // 변경 전 상태벡터 — 이걸 기준으로 증분만 뽑는다.
+  const before = Y.encodeStateVector(doc);
   const ytext = doc.getText("content");
+
+  let changed: boolean;
   if (!restored && ytext.length === 0) {
     const original = doc.clientID;
     doc.clientID = 1;
@@ -79,8 +94,13 @@ export function mergeContentIntoSnapshot(
     } finally {
       doc.clientID = original === 1 ? new Y.Doc().clientID : original;
     }
+    changed = nextContent.length > 0;
   } else {
-    applyTextDelta(ytext, nextContent);
+    changed = applyTextDelta(ytext, nextContent);
   }
-  return encodeUpdate(Y.encodeStateAsUpdate(doc));
+
+  return {
+    snapshot: encodeUpdate(Y.encodeStateAsUpdate(doc)),
+    update: changed ? encodeUpdate(Y.encodeStateAsUpdate(doc, before)) : null,
+  };
 }

@@ -27,6 +27,9 @@ import {
 
 export const maxDuration = 60;
 
+/** Realtime 브로드캐스트 페이로드 한도(base64 기준 여유 있게). */
+const MAX_BROADCAST_CHARS = 180_000;
+
 type Body = {
   action?: "start" | "poll";
   spaceId?: string;
@@ -98,23 +101,37 @@ export async function POST(request: NextRequest) {
         // 채로 두면 에이전트의 변경이 안 보인다. 그렇다고 null 로 지우면 그
         // 파일을 열어 둔 사람의 협업 이력이 통째로 날아간다 — 이전 상태 위에
         // 최소 델타를 얹어 정상적인 Yjs 스냅샷으로 갱신한다.
-        const { error } = existing
-          ? await supabase
-              .from("code_files")
-              .update({
-                content: f.content,
-                yjs_state: mergeContentIntoSnapshot(existing.yjs_state, f.content),
-                language: detectLanguage(name),
-              })
-              .eq("id", existing.id)
-          : await supabase.from("code_files").insert({
-              owner_id: userId,
-              name,
-              path,
-              language: detectLanguage(name),
+        let error;
+        if (existing) {
+          const merged = mergeContentIntoSnapshot(existing.yjs_state, f.content);
+          ({ error } = await supabase
+            .from("code_files")
+            .update({
               content: f.content,
-              code_repository_id: spaceId,
+              yjs_state: merged.snapshot,
+              language: detectLanguage(name),
+            })
+            .eq("id", existing.id));
+          // 이 파일을 열어 둔 편집기에 증분 업데이트를 밀어준다 — 클라이언트가
+          // 이미 처리하는 yupdate 이벤트라 편집기 쪽 변경이 필요 없다.
+          // 큰 업데이트는 Realtime 페이로드 한도를 넘으므로 보내지 않는다
+          // (그 경우 Refresh 하거나 다시 열면 스냅샷에서 따라잡는다).
+          if (!error && merged.update && merged.update.length <= MAX_BROADCAST_CHARS) {
+            await supabase.rpc("broadcast_code_yupdate", {
+              p_file_id: existing.id,
+              p_update: merged.update,
             });
+          }
+        } else {
+          ({ error } = await supabase.from("code_files").insert({
+            owner_id: userId,
+            name,
+            path,
+            language: detectLanguage(name),
+            content: f.content,
+            code_repository_id: spaceId,
+          }));
+        }
         if (error) failed.push(path);
         else saved.push(path);
       }

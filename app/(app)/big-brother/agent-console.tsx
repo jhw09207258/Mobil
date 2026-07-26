@@ -373,8 +373,41 @@ export function AgentConsole({
 
   return (
     <div className="agent-console">
-      <div className="console-head">
-        <span className="label">AGENT</span>
+      <div className="console-log" ref={logRef}>
+        {lines.map((l, i) => (
+          <div key={i} className={`console-line ${l.kind}`}>
+            {l.kind === "input" && <span className="console-prompt">›</span>}
+            <span className="console-text">{l.text}</span>
+            {l.detail && <div className="console-detail">{l.detail}</div>}
+          </div>
+        ))}
+        {busy && (
+          <div className="console-line running">
+            <span className="console-cursor" />
+            <span>working… {elapsed}s</span>
+            <button className="console-stop" onClick={() => (cancelRef.current = true)}>
+              stop
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="console-input-row">
+        <span className="console-prompt">›</span>
+        <textarea
+          className="console-input"
+          rows={1}
+          placeholder={busy ? "" : "Describe what to build or change — /help for commands"}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          spellCheck={false}
+          autoFocus
+        />
+      </div>
+
+      {/* 상태 표시줄 — 모델·토큰·비용·샌드박스를 항상 보이게 */}
+      <div className="console-status">
         <select
           className="console-model"
           value={model}
@@ -388,46 +421,25 @@ export function AgentConsole({
             </option>
           ))}
         </select>
-        <div className="console-meter" title="Tokens used in this session">
+        <span className="sep">|</span>
+        <span>{spaceName}</span>
+        <span className="sep">|</span>
+        <span>{files.length} files</span>
+        <span className="sep">|</span>
+        <span>{session.turns} turns</span>
+        <span className="sep">|</span>
+        <span>
           {session.totalTokens.toLocaleString()} tok
           {session.totalTokens > 0 && ` · $${cost.toFixed(3)}`}
-        </div>
+        </span>
         {session.environmentId && (
-          <span className="console-env" title={`Sandbox ${session.environmentId}`}>
-            ● sandbox live
-          </span>
+          <>
+            <span className="sep">|</span>
+            <span className="live" title={`Sandbox ${session.environmentId}`}>
+              ● sandbox
+            </span>
+          </>
         )}
-      </div>
-
-      <div className="console-log" ref={logRef}>
-        {lines.map((l, i) => (
-          <div key={i} className={`console-line ${l.kind}`}>
-            {l.kind === "input" ? <span className="console-prompt">›</span> : null}
-            <span className="console-text">{l.text}</span>
-            {l.detail && <div className="console-detail">{l.detail}</div>}
-          </div>
-        ))}
-        {busy && (
-          <div className="console-line running">
-            <span className="console-text">working… {elapsed}s</span>
-            <button className="console-stop" onClick={() => (cancelRef.current = true)}>
-              stop
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="console-input-row">
-        <span className="console-prompt">›</span>
-        <textarea
-          className="console-input"
-          rows={1}
-          placeholder={busy ? "Agent is working…" : "Build, change, or ask about this Code Space"}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          spellCheck={false}
-        />
       </div>
     </div>
   );

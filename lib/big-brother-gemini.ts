@@ -132,6 +132,11 @@ export async function runBigBrotherGemini(opts: {
     }
 
     const calls: { name: string; args: Record<string, unknown> }[] = [];
+    // 모델이 준 파트를 그대로 모은다 — 재구성하면 안 된다.
+    // Gemini 3.x 사고 모델은 functionCall 파트에 thoughtSignature 를 붙여 보내고,
+    // 다음 요청에 그게 그대로 없으면 400 "Function call is missing a
+    // thought_signature" 로 거절한다.
+    const modelParts: Record<string, unknown>[] = [];
     let roundText = "";
 
     try {
@@ -141,8 +146,17 @@ export async function runBigBrotherGemini(opts: {
           roundText += t;
           opts.forward(t);
         }
-        for (const c of chunk.functionCalls ?? []) {
-          if (c.name) calls.push({ name: c.name, args: (c.args ?? {}) as Record<string, unknown> });
+        for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+          // 화면에 이미 흘린 순수 텍스트는 이력에서 마지막에 한 번만 합친다.
+          if (part.functionCall || part.thoughtSignature || part.thought) {
+            modelParts.push(part as Record<string, unknown>);
+          }
+          if (part.functionCall?.name) {
+            calls.push({
+              name: part.functionCall.name,
+              args: (part.functionCall.args ?? {}) as Record<string, unknown>,
+            });
+          }
         }
         const u = chunk.usageMetadata;
         if (u) {
@@ -167,9 +181,10 @@ export async function runBigBrotherGemini(opts: {
     if (calls.length === 0) break;
 
     // 모델의 도구 호출 턴과 그 결과를 이력에 남기고 한 번 더 돌린다.
+    // 파트는 받은 그대로 — thoughtSignature 가 붙어 있어야 다음 요청이 통과한다.
     contents.push({
       role: "model",
-      parts: calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })),
+      parts: roundText ? [...modelParts, { text: roundText }] : modelParts,
     });
     const parts: Record<string, unknown>[] = [];
     for (const c of calls) {

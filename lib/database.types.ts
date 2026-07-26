@@ -767,6 +767,11 @@ export interface Database {
         Args: { p_kind: string; p_id: string };
         Returns: undefined;
       };
+      /** 에이전트가 고친 코드 파일을 열어 둔 편집기들에 증분 Yjs 업데이트로 밀어준다. */
+      broadcast_code_yupdate: {
+        Args: { p_file_id: string; p_update: string };
+        Returns: undefined;
+      };
       restore_from_trash: {
         Args: { p_kind: string; p_id: string };
         Returns: undefined;
