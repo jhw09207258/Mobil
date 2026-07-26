@@ -404,6 +404,49 @@ export interface Database {
         };
         Relationships: [];
       };
+      agent_runs: {
+        Row: {
+          space_id: string;
+          owner_id: string;
+          lines: Json;
+          interaction_id: string | null;
+          environment_id: string | null;
+          model: string | null;
+          turns: number;
+          total_tokens: number;
+          input_tokens: number;
+          output_tokens: number;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          space_id: string;
+          owner_id: string;
+          lines?: Json;
+          interaction_id?: string | null;
+          environment_id?: string | null;
+          model?: string | null;
+          turns?: number;
+          total_tokens?: number;
+          input_tokens?: number;
+          output_tokens?: number;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          lines?: Json;
+          interaction_id?: string | null;
+          environment_id?: string | null;
+          model?: string | null;
+          turns?: number;
+          total_tokens?: number;
+          input_tokens?: number;
+          output_tokens?: number;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       ai_conversation_plugins: {
         Row: {
           id: string;

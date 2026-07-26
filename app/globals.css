@@ -946,3 +946,92 @@ html[data-theme="light"] .btn {
     animation-duration: 2.4s;
   }
 }
+
+/* ============================================================================
+   Agent 완료 알림 — 어느 화면에 있든 우측 상단에 뜬다.
+   에이전트를 돌려놓고 다른 일을 하다가 끝난 걸 알 수 있어야 "백그라운드"가
+   의미를 갖는다.
+   ============================================================================ */
+.agent-toasts {
+  position: fixed;
+  top: calc(var(--header-h, 56px) + 12px);
+  right: 16px;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.agent-toast {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px 4px 4px 0;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-left: 2px solid var(--ok);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  animation: agent-toast-in 0.22s ease-out;
+}
+.agent-toast.failed {
+  border-left-color: var(--danger, #e5484d);
+}
+@keyframes agent-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+.agent-toast-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 4px 8px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.agent-toast-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-0);
+}
+.agent-toast-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.agent-toast.failed .agent-toast-dot {
+  background: var(--danger, #e5484d);
+}
+.agent-toast-body {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.agent-toast-close {
+  flex: none;
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.agent-toast-close:hover {
+  color: var(--text-0);
+  background: var(--bg-3);
+}
