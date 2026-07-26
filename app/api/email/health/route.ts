@@ -3,10 +3,16 @@ import { createClient } from "@/lib/supabase/server";
 import { appUrl, emailConfigured, sendEmail } from "@/lib/email";
 
 // 알림 메일 진단 엔드포인트(관리자 전용).
-//   GET /api/email/health              — 설정 여부만 본다(메일은 안 보냄).
-//   GET /api/email/health?send=1       — 자기 자신에게 실제로 한 통 보낸다.
+//   GET /api/email/health                       — 설정 여부만 본다(메일은 안 보냄).
+//   GET /api/email/health?send=1                — 자기 자신에게 실제로 한 통 보낸다.
+//   GET /api/email/health?send=1&to=누군가@메일   — 다른 주소로 보내본다. 발신
+//     로직(누구를 고를지)과 실제 배달(Resend 가 받아들이는지)을 분리해서
+//     확인할 때 쓴다 — claim 은 성공했는데 그 사람에게 메일이 안 갔다면,
+//     문제는 우리 코드가 아니라 Resend 쪽(도메인 미인증 등)이다.
 // 키 값은 응답에 싣지 않는다 — 이름과 말미 4자리만.
 export const maxDuration = 30;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const tail = (v?: string) => (v ? `...${v.slice(-4)}` : null);
 
@@ -46,8 +52,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: true, configured, env, sent: false });
   }
 
+  const to = request.nextUrl.searchParams.get("to")?.trim() || user.email || "";
+  if (!EMAIL_RE.test(to)) {
+    return NextResponse.json({ error: "`to` is not a valid email address." }, { status: 400 });
+  }
+
   const res = await sendEmail({
-    to: user.email ?? "",
+    to,
     subject: "Possion — notification test",
     text: "This is a test of Possion's chat notification email. Nothing is wrong.",
     html: "<p>This is a test of Possion&rsquo;s chat notification email. Nothing is wrong.</p>",
@@ -57,7 +68,7 @@ export async function GET(request: NextRequest) {
     configured,
     env,
     sent: "ok" in res,
-    to: user.email ?? null,
+    to,
     detail: "error" in res ? res.error : null,
   });
 }

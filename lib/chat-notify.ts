@@ -37,11 +37,19 @@ export async function notifyChatByEmail(
   const link = base ? `${base}/chat?c=${encodeURIComponent(args.conversationId)}` : "";
 
   await Promise.all(
-    (data as Recipient[]).map((r) =>
-      sendEmail({ to: r.email, subject, ...body(r, args.senderName, where, link, base) }).catch(
-        () => undefined
-      )
-    )
+    (data as Recipient[]).map(async (r) => {
+      const sent = await sendEmail({
+        to: r.email,
+        subject,
+        ...body(r, args.senderName, where, link, base),
+      }).catch((e) => ({ error: e instanceof Error ? e.message : "unknown" }));
+      // sendEmail 은 실패해도 던지지 않고 { error } 를 돌려주므로, 위 .catch
+      // 만으로는 절대 못 잡는다 — 그래서 이렇게 직접 결과를 봐야 Resend 가
+      // 실제로 무슨 이유로 거절했는지(도메인 미인증 등) 로그에 남는다.
+      if ("error" in sent) {
+        console.error(`[chat-notify] send to ${r.email} failed: ${sent.error}`);
+      }
+    })
   );
 }
 
