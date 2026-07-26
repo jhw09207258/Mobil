@@ -13,22 +13,6 @@ import { GoogleGenAI, type FunctionDeclaration } from "@google/genai";
 
 export const BIG_BROTHER_MODEL = "gemini-3.5-flash";
 
-/**
- * 어시스턴트에서 고를 수 있는 모델.
- *
- * 3.1 Pro 는 추론이 가장 강하지만(1M 컨텍스트, 도구 호출 지원) preview 이고
- * flash 대비 훨씬 비싸다 — 기본값은 flash 로 두고 필요할 때 올려 쓰게 한다.
- */
-export const BIG_BROTHER_MODELS = [
-  { id: "gemini-3.5-flash", label: "3.5 Flash — fast, cheap (default)" },
-  { id: "gemini-3.6-flash", label: "3.6 Flash — newer, still fast" },
-  { id: "gemini-3.1-pro-preview", label: "3.1 Pro — deepest reasoning, costly" },
-] as const;
-
-export function isBigBrotherModel(m: string | undefined): boolean {
-  return !!m && BIG_BROTHER_MODELS.some((x) => x.id === m);
-}
-
 /** OpenAI 형식 도구 선언을 Gemini 형식으로. 스키마는 그대로 재사용한다. */
 export function toGeminiTools(
   openAiTools: readonly {

@@ -1,7 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { ANTIGRAVITY_AGENT, AGENT_MODELS, agentBaseConfig } from "@/lib/antigravity";
+import { CLAUDE_MODELS } from "@/lib/big-brother-claude";
 
 // 코드 에이전트 진단(로그인 필요). /api/code-agent/health 를 브라우저에서 열면
 // GEMINI_API_KEY 가 이 배포에 실제로 주입됐는지, 그리고 그 키로 Gemini 호출이
@@ -60,6 +62,67 @@ async function probeAntigravity(ai: GoogleGenAI) {
   }
 }
 
+/**
+ * Claude 키가 이 배포에 실제로 주입됐고 통하는지 확인한다.
+ * 값은 절대 돌려주지 않는다(변수명과 끝 4자리만).
+ */
+async function probeClaude() {
+  const key = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
+  const varName = process.env.CLAUDE_API_KEY
+    ? "CLAUDE_API_KEY"
+    : process.env.ANTHROPIC_API_KEY
+    ? "ANTHROPIC_API_KEY"
+    : null;
+  if (!key) {
+    return {
+      available: false,
+      keyConfigured: false,
+      hint: "No Claude key in this deployment. Vercel applies env-var changes only to NEW deployments — redeploy if you just added it.",
+    };
+  }
+  const t = Date.now();
+  try {
+    const client = new Anthropic({ apiKey: key });
+    const msg = await client.messages.create({
+      model: CLAUDE_MODELS[0].id,
+      max_tokens: 16,
+      messages: [{ role: "user", content: "Reply with the single word OK." }],
+    });
+    // 거절은 예외가 아니라 정상 200 으로 온다 — content 를 읽기 전에 확인한다.
+    if (msg.stop_reason === "refusal") {
+      return { available: true, keyConfigured: true, variable: varName, refused: true };
+    }
+    const first = msg.content.find((b) => b.type === "text");
+    return {
+      available: true,
+      keyConfigured: true,
+      variable: varName,
+      keyTail: `...${key.slice(-4)}`,
+      model: CLAUDE_MODELS[0].id,
+      elapsedMs: Date.now() - t,
+      reply: first && first.type === "text" ? first.text.trim().slice(0, 40) : "",
+      totalTokens: (msg.usage?.input_tokens ?? 0) + (msg.usage?.output_tokens ?? 0),
+    };
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return {
+      available: false,
+      keyConfigured: true,
+      variable: varName,
+      keyTail: `...${key.slice(-4)}`,
+      elapsedMs: Date.now() - t,
+      reason: /authentication|401|invalid.*api.?key/i.test(detail)
+        ? "key-rejected"
+        : /rate.?limit|429/i.test(detail)
+        ? "quota"
+        : /not_found|404|model/i.test(detail)
+        ? "model-not-available-on-this-key"
+        : "request-failed",
+      detail: detail.slice(0, 300),
+    };
+  }
+}
+
 export async function GET() {
   await requireUser();
 
@@ -98,6 +161,7 @@ export async function GET() {
       elapsedMs: Date.now() - started,
       reply: (res.text ?? "").trim().slice(0, 40),
       antigravity: await probeAntigravity(ai),
+      claude: await probeClaude(),
     });
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);

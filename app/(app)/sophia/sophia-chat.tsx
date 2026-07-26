@@ -15,7 +15,7 @@ import {
 import { PluginBar } from "./plugin-bar";
 import { Modal } from "@/components/modal";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
-import { BIG_BROTHER_MODELS } from "@/lib/big-brother-gemini";
+import { DEFAULT_BB_MODEL, bbModelGroups } from "@/lib/big-brother-models";
 
 type LocalMessage = MessageRow & { pending?: boolean };
 
@@ -38,7 +38,7 @@ export function SophiaChat({
   const router = useRouter();
   // 답을 기다리는 동안 경과 초 — 멈춘 것처럼 보이지 않게 한다.
   const [thinkSecs, setThinkSecs] = useState(0);
-  const [model, setModel] = useState<string>(BIG_BROTHER_MODELS[0].id);
+  const [model, setModel] = useState<string>(DEFAULT_BB_MODEL);
 
   useEffect(() => {
     if (!sending) {
@@ -307,10 +307,14 @@ export function SophiaChat({
             disabled={sending}
             title="Reasoning model"
           >
-            {BIG_BROTHER_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
+            {bbModelGroups().map((g) => (
+              <optgroup key={g.group} label={g.group}>
+                {g.models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>

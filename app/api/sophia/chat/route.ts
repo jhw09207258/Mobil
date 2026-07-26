@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { SOPHIA_TOOLS, executeSophiaTool } from "@/app/(app)/sophia/tools";
-import { runBigBrotherGemini, toGeminiTools, isBigBrotherModel } from "@/lib/big-brother-gemini";
+import { runBigBrotherGemini, toGeminiTools } from "@/lib/big-brother-gemini";
+import { runBigBrotherClaude, toClaudeTools } from "@/lib/big-brother-claude";
+import { bbModel, DEFAULT_BB_MODEL } from "@/lib/big-brother-models";
 
 // Llama 70B 완성 전체를 기다리면 서버리스 함수 기본 제한 시간(대개 10초)을
 // 넘기기 쉬워 "응답이 아예 안 옴" 증상으로 이어진다. 스트리밍으로 바꿔도
@@ -355,6 +357,61 @@ list if the user clearly asks you to.`
     await supabase.from("ai_conversations").update({ title: nextTitle }).eq("id", conversationId);
   };
 
+  // ---- 모델에 따라 제공자를 고른다 ----
+  const chosen = bbModel(body.model) ?? bbModel(DEFAULT_BB_MODEL);
+
+  // ---- Claude 경로 ----
+  const claudeKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
+  if (chosen?.provider === "claude") {
+    if (!claudeKey) {
+      const msg =
+        "No Claude API key configured on the server (CLAUDE_API_KEY). Pick a Gemini model, or set the key.";
+      await saveAssistant(msg);
+      return new Response(msg, {
+        status: 200,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const forward = (chunk: string) => controller.enqueue(encoder.encode(chunk));
+        let result: Awaited<ReturnType<typeof runBigBrotherClaude>>;
+        try {
+          result = await runBigBrotherClaude({
+            apiKey: claudeKey,
+            model: chosen.id,
+            system: SYSTEM_PROMPT + pluginBlock,
+            history: (history ?? []) as { role: string; content: string | null }[],
+            tools: toClaudeTools(SOPHIA_TOOLS),
+            execute: (name, args) => executeSophiaTool(name, args),
+            forward,
+            maxRounds: MAX_TOOL_ROUNDS,
+            maxHistoryTurns: MAX_HISTORY_TURNS,
+            maxToolResultChars: MAX_TOOL_RESULT_CHARS,
+            deadline,
+          });
+        } catch (e) {
+          result = {
+            text: "",
+            error: e instanceof Error ? e.message : "Big Brother failed.",
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+          };
+        }
+        const finalContent = result.error && !result.text ? result.error : result.text || "…";
+        if (result.error && !result.text) forward(result.error);
+        await saveAssistant(finalContent);
+        controller.close();
+      },
+      cancel() {},
+    });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
   // ---- Gemini 경로 ----
   // NVIDIA 는 이 배포 리전(icn1)에서 응답이 오지 않는 상태가 계속돼 사실상
   // 못 쓴다. Gemini 키가 있으면 그쪽이 기본이고, NVIDIA 는 명시 요청 시에만.
@@ -370,7 +427,7 @@ list if the user clearly asks you to.`
         try {
           result = await runBigBrotherGemini({
             apiKey: geminiKey,
-            model: isBigBrotherModel(body.model) ? body.model : undefined,
+            model: chosen?.provider === "gemini" ? chosen.id : undefined,
             system: SYSTEM_PROMPT + pluginBlock,
             history: (history ?? []) as { role: string; content: string | null }[],
             tools: toGeminiTools(SOPHIA_TOOLS),
