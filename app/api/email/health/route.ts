@@ -8,7 +8,7 @@ import { appUrl, emailConfigured, sendEmail } from "@/lib/email";
 // 키 값은 응답에 싣지 않는다 — 이름과 말미 4자리만.
 export const maxDuration = 30;
 
-const tail = (v?: string) => (v ? `…${v.slice(-4)}` : null);
+const tail = (v?: string) => (v ? `...${v.slice(-4)}` : null);
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
