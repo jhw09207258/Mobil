@@ -20,7 +20,9 @@ export type ChatReaction = { emoji: string; count: number; reacted_by_me: boolea
 
 export type ChatMessage = {
   id: string;
-  sender_id: string;
+  /** Big Brother 가 보낸 메시지는 보낸 사람이 없다(is_bot 이 true). */
+  sender_id: string | null;
+  is_bot?: boolean;
   sender_name: string;
   sender_avatar_url: string | null;
   content: string;
@@ -284,4 +286,31 @@ export async function listAttachableItems(): Promise<AttachableItem[]> {
   for (const s of sheets.data ?? []) out.push({ kind: "sheet", id: s.id, title: s.title || "Untitled" });
   for (const m of maps.data ?? []) out.push({ kind: "mindmap", id: m.id, title: m.title || "Untitled" });
   return out;
+}
+
+/** 이 대화에 Big Brother 가 들어와 있는지. */
+export async function getBigBrotherEnabled(conversationId: string): Promise<boolean> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("chat_conversations")
+    .select("bigbrother_enabled")
+    .eq("id", conversationId)
+    .maybeSingle();
+  return !!data?.bigbrother_enabled;
+}
+
+/** 초대/해제 — 그 대화의 멤버만(SQL 쪽에서도 한 번 더 막는다). */
+export async function setBigBrother(
+  conversationId: string,
+  enabled: boolean
+): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_bigbrother", {
+    p_conversation: conversationId,
+    p_enabled: enabled,
+  });
+  if (error) return { error: "Could not change Big Brother for this chat." };
+  return { ok: true };
 }

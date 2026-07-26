@@ -8,12 +8,15 @@ import { UserAvatar } from "@/components/user-avatar";
 import { useIsMobile } from "@/lib/use-media-query";
 import { IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat, IconSend } from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
+import { ThinkingIndicator } from "@/components/thinking-indicator";
 import {
   addMembers,
   createGroup,
   deleteChatMessage,
   editChatMessage,
   getChatMembers,
+  getBigBrotherEnabled,
+  setBigBrother,
   getChatMessages,
   leaveConversation,
   listAttachableItems,
@@ -253,6 +256,9 @@ const TYPING_SEND_EVERY_MS = 2000;
 
 // ---------------------------------------------------------------------------
 
+/** @bigbrother 호출 감지. 단어 경계를 둬서 이메일 등에 섞인 경우를 피한다. */
+const MENTION_RE = /(^|[^\w@])@big\s?brother\b/i;
+
 export function ChatShell({
   selfId,
   selfName,
@@ -276,6 +282,9 @@ export function ChatShell({
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<ChatMemberInfo[]>([]);
+  // Big Brother 는 @bigbrother 로 부를 때만 답한다 — 상시 감시가 아니다.
+  const [bbEnabled, setBbEnabled] = useState(false);
+  const [bbThinking, setBbThinking] = useState(false);
   const [typing, setTyping] = useState<Record<string, { name: string; at: number }>>({});
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
@@ -388,6 +397,9 @@ export function ChatShell({
       setMessages(rows);
       setLoading(false);
     });
+    getBigBrotherEnabled(activeId).then((v) => {
+      if (!cancelled) setBbEnabled(v);
+    }, () => {});
     getChatMembers(activeId).then((rows) => {
       if (!cancelled) setMembers(rows);
     });
@@ -402,7 +414,8 @@ export function ChatShell({
         if (!msg?.id) return;
         setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
         setTyping((prev) => {
-          if (!prev[msg.sender_id]) return prev;
+          // 봇 메시지는 보낸 사람이 없다 — 타이핑 표시를 지울 대상도 없다.
+          if (!msg.sender_id || !prev[msg.sender_id]) return prev;
           const next = { ...prev };
           delete next[msg.sender_id];
           return next;
@@ -592,6 +605,20 @@ export function ChatShell({
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
     );
     inputRef.current?.focus();
+
+    // @bigbrother 로 불렀을 때만 돈다. 답은 서버가 채팅 메시지로 남기고 기존
+    // fanout 이 실시간으로 뿌리므로, 여기서 응답을 기다리지 않는다 —
+    // 화면을 옮기거나 창을 닫아도 답이 도착한다.
+    if (bbEnabled && MENTION_RE.test(text)) {
+      setBbThinking(true);
+      fetch("/api/sophia/chat-mention", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ conversationId: activeId }),
+      })
+        .catch(() => {})
+        .finally(() => setBbThinking(false));
+    }
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -683,6 +710,17 @@ export function ChatShell({
     setDialog(null);
     refreshList();
     setActiveId(id);
+  };
+
+  const onToggleBigBrother = async () => {
+    if (!activeId) return;
+    const next = !bbEnabled;
+    setBbEnabled(next); // 낙관적 — 실패하면 되돌린다.
+    const res = await setBigBrother(activeId, next);
+    if ("error" in res) {
+      setBbEnabled(!next);
+      setError(res.error);
+    }
   };
 
   const onLeave = async () => {
@@ -902,16 +940,31 @@ export function ChatShell({
                   </span>
                 </div>
               </div>
-              {active.kind === "group" && (
-                <div className="row">
-                  <button className="btn btn-sm" onClick={() => setDialog("add-members")}>
-                    Add members
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={onLeave}>
-                    Leave
-                  </button>
-                </div>
-              )}
+              <div className="row">
+                {/* 1:1 이든 그룹이든 부를 수 있다. 초대해도 @bigbrother 로
+                    부를 때만 답하므로 대화를 상시 읽지 않는다. */}
+                <button
+                  className={`btn btn-sm ${bbEnabled ? "btn-primary" : ""}`}
+                  onClick={onToggleBigBrother}
+                  title={
+                    bbEnabled
+                      ? "Big Brother is in this chat. It only replies when you write @bigbrother."
+                      : "Invite Big Brother. It stays silent until you write @bigbrother."
+                  }
+                >
+                  {bbEnabled ? "Big Brother ✓" : "+ Big Brother"}
+                </button>
+                {active.kind === "group" && (
+                  <>
+                    <button className="btn btn-sm" onClick={() => setDialog("add-members")}>
+                      Add members
+                    </button>
+                    <button className="btn btn-sm btn-danger" onClick={onLeave}>
+                      Leave
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
@@ -949,7 +1002,7 @@ export function ChatShell({
                       </div>
                     )}
                     <div className="chat-msg-wrap">
-                      <div className={`chat-msg ${mine ? "mine" : "theirs"}`}>
+                      <div className={`chat-msg ${mine ? "mine" : "theirs"} ${m.is_bot ? "bot" : ""}`}>
                         {m.reply_to_id && (
                           <button
                             type="button"
@@ -1076,6 +1129,12 @@ export function ChatShell({
                 {typingNames.length === 1
                   ? `${typingNames[0]} is typing…`
                   : `${typingNames.slice(0, 2).join(", ")}${typingNames.length > 2 ? ` +${typingNames.length - 2}` : ""} are typing…`}
+              </div>
+            )}
+            {/* 부르고 나서 답이 오기까지 몇십 초가 걸릴 수 있다 — 침묵처럼 보이면 안 된다. */}
+            {bbThinking && (
+              <div className="chat-typing">
+                <ThinkingIndicator label="Big Brother is working" compact />
               </div>
             )}
           </div>

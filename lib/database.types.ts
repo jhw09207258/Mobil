@@ -503,6 +503,7 @@ export interface Database {
       chat_conversations: {
         Row: {
           id: string;
+          bigbrother_enabled: boolean;
           kind: "dm" | "group";
           title: string | null;
           created_by: string;
@@ -808,7 +809,8 @@ export interface Database {
         Args: { p_conversation: string; p_limit?: number };
         Returns: {
           id: string;
-          sender_id: string;
+          // 봇 메시지는 보낸 사람이 없다.
+          sender_id: string | null;
           sender_name: string;
           sender_avatar_url: string | null;
           content: string;
@@ -818,6 +820,7 @@ export interface Database {
           reply_to_sender_name: string | null;
           reply_to_content: string | null;
           reactions: Json;
+          is_bot: boolean;
         }[];
       };
       toggle_chat_reaction: {
@@ -829,6 +832,16 @@ export interface Database {
         Returns: undefined;
       };
       /** 에이전트가 고친 코드 파일을 열어 둔 편집기들에 증분 Yjs 업데이트로 밀어준다. */
+      /** 채팅에 Big Brother 를 넣거나 뺀다(그 대화 멤버만). */
+      set_bigbrother: {
+        Args: { p_conversation: string; p_enabled: boolean };
+        Returns: undefined;
+      };
+      /** 봇 답변을 채팅에 남긴다 — 사람 인증으로는 sender_id 없이 못 넣는다. */
+      post_bigbrother_message: {
+        Args: { p_conversation: string; p_content: string };
+        Returns: string;
+      };
       /** 대화에 연결된 항목 + 제목을 종류별 테이블에서 모아 준다. */
       list_conversation_plugins: {
         Args: { p_conversation_id: string };
