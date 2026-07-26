@@ -13,9 +13,13 @@ import { useEffect } from "react";
  * 쓰면 레이아웃 자체가 줄어들어, 헤더는 제자리에 있고 입력창만 키보드 바로
  * 위에 붙는다.
  *
- * 셸을 줄이면 포커스된 입력이 이미 보이는 영역 안에 들어오므로, 브라우저가
- * 화면을 밀어 올릴 이유 자체가 사라진다 — 밀린 양을 따로 상쇄하지 않는다.
- * (상쇄하려고 margin 을 더하면 이미 밀린 상태에서는 아래가 잘린다.)
+ * 높이만 줄이면 안 된다. 브라우저는 그 시점에 이미 시각 뷰포트를 위로 밀어
+ * 놓았으므로, 줄어든 셸 아래의 빈 공간이 화면에 남는다. 그래서 밀린 양
+ * (offsetTop)도 함께 내보내고, CSS 는 position:fixed + top 으로 셸을 보이는
+ * 영역에 정확히 얹는다.
+ *
+ * 이 값들은 키보드가 올라와 있을 때만 쓰인다(.keyboard-open) — 평상시 레이아웃은
+ * 건드리지 않는다.
  */
 export function ViewportFit() {
   useEffect(() => {
@@ -30,6 +34,7 @@ export function ViewportFit() {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         root.style.setProperty("--app-vh", `${Math.round(vv.height)}px`);
+        root.style.setProperty("--app-vv-top", `${Math.round(vv.offsetTop)}px`);
         // 키보드가 올라와 있는 동안에만 켜지는 표식 — 좁은 화면에서 부차 요소를
         // 접어 입력 영역을 확보하는 데 쓴다.
         const keyboardUp = window.innerHeight - vv.height > 120;
@@ -45,6 +50,7 @@ export function ViewportFit() {
       vv.removeEventListener("resize", apply);
       vv.removeEventListener("scroll", apply);
       root.style.removeProperty("--app-vh");
+      root.style.removeProperty("--app-vv-top");
       root.classList.remove("keyboard-open");
     };
   }, []);

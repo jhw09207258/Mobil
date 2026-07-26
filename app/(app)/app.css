@@ -32,13 +32,22 @@
 }
 
 /* App shell: fixed header on top, icon rail + main below it. */
+/* 키보드가 올라와 있는 동안에만 셸을 보이는 영역에 고정한다.
+   높이만 줄이면 안 된다 — 브라우저는 이미 시각 뷰포트를 위로 밀어 놓았으므로,
+   줄어든 셸 아래의 빈 공간이 화면에 남는다(그게 "화면이 이상해지는" 증상이다).
+   그래서 높이(--app-vh)와 밀린 양(--app-vv-top)을 함께 써서 보이는 영역에
+   정확히 얹는다. 키보드가 없을 때는 이 규칙이 전혀 적용되지 않는다. */
+.keyboard-open .app {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--app-vv-top, 0px);
+  height: var(--app-vh, 100dvh);
+}
+
 .app {
   height: 100vh; /* dvh 미지원 브라우저 폴백 */
   height: 100dvh; /* 모바일 URL 바 표시/숨김 반영 */
-  /* --app-vh 는 visualViewport 높이(components/viewport-fit.tsx). dvh 와 달리
-     키보드가 가린 만큼도 줄어들기 때문에, 키보드가 올라와도 셸이 화면을 넘지
-     않고 브라우저가 화면 전체를 밀어 올리지 않는다. */
-  height: var(--app-vh, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;

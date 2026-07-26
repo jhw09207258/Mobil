@@ -39,6 +39,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // 키보드가 뜰 때 화면을 스크롤하지 말고 레이아웃 자체를 줄이라고 지시한다.
+  // 이게 먹는 브라우저(Android Chrome 108+)에서는 100dvh 가 키보드까지 반영해
+  // 아래의 visualViewport 보정이 아예 필요 없어진다. iOS 는 아직 무시한다.
+  interactiveWidget: "resizes-content",
 };
 
 // Supabase 오리진에 미리 DNS 조회 + TCP/TLS 핸드셰이크를 걸어두면(preconnect)
