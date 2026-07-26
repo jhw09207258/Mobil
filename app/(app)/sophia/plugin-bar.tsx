@@ -7,11 +7,13 @@ import {
   detachPlugin,
   listPluginCandidates,
   listPlugins,
+} from "./plugin-actions";
+import {
   PLUGIN_LABEL,
   type Plugin,
   type PluginCandidate,
   type PluginKind,
-} from "./plugin-actions";
+} from "./plugin-types";
 
 /**
  * 대화에 연결된 항목(Plugin) 바.
@@ -35,7 +37,11 @@ export function PluginBar({
         setPlugins([]);
         return;
       }
-      setPlugins(await listPlugins(conversationId));
+      try {
+        setPlugins(await listPlugins(conversationId));
+      } catch {
+        setPlugins([]);
+      }
     },
     [conversationId]
   );
@@ -113,9 +119,17 @@ function PluginPicker({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // 실패를 삼키면 "Loading…" 이 영원히 남는다 — 원인을 화면에 띄운다.
   useEffect(() => {
     let alive = true;
-    listPluginCandidates(query).then((r) => alive && setItems(r));
+    listPluginCandidates(query).then(
+      (r) => alive && setItems(r),
+      (e) => {
+        if (!alive) return;
+        setItems([]);
+        setError(e instanceof Error ? e.message : "Could not load your items.");
+      }
+    );
     return () => {
       alive = false;
     };

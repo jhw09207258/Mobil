@@ -26,8 +26,12 @@ export function AgentMode() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 실패를 삼키면 "Loading…" 이 영원히 남아 원인을 알 수 없다 — 반드시 표시한다.
   useEffect(() => {
-    listCodeRepositories().then(setSpaces);
+    listCodeRepositories().then(setSpaces, (e) => {
+      setSpaces([]);
+      setError(e instanceof Error ? e.message : "Could not load your Code Spaces.");
+    });
   }, []);
 
   const loadFiles = useCallback(async (spaceId: string) => {

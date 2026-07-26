@@ -2,6 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
+// 타입·상수는 별도 모듈에 둔다 — "use server" 파일은 export 가 전부 async
+// 함수여야 하고, 상수를 하나라도 내보내면 모듈이 통째로 깨진다.
+import type { Plugin, PluginCandidate, PluginKind } from "./plugin-types";
 
 // ============================================================================
 // Plugin — 대화에 연결한 작업 대상.
@@ -10,30 +13,6 @@ import { requireUser } from "@/lib/auth";
 // 바로 알고 작업하므로, 엉뚱한 문서를 덮어쓰는 사고와 매 턴의 검색 토큰이
 // 함께 사라진다.
 // ============================================================================
-
-export type PluginKind =
-  | "document"
-  | "code"
-  | "sheet"
-  | "mindmap"
-  | "repository"
-  | "code_space";
-
-export type Plugin = {
-  kind: PluginKind;
-  objectId: string;
-  title: string;
-  subtitle: string | null;
-};
-
-export const PLUGIN_LABEL: Record<PluginKind, string> = {
-  document: "Doc",
-  code: "Code",
-  sheet: "Table",
-  mindmap: "Link Graph",
-  repository: "Repository",
-  code_space: "Code Space",
-};
 
 export async function listPlugins(conversationId: string): Promise<Plugin[]> {
   await requireUser();
@@ -84,13 +63,6 @@ export async function detachPlugin(
   if (error) return { error: "Could not detach that item." };
   return { ok: true };
 }
-
-export type PluginCandidate = {
-  kind: PluginKind;
-  id: string;
-  title: string;
-  subtitle: string | null;
-};
 
 /** 붙일 수 있는 항목 목록 — 피커용. 내가 소유한 것만. */
 export async function listPluginCandidates(query: string): Promise<PluginCandidate[]> {
