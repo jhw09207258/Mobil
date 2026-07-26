@@ -327,3 +327,29 @@
   color: var(--text-0);
   background: var(--bg-3);
 }
+
+/* Plugin 바 + 모델 선택을 한 줄에 */
+.sophia-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sophia-meta-row .plugin-bar {
+  flex: 1;
+  min-width: 0;
+}
+.sophia-model {
+  flex: none;
+  margin-right: 16px;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--bg-3);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  outline: none;
+  cursor: pointer;
+  max-width: 220px;
+}

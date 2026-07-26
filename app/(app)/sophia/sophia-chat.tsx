@@ -15,6 +15,7 @@ import {
 import { PluginBar } from "./plugin-bar";
 import { Modal } from "@/components/modal";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
+import { BIG_BROTHER_MODELS } from "@/lib/big-brother-gemini";
 
 type LocalMessage = MessageRow & { pending?: boolean };
 
@@ -37,6 +38,7 @@ export function SophiaChat({
   const router = useRouter();
   // 답을 기다리는 동안 경과 초 — 멈춘 것처럼 보이지 않게 한다.
   const [thinkSecs, setThinkSecs] = useState(0);
+  const [model, setModel] = useState<string>(BIG_BROTHER_MODELS[0].id);
 
   useEffect(() => {
     if (!sending) {
@@ -150,7 +152,7 @@ export function SophiaChat({
       const res = await fetch("/api/sophia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, content: text }),
+        body: JSON.stringify({ conversationId, content: text, model }),
       });
 
       if (!res.ok || !res.body) {
@@ -296,7 +298,22 @@ export function SophiaChat({
         </div>
 
         {/* 연결된 항목 — 어시스턴트가 검색 없이 바로 이걸 다룬다. */}
-        <PluginBar conversationId={activeId} />
+        <div className="sophia-meta-row">
+          <PluginBar conversationId={activeId} />
+          <select
+            className="sophia-model"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            disabled={sending}
+            title="Reasoning model"
+          >
+            {BIG_BROTHER_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="sophia-input-bar">
           <textarea

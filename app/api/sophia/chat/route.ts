@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { SOPHIA_TOOLS, executeSophiaTool } from "@/app/(app)/sophia/tools";
-import { runBigBrotherGemini, toGeminiTools } from "@/lib/big-brother-gemini";
+import { runBigBrotherGemini, toGeminiTools, isBigBrotherModel } from "@/lib/big-brother-gemini";
 
 // Llama 70B 완성 전체를 기다리면 서버리스 함수 기본 제한 시간(대개 10초)을
 // 넘기기 쉬워 "응답이 아예 안 옴" 증상으로 이어진다. 스트리밍으로 바꿔도
@@ -247,7 +247,12 @@ async function consumeJson(
 type ToolsMode = "stream" | "nonstream" | "off";
 
 export async function POST(req: Request) {
-  let body: { conversationId?: string; content?: string; provider?: "gemini" | "nvidia" };
+  let body: {
+    conversationId?: string;
+    content?: string;
+    provider?: "gemini" | "nvidia";
+    model?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -365,6 +370,7 @@ list if the user clearly asks you to.`
         try {
           result = await runBigBrotherGemini({
             apiKey: geminiKey,
+            model: isBigBrotherModel(body.model) ? body.model : undefined,
             system: SYSTEM_PROMPT + pluginBlock,
             history: (history ?? []) as { role: string; content: string | null }[],
             tools: toGeminiTools(SOPHIA_TOOLS),
