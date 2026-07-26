@@ -183,3 +183,125 @@
     padding: 10px 14px;
   }
 }
+
+/* ============================================================================
+   Plugin — 이 대화에 연결된 작업 대상.
+   컴포저 바로 위에 두어, 무엇을 대상으로 말하고 있는지 항상 보이게 한다.
+   ============================================================================ */
+.plugin-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 16px 0;
+}
+.plugin-add {
+  flex: none;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  color: var(--text-2);
+  background: var(--bg-3);
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.plugin-add:hover:not(:disabled) {
+  color: var(--text-0);
+  border-color: var(--create);
+}
+.plugin-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.plugin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 6px 3px 8px;
+  font-size: 11.5px;
+  color: var(--text-1);
+  background: var(--create-ghost);
+  border: 1px solid var(--create-dim);
+  border-radius: 999px;
+}
+.plugin-kind {
+  flex: none;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.plugin-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plugin-x {
+  flex: none;
+  padding: 0 2px;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--text-3);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.plugin-x:hover {
+  color: var(--text-0);
+}
+.plugin-hint {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* 피커 */
+.plugin-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin-top: 12px;
+  border: 1px solid var(--border-0);
+  border-radius: var(--radius);
+}
+.plugin-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  text-align: left;
+  color: var(--text-1);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-0);
+  cursor: pointer;
+}
+.plugin-row:last-child {
+  border-bottom: none;
+}
+.plugin-row:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+.plugin-row:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.plugin-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plugin-row-sub {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.plugin-row-action {
+  flex: none;
+  font-size: 11px;
+  color: var(--create);
+}

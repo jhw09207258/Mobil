@@ -10,6 +10,7 @@ import {
   type ConversationRow,
   type MessageRow,
 } from "./actions";
+import { PluginBar } from "./plugin-bar";
 
 type LocalMessage = MessageRow & { pending?: boolean };
 
@@ -215,6 +216,9 @@ export function SophiaChat({
               </div>
             ))}
         </div>
+
+        {/* 연결된 항목 — 어시스턴트가 검색 없이 바로 이걸 다룬다. */}
+        <PluginBar conversationId={activeId} />
 
         <div className="sophia-input-bar">
           <textarea

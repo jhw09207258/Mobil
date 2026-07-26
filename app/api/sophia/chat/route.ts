@@ -284,8 +284,29 @@ export async function POST(req: Request) {
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
 
+  // 대화에 연결된 항목(Plugin)을 시스템 컨텍스트로 준다 — 이게 있으면
+  // 어시스턴트가 대상을 검색으로 추측하지 않고 바로 그 id 로 작업한다.
+  const { data: plugins } = await supabase.rpc("list_conversation_plugins", {
+    p_conversation_id: conversationId,
+  });
+  const pluginBlock =
+    plugins && plugins.length > 0
+      ? `\n\nThe user has connected these workspace items to this conversation. Work on
+these directly — you already have their ids, so do NOT search for them:
+${plugins
+  .map(
+    (p) =>
+      `- ${p.kind} "${p.title}"${p.subtitle ? ` (${p.subtitle})` : ""} — id: ${p.object_id}`
+  )
+  .join("\n")}
+
+When the user says "the doc", "this sheet", "the repo" and so on without naming
+one, they mean the connected item of that kind. Only edit something outside this
+list if the user clearly asks you to.`
+      : "";
+
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: SYSTEM_PROMPT + pluginBlock },
     ...(history ?? []).map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
   ];
 
@@ -344,7 +365,7 @@ export async function POST(req: Request) {
         try {
           result = await runBigBrotherGemini({
             apiKey: geminiKey,
-            system: SYSTEM_PROMPT,
+            system: SYSTEM_PROMPT + pluginBlock,
             history: (history ?? []) as { role: string; content: string | null }[],
             tools: toGeminiTools(SOPHIA_TOOLS),
             execute: (name, args) => executeSophiaTool(name, args),
