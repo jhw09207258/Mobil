@@ -6,6 +6,9 @@ import dynamic from "next/dynamic";
 import type { MonacoApi } from "@/components/monaco/monaco-editor";
 import { isLangKey, type LangKey } from "@/lib/languages";
 import { Modal } from "@/components/modal";
+import {
+  IconEdit, IconTrash, IconClose, IconMore, IconChevronRight, IconChevronDown,
+} from "../../../icons";
 import { useIsMobile } from "@/lib/use-media-query";
 import {
   addCodeFileToRepo,
@@ -375,10 +378,10 @@ export function CodeSpaceWorkspace({
           </button>
           <span className="tree-actions">
             <button title="Rename" onClick={() => setDialog({ kind: "rename", file: n.file! })}>
-              ✎
+              <IconEdit size={13} />
             </button>
             <button title="Delete" onClick={() => onDelete(n.file!)}>
-              ✕
+              <IconTrash size={13} />
             </button>
           </span>
         </div>
@@ -390,7 +393,9 @@ export function CodeSpaceWorkspace({
               style={{ paddingLeft: 10 + depth * 12 }}
               onClick={() => toggle(n.path)}
             >
-              <span className="tree-caret">{collapsed.has(n.path) ? "▸" : "▾"}</span>
+              <span className="tree-caret">
+                {collapsed.has(n.path) ? <IconChevronRight size={11} /> : <IconChevronDown size={11} />}
+              </span>
               {n.name}
             </button>
             <span className="tree-actions">
@@ -398,7 +403,7 @@ export function CodeSpaceWorkspace({
                 +
               </button>
               <button title="Rename folder" onClick={() => setDialog({ kind: "renameFolder", path: n.path })}>
-                ✎
+                <IconEdit size={13} />
               </button>
             </span>
           </div>
@@ -445,7 +450,7 @@ export function CodeSpaceWorkspace({
                 onClick={() => setMoreOpen((v) => !v)}
                 aria-label="More actions"
               >
-                ⋯
+                <IconMore size={16} />
               </button>
               {moreOpen && (
                 <div className="more-menu">
@@ -536,7 +541,7 @@ export function CodeSpaceWorkspace({
                     }}
                     aria-label={`Close ${t.path}`}
                   >
-                    ✕
+                    <IconClose size={12} />
                   </button>
                 </div>
               ))}

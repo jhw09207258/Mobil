@@ -16,6 +16,7 @@ import { PluginBar } from "./plugin-bar";
 import { AttachBar, AttachChips } from "./attach-bar";
 import type { BbAttachment } from "@/lib/bb-attachments";
 import { Modal } from "@/components/modal";
+import { IconEdit, IconTrash } from "../icons";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { DEFAULT_BB_MODEL, bbModelGroups } from "@/lib/big-brother-models";
 
@@ -230,7 +231,7 @@ export function SophiaChat({
                 aria-label="Rename chat"
                 title="Rename chat"
               >
-                ✎
+                <IconEdit size={13} />
               </button>
               <button
                 className="sophia-conv-delete"
@@ -238,7 +239,7 @@ export function SophiaChat({
                 aria-label="Delete chat"
                 title="Delete chat"
               >
-                ✕
+                <IconTrash size={13} />
               </button>
             </div>
           ))}

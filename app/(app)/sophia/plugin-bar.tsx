@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/modal";
+import { IconClose } from "../icons";
 import {
   attachPlugin,
   detachPlugin,
@@ -77,7 +78,7 @@ export function PluginBar({
           <span className="plugin-kind">{PLUGIN_LABEL[p.kind]}</span>
           <span className="plugin-name">{p.title}</span>
           <button className="plugin-x" onClick={() => detach(p)} aria-label={`Disconnect ${p.title}`}>
-            ✕
+            <IconClose size={11} />
           </button>
         </span>
       ))}

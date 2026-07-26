@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/modal";
+import { IconClose } from "../icons";
 import { listWorkspaceFiles, uploadAttachment, type WorkspaceFileRow } from "./attach-actions";
 import { safeHttpUrl, type BbAttachment } from "@/lib/bb-attachments";
 
@@ -178,7 +179,7 @@ export function AttachChips({
           <span className="attach-kind">{KIND_LABEL[a.kind]}</span>
           <span className="attach-name">{a.name}</span>
           <button onClick={() => onRemove(i)} aria-label={`Remove ${a.name}`}>
-            ✕
+            <IconClose size={11} />
           </button>
         </span>
       ))}

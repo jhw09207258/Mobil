@@ -1153,3 +1153,28 @@ html[data-theme="light"] .btn {
     display: none;
   }
 }
+
+/* ============================================================================
+   글리프 버튼 안전장치.
+   ✕ ▸ ▾ 같은 기호는 폰트에 따라 컬러 이모지로 렌더링되기도 한다(iOS 가 특히
+   그렇다). 버튼 안의 기호는 항상 텍스트 형태로, 본문 색으로 그린다.
+   ============================================================================ */
+button,
+.chat-msg-act,
+.tree-actions button,
+.tab-close,
+.attach-chip button,
+.plugin-x {
+  font-variant-emoji: text;
+}
+/* 아이콘(SVG)은 버튼 글자 크기와 무관하게 선 위에 정확히 앉아야 한다. */
+.chat-msg-act svg,
+.tree-actions svg,
+.tab-close svg,
+.attach-chip svg,
+.plugin-x svg,
+.more-wrap > button svg,
+.sophia-conv-action svg,
+.sophia-conv-delete svg {
+  display: block;
+}

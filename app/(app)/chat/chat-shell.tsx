@@ -6,7 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { useIsMobile } from "@/lib/use-media-query";
-import { IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat, IconSend } from "../icons";
+import {
+  IconPlus, IconClip, IconSmile, IconLink, IconImage, IconChat, IconSend,
+  IconReply, IconEdit, IconTrash, IconMore,
+} from "../icons";
 import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
 import {
@@ -960,7 +963,7 @@ export function ChatShell({
                     onClick={() => setChatMoreOpen((v) => !v)}
                     aria-label="Conversation actions"
                   >
-                    ⋯
+                    <IconMore size={16} />
                   </button>
                   {chatMoreOpen && (
                     <div className="more-menu">
@@ -1111,7 +1114,7 @@ export function ChatShell({
                       {editingId !== m.id && (
                         <div className={`chat-msg-actions ${reactMenuFor === m.id ? "force-visible" : ""}`}>
                           <button className="chat-msg-act" title="Reply" onClick={() => setReplyTo(m)}>
-                            ↩
+                            <IconReply size={15} />
                           </button>
                           <div className="chat-react-popover">
                             <button
@@ -1119,7 +1122,7 @@ export function ChatShell({
                               title="React"
                               onClick={() => setReactMenuFor((v) => (v === m.id ? null : m.id))}
                             >
-                              ☺
+                              <IconSmile size={15} />
                             </button>
                             {reactMenuFor === m.id && (
                               <div className="chat-react-menu">
@@ -1138,10 +1141,10 @@ export function ChatShell({
                           {mine && (
                             <>
                               <button className="chat-msg-act" title="Edit" onClick={() => startEdit(m)}>
-                                ✎
+                                <IconEdit size={15} />
                               </button>
                               <button className="chat-msg-act" title="Delete" onClick={() => onDeleteMessage(m.id)}>
-                                🗑
+                                <IconTrash size={15} />
                               </button>
                             </>
                           )}

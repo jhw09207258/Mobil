@@ -186,3 +186,69 @@ export function IconTrash({ size }: P) {
     </svg>
   );
 }
+
+/* 메시지 액션 등 — 예전에는 ↩ ☺ ✎ 🗑 같은 날글자를 썼는데, 흑백 레거시 글리프와
+   컬러 이모지가 섞여 플랫폼마다 크기·색·정렬이 제각각이었다. 나머지 아이콘과
+   같은 선 굵기·색으로 통일한다. */
+export function IconReply({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M9 10L4.5 14.5 9 19" />
+      <path d="M4.5 14.5H14a5.5 5.5 0 0 0 5.5-5.5V5" />
+    </svg>
+  );
+}
+export function IconEdit({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M4 20h4l10-10-4-4L4 16v4Z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+  );
+}
+export function IconClose({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+export function IconMore({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+export function IconRefresh({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M20 11a8 8 0 1 0-.6 4" />
+      <path d="M20 5v6h-6" />
+    </svg>
+  );
+}
+export function IconChevronRight({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M9.5 5.5L16 12l-6.5 6.5" />
+    </svg>
+  );
+}
+export function IconChevronDown({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M5.5 9.5L12 16l6.5-6.5" />
+    </svg>
+  );
+}
+export function IconUndo({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <path d="M4 9h11a5 5 0 0 1 0 10h-6" />
+      <path d="M8 5L4 9l4 4" />
+    </svg>
+  );
+}
