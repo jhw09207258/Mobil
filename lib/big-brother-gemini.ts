@@ -1,4 +1,5 @@
 import { GoogleGenAI, type FunctionDeclaration } from "@google/genai";
+import type { ResolvedPart } from "@/lib/bb-attachments";
 
 // ============================================================================
 // Big Brother 의 Gemini 백엔드.
@@ -78,6 +79,8 @@ export async function runBigBrotherGemini(opts: {
   maxHistoryTurns: number;
   maxToolResultChars: number;
   deadline: number;
+  /** 이번 턴에 딸린 첨부(이미지·PDF는 원본 그대로 들어간다). */
+  attachments?: ResolvedPart[];
 }): Promise<GeminiRunResult> {
   const ai = new GoogleGenAI({ apiKey: opts.apiKey });
   const model = opts.model || BIG_BROTHER_MODEL;
@@ -89,6 +92,18 @@ export async function runBigBrotherGemini(opts: {
 
   if (contents.length === 0) {
     return { text: "", error: "Nothing to send.", inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+  }
+
+  // 첨부는 마지막 사용자 턴에 붙인다 — 그 질문에 딸린 자료이기 때문이다.
+  if (opts.attachments?.length) {
+    const last = contents[contents.length - 1];
+    for (const part of opts.attachments) {
+      last.parts.push(
+        part.type === "media"
+          ? { inlineData: { mimeType: part.mime, data: part.base64 } }
+          : { text: part.text }
+      );
+    }
   }
 
   let full = "";

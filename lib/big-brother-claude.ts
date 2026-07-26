@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { ResolvedPart } from "@/lib/bb-attachments";
 
 // ============================================================================
 // Big Brother 의 Claude 백엔드.
@@ -89,11 +90,42 @@ export async function runBigBrotherClaude(opts: {
   maxHistoryTurns: number;
   maxToolResultChars: number;
   deadline: number;
+  /** 이번 턴에 딸린 첨부(이미지·PDF는 원본 그대로 들어간다). */
+  attachments?: ResolvedPart[];
 }): Promise<ClaudeRunResult> {
   const client = new Anthropic({ apiKey: opts.apiKey });
   const messages = toClaudeMessages(opts.history, opts.maxHistoryTurns);
   if (messages.length === 0) {
     return { text: "", error: "Nothing to send.", inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+  }
+
+  // 첨부는 마지막 사용자 턴에 붙인다 — 그 질문에 딸린 자료이기 때문이다.
+  if (opts.attachments?.length) {
+    const last = messages[messages.length - 1];
+    const blocks: Anthropic.ContentBlockParam[] =
+      typeof last.content === "string"
+        ? [{ type: "text", text: last.content }]
+        : [...last.content];
+    for (const part of opts.attachments) {
+      if (part.type === "text") {
+        blocks.push({ type: "text", text: part.text });
+      } else if (part.mime === "application/pdf") {
+        blocks.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: part.base64 },
+        });
+      } else {
+        blocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: part.mime as "image/png" | "image/jpeg" | "image/webp" | "image/gif",
+            data: part.base64,
+          },
+        });
+      }
+    }
+    last.content = blocks;
   }
 
   let full = "";

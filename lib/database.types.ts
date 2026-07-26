@@ -487,6 +487,7 @@ export interface Database {
           conversation_id: string;
           role: "user" | "assistant";
           content: string;
+          attachments: Json;
           created_at: string;
         };
         Insert: {
@@ -494,6 +495,7 @@ export interface Database {
           conversation_id: string;
           role: "user" | "assistant";
           content: string;
+          attachments?: Json;
         };
         Update: Record<string, never>;
         Relationships: [];

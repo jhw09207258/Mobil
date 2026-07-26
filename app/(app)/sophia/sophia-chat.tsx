@@ -13,6 +13,8 @@ import {
   type MessageRow,
 } from "./actions";
 import { PluginBar } from "./plugin-bar";
+import { AttachBar, AttachChips } from "./attach-bar";
+import type { BbAttachment } from "@/lib/bb-attachments";
 import { Modal } from "@/components/modal";
 import { ThinkingIndicator } from "@/components/thinking-indicator";
 import { DEFAULT_BB_MODEL, bbModelGroups } from "@/lib/big-brother-models";
@@ -39,6 +41,7 @@ export function SophiaChat({
   // 답을 기다리는 동안 경과 초 — 멈춘 것처럼 보이지 않게 한다.
   const [thinkSecs, setThinkSecs] = useState(0);
   const [model, setModel] = useState<string>(DEFAULT_BB_MODEL);
+  const [attachments, setAttachments] = useState<BbAttachment[]>([]);
 
   useEffect(() => {
     if (!sending) {
@@ -149,10 +152,12 @@ export function SophiaChat({
     ]);
 
     try {
+      const sentAttachments = attachments;
+      setAttachments([]);
       const res = await fetch("/api/sophia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, content: text, model }),
+        body: JSON.stringify({ conversationId, content: text, model, attachments: sentAttachments }),
       });
 
       if (!res.ok || !res.body) {
@@ -319,7 +324,13 @@ export function SophiaChat({
           </select>
         </div>
 
+        <AttachChips
+          attachments={attachments}
+          onRemove={(i) => setAttachments((prev) => prev.filter((_, n) => n !== i))}
+        />
+
         <div className="sophia-input-bar">
+          <AttachBar attachments={attachments} onChange={setAttachments} disabled={sending} />
           <textarea
             className="sophia-textarea"
             placeholder={

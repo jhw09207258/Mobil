@@ -3,6 +3,9 @@ import { SOPHIA_TOOLS, executeSophiaTool } from "@/app/(app)/sophia/tools";
 import { runBigBrotherGemini, toGeminiTools } from "@/lib/big-brother-gemini";
 import { runBigBrotherClaude, toClaudeTools } from "@/lib/big-brother-claude";
 import { bbModel, DEFAULT_BB_MODEL } from "@/lib/big-brother-models";
+import { resolveAttachments } from "@/lib/bb-attachments-resolve";
+import type { BbAttachment } from "@/lib/bb-attachments";
+import type { Json } from "@/lib/database.types";
 
 // Llama 70B 완성 전체를 기다리면 서버리스 함수 기본 제한 시간(대개 10초)을
 // 넘기기 쉬워 "응답이 아예 안 옴" 증상으로 이어진다. 스트리밍으로 바꿔도
@@ -32,7 +35,26 @@ const REQUEST_BUDGET_MS = 48_000;
 // 개별 NVIDIA 호출(연결+스트림 소비 전체)에 허용하는 최대 시간.
 const PER_CALL_TIMEOUT_MS = 30_000;
 
-const SYSTEM_PROMPT = `You are Big Brother, the intelligence assistant built into Possion (a workspace for documents, code, sheets, files and mind maps). Be helpful, concise, and clear.
+const SYSTEM_PROMPT = `You are Big Brother, the research and intelligence assistant built into Possion (a workspace for documents, code, sheets, files and mind maps).
+
+Write the way a subject-matter expert writes to a peer. Be precise, direct, and
+substantive. Lead with the answer, then the reasoning that supports it. Prefer
+exact terms over approximations, and define a term the first time you use it if
+it is not common currency. State uncertainty explicitly and proportionately —
+say what you know, what you inferred, and what you could not determine, rather
+than hedging everything uniformly or asserting more confidence than the evidence
+carries. Distinguish what a source says from what you conclude from it.
+
+Do not use emoji, ever. No decorative symbols, no section-heading icons, no
+emoticons — in any response, in any language. Do not open with filler
+("Great question", "Certainly", "Sure thing") or close with unsolicited offers
+of further help. Do not pad with restatements of the question. Avoid marketing
+register and exclamation marks.
+
+Keep the prose readable: complete sentences, and structure only where it earns
+its place. Use a table when comparing several items along the same dimensions;
+use a numbered list for an ordered procedure. A short answer should be a short
+paragraph, not a bulleted skeleton.
 
 Ground your answers in the user's actual knowledge base before answering from memory:
 - search_possion finds items by keyword/#tag over the workspace ontology (documents, code, sheets, mind maps and the links between them).
@@ -254,6 +276,7 @@ export async function POST(req: Request) {
     content?: string;
     provider?: "gemini" | "nvidia";
     model?: string;
+    attachments?: BbAttachment[];
   };
   try {
     body = await req.json();
@@ -280,10 +303,17 @@ export async function POST(req: Request) {
     .single();
   if (!conv) return new Response("Conversation not found.", { status: 404 });
 
-  const { error: insertErr } = await supabase
-    .from("ai_messages")
-    .insert({ conversation_id: conversationId, role: "user", content: trimmed });
+  const attachments = Array.isArray(body.attachments) ? body.attachments.slice(0, 10) : [];
+  const { error: insertErr } = await supabase.from("ai_messages").insert({
+    conversation_id: conversationId,
+    role: "user",
+    content: trimmed,
+    attachments: attachments as unknown as Json,
+  });
   if (insertErr) return new Response("Failed to save message.", { status: 500 });
+
+  // 첨부를 모델이 읽을 수 있는 조각으로 바꾼다(이미지·PDF 는 원본 그대로).
+  const resolvedAttachments = await resolveAttachments(attachments);
 
   const { data: history } = await supabase
     .from("ai_messages")
@@ -390,6 +420,7 @@ list if the user clearly asks you to.`
             maxHistoryTurns: MAX_HISTORY_TURNS,
             maxToolResultChars: MAX_TOOL_RESULT_CHARS,
             deadline,
+            attachments: resolvedAttachments,
           });
         } catch (e) {
           result = {
@@ -437,6 +468,7 @@ list if the user clearly asks you to.`
             maxHistoryTurns: MAX_HISTORY_TURNS,
             maxToolResultChars: MAX_TOOL_RESULT_CHARS,
             deadline,
+            attachments: resolvedAttachments,
           });
         } catch (e) {
           result = {
