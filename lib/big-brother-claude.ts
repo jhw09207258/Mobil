@@ -196,6 +196,11 @@ export async function runBigBrotherClaude(opts: {
 }
 
 function claudeErrorMessage(detail: string): string {
+  // 사용자가 무엇을 해야 하는지가 다르므로 청구 문제를 먼저 갈라낸다 —
+  // 키를 다시 발급받아도 해결되지 않는다.
+  if (/credit balance|Plans & Billing|billing/i.test(detail)) {
+    return "This Anthropic account has no credit, so Claude models can't run. Add a payment method at console.anthropic.com/settings/billing, or pick a Gemini model above.";
+  }
   if (/authentication|invalid.*api.?key|401/i.test(detail)) {
     return "Big Brother's Claude API key was rejected.";
   }

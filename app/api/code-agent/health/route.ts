@@ -111,13 +111,21 @@ async function probeClaude() {
       variable: varName,
       keyTail: `...${key.slice(-4)}`,
       elapsedMs: Date.now() - t,
-      reason: /authentication|401|invalid.*api.?key/i.test(detail)
+      // 청구 문제는 키 문제와 완전히 다르다 — 뭉뚱그리면 멀쩡한 키를 의심하게 된다.
+      reason: /credit balance|Plans & Billing|billing/i.test(detail)
+        ? "no-credit"
+        : /authentication|401|invalid.*api.?key/i.test(detail)
         ? "key-rejected"
         : /rate.?limit|429/i.test(detail)
         ? "quota"
         : /not_found|404|model/i.test(detail)
         ? "model-not-available-on-this-key"
         : "request-failed",
+      ...(/credit balance|Plans & Billing|billing/i.test(detail)
+        ? {
+            hint: "The key works — the Anthropic account has no credit. Add a payment method or buy credits at console.anthropic.com/settings/billing.",
+          }
+        : {}),
       detail: detail.slice(0, 300),
     };
   }
