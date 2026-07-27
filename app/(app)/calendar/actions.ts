@@ -1,8 +1,11 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedUser as requireUser } from "@/lib/auth";
 import { parseIcs } from "@/lib/ics";
+import { nextReminderAt } from "@/lib/recurrence";
+import { pushConfigured, sendPush, type PushTarget } from "@/lib/push";
 import { sendChatMessage } from "../chat/actions";
 
 /**
@@ -54,6 +57,10 @@ export type CalendarEventRow = {
   is_invited: boolean;
   link_count: number;
   can_edit: boolean;
+  /** "이 일정만 삭제/수정" 으로 빠진 발생들(EXDATE). */
+  exceptions: string[];
+  /** 반복에서 떼어낸 일정이면 원본 id. */
+  detached_from: string | null;
 };
 
 export type EventAttendee = {
@@ -68,6 +75,9 @@ export type EventDetail = CalendarEventRow & {
   attendees: EventAttendee[];
   links: { kind: string; id: string }[];
 };
+
+/** 반복 일정을 고칠 때 어디까지 바꾸는가. */
+export type OccurrenceScope = "all" | "this";
 
 export type CalendarMember = {
   user_id: string;
@@ -181,6 +191,157 @@ export async function saveEvent(
 
   if (error || !data) {
     return { error: describeDbError(error?.message, "Could not save this event.") };
+  }
+
+  const eventId = data;
+
+  // 알림 예약과 초대 푸시는 저장 결과를 붙잡지 않는다 — 실패해도 일정은 남는다.
+  after(async () => {
+    await scheduleNextReminder(supabase, eventId, {
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      allDay: !!input.allDay,
+      timeZone: input.timeZone || "UTC",
+      recurrence: input.recurrence ?? null,
+      recurrenceUntil: input.recurrenceUntil ?? null,
+      reminderMinutes: input.reminderMinutes ?? null,
+    });
+    await notifyInvitees(supabase, eventId, title, start, !!input.allDay, input.timeZone);
+  });
+
+  return { id: eventId };
+}
+
+/**
+ * 다음 알림 시각을 계산해 DB 에 넣는다.
+ *
+ * 반복 전개는 앱에만 있으므로(0069 주석 참고) DB 는 "언제" 를 스스로 알 수
+ * 없다. 저장할 때 한 번, 그리고 발송기가 보낸 뒤 한 번 더 채운다.
+ */
+async function scheduleNextReminder(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventId: string,
+  event: {
+    startsAt: string;
+    endsAt: string;
+    allDay: boolean;
+    timeZone: string;
+    recurrence: string | null;
+    recurrenceUntil: string | null;
+    reminderMinutes: number | null;
+  }
+): Promise<void> {
+  try {
+    // 예외(EXDATE)까지 반영해야 정확하다 — 저장 직후라 다시 읽는다.
+    const { data: detail } = await supabase.rpc("get_calendar_event", { p_event: eventId });
+    const exceptions = ((detail as { exceptions?: string[] } | null)?.exceptions ?? []) as string[];
+
+    const at = nextReminderAt({
+      startsAt: event.startsAt,
+      endsAt: event.endsAt,
+      allDay: event.allDay,
+      timeZone: event.timeZone,
+      recurrence: event.recurrence,
+      recurrenceUntil: event.recurrenceUntil,
+      exceptions,
+      reminderMinutes: event.reminderMinutes,
+    });
+
+    await supabase.rpc("set_next_reminder", {
+      p_event: eventId,
+      p_at: at ? at.toISOString() : null,
+    });
+  } catch {
+    /* 알림 예약 실패가 일정 저장을 되돌리지는 않는다. */
+  }
+}
+
+/** 초대받은 사람에게 즉시 푸시. 실시간 알림(0067)은 앱을 열어 둔 사람만 받는다. */
+async function notifyInvitees(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  eventId: string,
+  title: string,
+  start: Date,
+  allDay: boolean,
+  timeZone: string | undefined
+): Promise<void> {
+  if (!pushConfigured()) return;
+  try {
+    const { data } = await supabase.rpc("claim_event_push_recipients", {
+      p_event: eventId,
+      p_users: null,
+    });
+    const targets = (data ?? []) as PushTarget[];
+    if (targets.length === 0) return;
+
+    const when = allDay
+      ? start.toLocaleDateString("en-US", { timeZone: "UTC", dateStyle: "medium" })
+      : start.toLocaleString("en-US", {
+          timeZone: timeZone || "UTC",
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+
+    const result = await sendPush(targets, {
+      title: "Calendar invitation",
+      body: `${title} · ${when}`,
+      url: `/calendar?event=${eventId}`,
+      tag: `event-invite:${eventId}`,
+    });
+    for (const endpoint of result.gone) {
+      await supabase.rpc("prune_push_subscription", { p_endpoint: endpoint }).then(
+        () => {},
+        () => {}
+      );
+    }
+  } catch {
+    /* 알림 실패가 일정 저장을 되돌리지는 않는다. */
+  }
+}
+
+/**
+ * 반복 일정에서 이 발생만 삭제 — 규칙은 그대로 두고 그 날짜만 뺀다.
+ */
+export async function deleteOccurrence(
+  eventId: string,
+  occurrenceStart: string
+): Promise<{ ok: true } | { error: string }> {
+  await requireUser();
+  if (!UUID_RE.test(eventId)) return { error: "Invalid event." };
+  const when = new Date(occurrenceStart);
+  if (Number.isNaN(when.getTime())) return { error: "Invalid occurrence." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("delete_event_occurrence", {
+    p_event: eventId,
+    p_occurrence_start: when.toISOString(),
+  });
+  if (error) {
+    return { error: describeDbError(error.message, "Could not remove that occurrence.") };
+  }
+  return { ok: true };
+}
+
+/**
+ * 이 발생만 따로 떼어낸다 — 같은 내용의 단발 일정이 만들어지고, 원본에는
+ * 예외가 남는다. 이후에는 평범한 일정이라 기존 편집이 그대로 통한다.
+ */
+export async function detachOccurrence(
+  eventId: string,
+  occurrenceStart: string
+): Promise<{ id: string } | { error: string }> {
+  await requireUser();
+  if (!UUID_RE.test(eventId)) return { error: "Invalid event." };
+  const when = new Date(occurrenceStart);
+  if (Number.isNaN(when.getTime())) return { error: "Invalid occurrence." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("detach_event_occurrence", {
+    p_event: eventId,
+    p_occurrence_start: when.toISOString(),
+  });
+  if (error || !data) {
+    return { error: describeDbError(error?.message, "Could not separate that occurrence.") };
   }
   return { id: data };
 }
@@ -366,11 +527,13 @@ export async function getFeedToken(rotate = false): Promise<{ token: string } | 
 
 /** .ics 파일 가져오기. 우리가 저장할 수 있는 것만 취한다(참석자·첨부는 버린다). */
 /**
- * 한 번에 가져올 수 있는 일정 수. 일정마다 RPC 를 한 번씩 부르므로, 서버리스
- * 함수의 실행 시간 안에 확실히 끝나는 선에서 자른다 — 절반쯤 넣다가 시간이
- * 끊겨 무엇이 들어갔는지 모르는 상태가 가장 나쁘다.
+ * 한 번에 가져올 수 있는 일정 수.
+ *
+ * 처음에는 일정마다 RPC 를 한 번씩 불러 200개가 상한이었다. 이제 한 문장으로
+ * 통째로 넣으므로(import_calendar_events) 왕복이 한 번이고, 상한은 "한 트랜잭션
+ * 에서 무리 없이 처리되는 양" 으로 다시 잡았다.
  */
-const MAX_IMPORT = 200;
+const MAX_IMPORT = 2000;
 
 export async function importIcs(
   calendarId: string,
@@ -389,40 +552,35 @@ export async function importIcs(
   if (parsed.length === 0) return { error: "No events found in that file." };
 
   const supabase = await createClient();
-  let imported = 0;
-  let skipped = 0;
-
-  for (const e of parsed.slice(0, MAX_IMPORT)) {
+  const batch = parsed.slice(0, MAX_IMPORT).map((e) => ({
     // 종일 일정은 UTC 자정에 맞춰 저장한다 — 표시와 ICS 내보내기가 시간대에
     // 흔들리지 않게 하는 기준점(0066 참고).
-    const startsAt = e.allDay ? utcMidnight(e.startsAt) : e.startsAt;
-    const endsAt = e.allDay ? utcEndOfDay(e.endsAt) : e.endsAt;
+    title: e.title.slice(0, 200),
+    starts_at: (e.allDay ? utcMidnight(e.startsAt) : e.startsAt).toISOString(),
+    ends_at: (e.allDay ? utcEndOfDay(e.endsAt) : e.endsAt).toISOString(),
+    all_day: e.allDay,
+    description: e.description,
+    location: e.location,
+    conference_url: e.url && /^https?:\/\//i.test(e.url) ? e.url.slice(0, 500) : null,
+    recurrence: e.recurrence,
+    recurrence_until: e.recurrenceUntil ? e.recurrenceUntil.toISOString() : null,
+    status: e.status === "cancelled" || e.status === "tentative" ? e.status : "confirmed",
+  }));
 
-    const { error } = await supabase.rpc("save_calendar_event", {
-      p_id: null,
-      p_calendar: calendarId,
-      p_title: e.title.slice(0, 200),
-      p_starts_at: startsAt.toISOString(),
-      p_ends_at: endsAt.toISOString(),
-      p_all_day: e.allDay,
-      p_description: e.description,
-      p_location: e.location,
-      p_conference_url: e.url && /^https?:\/\//i.test(e.url) ? e.url.slice(0, 500) : null,
-      p_time_zone: "UTC",
-      p_color: null,
-      p_recurrence: e.recurrence,
-      p_recurrence_until: e.recurrenceUntil ? e.recurrenceUntil.toISOString() : null,
-      p_reminder_minutes: null,
-      p_status: e.status === "cancelled" || e.status === "tentative" ? e.status : "confirmed",
-      p_busy: true,
-      p_repository: null,
-      p_attendees: [],
-    });
-    if (error) skipped += 1;
-    else imported += 1;
+  const { data: imported, error } = await supabase.rpc("import_calendar_events", {
+    p_calendar: calendarId,
+    p_events: batch,
+  });
+  if (error) {
+    return { error: describeDbError(error.message, "Could not import those events.") };
   }
 
-  return { imported, skipped, truncated: Math.max(0, parsed.length - MAX_IMPORT) };
+  const inserted = imported ?? 0;
+  return {
+    imported: inserted,
+    skipped: batch.length - inserted,
+    truncated: Math.max(0, parsed.length - MAX_IMPORT),
+  };
 }
 
 function utcMidnight(d: Date): Date {

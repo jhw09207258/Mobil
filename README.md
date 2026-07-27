@@ -1,12 +1,70 @@
-# Possion (H-1 Prototype, beta v1.5)
+# Possion (H-1 Prototype, beta v1.6)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 27, v1.5 by Haewon Jeong
+Last Update in July 27, v1.6 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## v1.6 에서 무엇이 바뀌었나 — 알림, 그리고 남아 있던 한계들
+
+v1.5 를 내면서 스스로 적어 둔 한계 목록을 다시 열어 대부분을 없앴습니다.
+가장 큰 것은 **알림**입니다.
+
+### 알림: 이메일에서 웹 푸시로
+
+지금까지 "앱을 안 보고 있을 때" 알릴 방법은 가입 이메일 한 가지뿐이었습니다.
+메일은 늦게 오고, 스팸함에 들어가고, 읽음 표시가 남고, 무엇보다 한 대화에
+15분에 한 통이라 실시간 도구의 알림으로는 맞지 않았습니다.
+
+**표준 웹 푸시(Push API + VAPID)** 로 바꿨습니다.
+
+- 브라우저를 완전히 닫아 두어도 **OS 알림**이 뜹니다. 눌러서 열면 그 대화·일정으로
+  바로 갑니다.
+- 홈 화면에 설치한 PWA(**iPhone/iPad 는 iOS 16.4+ 에서 설치했을 때**), Android,
+  Windows/macOS 브라우저, 데스크톱 앱 모두 같은 경로입니다.
+- 알림이 가는 것: **새 채팅 메시지 · 일정 초대 · 일정 알림(시작 n분 전)**.
+- **이메일은 없애지 않고 폴백으로 내렸습니다.** 푸시를 켜지 않았거나 푸시가
+  실패한 사람에게만 메일이 갑니다 — 같은 메시지로 두 번 알리지 않고, 아무한테도
+  안 가는 일도 없습니다.
+- 설정 → NOTIFICATIONS 에서 기기별로 켜고 끄고, 등록된 기기 목록을 보고, 테스트
+  알림을 보낼 수 있습니다. 권한은 **버튼을 누른 순간에만** 묻습니다(페이지를
+  열자마자 묻지 않습니다 — 그렇게 물으면 대부분 거절되고, 되돌리기가 아주 번거롭습니다).
+
+> 서버에 VAPID 키가 없으면 이 기능은 조용히 꺼지고 예전처럼 이메일만 나갑니다.
+> 설정 방법은 아래 [알림 설정](#알림-설정-웹-푸시) 참고.
+
+### 반복 일정의 "이 일정만"
+
+v1.5 에서는 반복 일정을 고치면 무조건 전체가 바뀌었습니다. iCalendar 와 같은
+방식(EXDATE + 분리)으로 다시 만들었습니다.
+
+- 반복 일정의 한 발생을 눌러서 열면 **Save this one / Save all**,
+  **Delete this one / Delete all** 이 나옵니다.
+- "이 일정만" 은 그 발생을 단발 일정으로 떼어내고 원본에는 예외를 남깁니다 —
+  그 뒤로는 평범한 일정이라 시간·참석자·자료를 자유롭게 바꿀 수 있습니다.
+- 반복 **주기 자체**를 고쳤다면 "이 일정만" 은 말이 되지 않으므로 그 선택지를
+  숨기고 그렇게 말해 줍니다.
+
+### 시간대
+
+반복 일정을 **만든 사람의 시간대**로 전개합니다. 서울에서 만든 "매주 화요일
+09:00" 은 뉴욕에서 봐도 서울의 화요일 09:00 이고, 서머타임이 시작돼도 그 지역의
+09:00 에 머무릅니다(그때 UTC 시각은 한 시간 밀리는데, 그것이 벽시계를 지킨
+증거입니다). 5개 시간대에서 DST 전환을 포함해 테스트했습니다.
+
+### 그 밖에
+
+- **.ics 가져오기 상한 200 → 2,000.** 일정마다 왕복하던 것을 한 문장 삽입으로 바꿨습니다.
+- **첨부 카드 권한이 실시간으로 풀립니다.** 소유자가 "Share here" 를 누르면 그
+  대화를 보고 있는 사람의 잠긴 카드가 그 자리에서 열립니다(예전엔 대화를 다시
+  열어야 했습니다).
+- **미리보기 상한**: 텍스트 512KB → 4MB, PDF 25MB → 100MB. 잘린 경계에서 한글이
+  깨지던 것도 고쳤습니다(TextDecoder 스트리밍).
+- **PWA 매니페스트 보강** — `start_url`/`display: standalone`/테마색/바로가기.
+  iOS 에서 푸시를 받으려면 홈 화면 설치가 전제라 반드시 필요합니다.
 
 ## v1.5 에서 무엇이 바뀌었나
 
@@ -64,8 +122,9 @@ Google/Apple Calendar 의 **달력·색·반복·ICS**, Teams/Outlook 의 **참�
   (읽기 전용, 유출 시 회전 가능). **.ics 파일 가져오기**도 지원합니다
 - 대시보드 하단에 **"UP NEXT"** 줄 — 다음 7일의 가까운 일정 4개
 
-자세한 변경 목록·마이그레이션·알려진 한계는 아래
-[v1.5 상세 변경 기록](#v15-상세-변경-기록)에 있습니다.
+자세한 변경 목록과 마이그레이션은 아래 [v1.5 상세 변경 기록](#v15-상세-변경-기록)에
+있습니다. 여기 적혀 있던 한계 대부분은 v1.6 에서 없어졌습니다 —
+[v1.6 상세 변경 기록](#v16-상세-변경-기록)의 대조표를 보세요.
 
 ## 디자인 방향 (v1.4 —  Apple Liquid Glass)
 
@@ -155,7 +214,8 @@ party 위젯이라 자체 터치 최적화 여부를 보장할 수 없어 `.sh-p
 | 대시보드 | one-screen 압축 레이아웃(데스크톱 세로 스크롤 없음, Recent 만 내부 스크롤) + 실시간 데이터 전송 속도 위젯(PerformanceObserver, 현재 속도·피크·30초 스파크라인). 브라우저 확대/축소 차단(NoZoom — Ctrl/Cmd+휠·+/-/0·핀치). 하단 "UP NEXT" 줄에 다음 7일 일정 4개(일정이 없으면 렌더하지 않아 한 화면 높이를 지킨다) |
 | 자료 공유(채팅) | **첨부 = 권한 부여**(0065). 첨부가 든 메시지를 보내면 대화 멤버 전원에게 열람 권한이 자동으로 나간다(소유자일 때). 첨부 가능 종류에 **파일·일정** 추가, 내부 경로(`/documents/{id}`)를 붙여 넣어도 동일 동작. 첨부 칩 → **카드**(종류·제목·소유자·수정일, 파일은 크기/MIME)로 승격, 권한이 없으면 "Request access"(소유자와의 DM 으로 요청 자동 발송), 소유자에게는 "Share here"(대화 전체에 권한 부여). 삭제·휴지통 항목은 "No longer available". 파일/문서/시트/링크그래프 목록의 각 행에 "Chat" 버튼(메모 + view/edit 선택) |
 | 파일 미리보기 | 내려받지 않고 그 자리에서 본다 — 이미지·동영상·오디오·PDF·텍스트/코드/CSV/JSON. 파일 이름 클릭으로 열림. PDF 는 내용을 받아 `blob:` URL 로 렌더(스토리지 오리진을 프레임에 허용하지 않기 위해 CSP 는 `frame-src 'self' blob:` 만 연다). 텍스트는 512KB 까지, PDF 는 25MB 까지 미리보기 |
-| 캘린더 | 일정 공유(0066/0067) — 월/주/일/아젠다 4개 보기, 달력 여러 개(색 구분)와 달력 단위 공유(viewer/editor), 참석자 초대 + RSVP(Going/Maybe/Can't go), 반복 일정(FREQ=DAILY\|WEEKLY\|MONTHLY\|YEARLY · INTERVAL · BYDAY · 종료일), 알림(0/5/10/30분·1시간·1일 전, 앱을 보고 있는 동안 토스트), 바쁨/한가함, 회의 링크, 일정에 문서·시트·코드·링크그래프·파일 붙이기, 일정을 채팅으로 보내기, 공유 달력 실시간 반영(`calendar:<id>` 토픽), ICS 구독 주소 발급(Google/Apple 캘린더에서 구독) + .ics 가져오기 |
+| 알림 | **웹 푸시**(0068) — 새 채팅 메시지 · 일정 초대 · 일정 알림이 앱을 닫아 두어도 OS 알림으로 도착한다(PWA 설치 시 iOS 16.4+ 포함). 설정에서 기기별로 켜고 끄고 테스트 발송. 권한은 사용자가 버튼을 누른 순간에만 요청. **이메일은 폴백** — 푸시를 안 켰거나 실패한 사람에게만 나가 같은 메시지로 두 번 알리지 않는다. 시간 기반 알림은 발송기(`/api/push/dispatch`)가 보내며 Vercel Cron · pg_cron · 열려 있는 앱 창 중 무엇이 두드려도 동작한다(claim 이 원자적이라 중복 발송 없음) |
+| 캘린더 | 일정 공유(0066/0067/0069) — 월/주/일/아젠다 4개 보기, 달력 여러 개(색 구분)와 달력 단위 공유(viewer/editor), 참석자 초대 + RSVP(Going/Maybe/Can't go), 반복 일정(FREQ=DAILY\|WEEKLY\|MONTHLY\|YEARLY · INTERVAL · BYDAY · 종료일), 알림(0/5/10/30분·1시간·1일 전, 앱을 보고 있는 동안 토스트), 바쁨/한가함, 회의 링크, 일정에 문서·시트·코드·링크그래프·파일 붙이기, 일정을 채팅으로 보내기, 공유 달력 실시간 반영(`calendar:<id>` 토픽), ICS 구독 주소 발급(Google/Apple 캘린더에서 구독) + .ics 가져오기(한 번에 2,000건). 반복 일정은 **만든 사람의 시간대**로 전개되고, 한 발생만 골라 수정/삭제할 수 있다(EXDATE + 분리) |
 
 문서 에디터는 서식(굵게/기울임/밑줄/취소선/코드), **글자 색상 · 형광펜**, 링크,
 체크리스트, 인용, 코드블록, **이미지·동영상 업로드**(공개 `media` 버킷)를 지원하고,
@@ -255,8 +315,11 @@ app/
       date-utils.ts       화면용 날짜 계산(순수 함수)
       actions.ts          캘린더 서버 액션
     sharing/         자료 공유 공용 서버 액션(카드 조회·대화 공유·권한 요청)
+    push/            웹 푸시 — 구독 등록·기기 목록·발송기 하트비트
     send-to-chat-button.tsx  어느 목록/에디터에나 붙이는 "채팅으로 보내기"
   api/calendar/feed/ ICS 구독 피드(로그인 없이, 토큰으로만 인증)
+  api/push/dispatch/ 일정 알림 발송기(cron·pg_net·열린 창 중 무엇이 불러도 됨)
+  api/push/resubscribe/ 브라우저가 구독을 갱신했을 때 서비스 워커가 부르는 곳
   auth/              콜백 · 로그아웃 라우트
 components/codemirror/ 코드 에디터 래퍼 · 테마 · 언어 매핑
 components/file-preview.tsx 파일을 내려받지 않고 보는 미리보기 모달
@@ -265,8 +328,10 @@ lib/supabase/        browser · server · middleware 클라이언트
 lib/security-headers.ts 경로별 CSP/보안 헤더 구성
 lib/ontology-links.ts 마인드맵/문서 콘텐츠에서 온톨로지 링크 추출
 lib/use-media-query.ts SSR 안전 반응형 훅(useIsMobile 등)
-lib/recurrence.ts    반복 일정 전개(RRULE 부분집합) — recurrence.test.mjs
+lib/recurrence.ts    반복 일정 전개(RRULE 부분집합 · IANA 시간대 · EXDATE) — recurrence.test.mjs
 lib/ics.ts           iCalendar 읽기/쓰기(접기·이스케이프·종일 경계) — ics.test.mjs
+lib/push.ts          웹 푸시 발송(VAPID) — 죽은 구독 판별
+public/sw.js         서비스 워커 — 알림 수신만(오프라인 캐싱 없음)
 components/          공용 UI (모달 · 공유 다이얼로그 · 복사 필드)
 supabase/migrations/ DB 마이그레이션
 docs/                구축 지시서
@@ -370,18 +435,83 @@ Supabase 연결 후 DB 레벨 기능 검증에서 두 건의 실제 결함을 �
 `is_admin`(RLS 정책이 호출) 및 관리자 코드 함수(authenticated 전용, 내부
 `is_admin` 체크로 보호)로, 모두 의도된 설계입니다.
 
-### 5. 개발 서버
+### 5. 알림 설정 (웹 푸시)
+
+없어도 앱은 정상 동작합니다 — 이 절을 건너뛰면 새 메시지 알림이 예전처럼
+이메일로만 나갑니다.
+
+**① VAPID 키 한 쌍을 만들어 환경 변수에 넣습니다(한 번만).**
+
+```bash
+node -e "console.log(require('web-push').generateVAPIDKeys())"
+```
+
+```
+VAPID_PUBLIC_KEY=B...      # 브라우저로 나가는 값 — 비밀이 아니다
+VAPID_PRIVATE_KEY=...      # 절대 노출 금지
+VAPID_SUBJECT=mailto:admin@yourdomain.com
+```
+
+> 키를 나중에 바꾸면 기존 구독이 전부 무효가 되어 모든 사용자가 설정에서 다시
+> 켜야 합니다. 처음에 만들고 그대로 두세요.
+
+여기까지 하면 **채팅 메시지와 일정 초대 알림**이 동작합니다. 각 사용자는
+설정 → NOTIFICATIONS 에서 "Turn on for this device" 를 누르면 됩니다.
+
+**② 시간 기반 일정 알림("10분 뒤 회의")을 켜려면 한 단계 더.**
+
+이 알림은 아무도 아무것도 하지 않는 순간에 울려야 하므로, 밖에서 주기적으로
+두드려 줄 것이 필요합니다. 관리자 콘솔의 **EVENT REMINDER DISPATCH** 패널에서
+토큰을 발급해 환경 변수에 넣고 재배포하세요.
+
+```
+NOTIFY_DISPATCH_TOKEN=<관리자 콘솔에서 복사한 값>
+```
+
+> Supabase 서비스 롤 키를 쓰지 않는 이유: 그 키는 모든 RLS 를 무시합니다. 알림
+> 하나 때문에 그런 키를 배포 환경에 심는 대신, "지금 보낼 알림 목록" 하나만
+> 여는 전용 토큰을 씁니다.
+
+두드리는 주체는 셋 중 아무것이나 됩니다(여러 개여도 안전합니다 — 대상 선정이
+원자적이라 같은 알림이 두 번 나가지 않습니다).
+
+- **Vercel Cron** — `vercel.json` 에 이미 5분 간격으로 들어 있습니다. 배포만
+  하면 켜집니다(Hobby 플랜은 하루 1회로 제한되니 Pro 이상에서 의미가 있습니다).
+- **pg_cron + pg_net** — Supabase 만으로 끝내고 싶을 때. SQL Editor 에서 한 번:
+
+  ```sql
+  create extension if not exists pg_net;
+  select cron.schedule(
+    'possion-reminders', '*/5 * * * *',
+    $$select net.http_post(
+        url := 'https://<배포주소>/api/push/dispatch',
+        headers := jsonb_build_object('Authorization', 'Bearer <CRON_SECRET>')
+      )$$);
+  ```
+
+- **열려 있는 앱 창** — 아무 스케줄러도 없을 때의 마지막 보루입니다. 로그인한
+  탭이 5분마다 한 번씩 두드립니다(화면이 보일 때만). 아무도 앱을 안 보고 있으면
+  밀린 알림은 다음에 누군가 열 때 나갑니다.
+
+### 6. 개발 서버
 
 ```bash
 npm run dev
 # http://localhost:3000
 ```
 
+> 웹 푸시와 서비스 워커는 **HTTPS 또는 localhost** 에서만 동작합니다. 로컬
+> 개발은 `localhost` 라 그대로 되고, LAN 의 IP 로 접속해 시험하면 알림이 켜지지
+> 않습니다.
+
 ## 배포 (Vercel)
 
 1. 저장소를 Vercel 에 연결
 2. 환경 변수(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) 등록
 3. Supabase Auth 의 Redirect URL 에 배포 도메인의 `/auth/callback` 추가
+4. (선택) 알림을 쓰려면 `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` · `VAPID_SUBJECT`,
+   시간 기반 일정 알림까지 쓰려면 `NOTIFY_DISPATCH_TOKEN` — 위 "알림 설정" 참고.
+   `vercel.json` 의 cron 이 5분마다 `/api/push/dispatch` 를 부릅니다.
 
 ## 범위
 
@@ -389,6 +519,82 @@ npm run dev
 구성됩니다. 실시간 협업(Yjs)과 폴더 계층 구조는 포함하지 않습니다. 코드
 에디터는 초기 지시서의 제외 항목이었으나 명시적 요청으로 추가되었습니다.
 초기 요구사항은 [`docs/SaaS_구축_지시서.md`](docs/SaaS_구축_지시서.md) 참고.
+
+---
+
+## v1.6 상세 변경 기록
+
+### 추가된 마이그레이션
+
+| 번호 | 내용 |
+| --- | --- |
+| `0068_web_push.sql` | `push_subscriptions`(구독 정보 — RLS 로 본인만) + `profiles.push_notifications`. `claim_chat_push_recipients`(보낸 사람 본인만 호출 가능, 45초 이내 읽은 사람 제외 — 이메일의 15분 쿨다운은 두지 않는다), `claim_chat_email_recipients` 를 **`p_exclude` 인자를 받도록 재정의**(푸시로 알린 사람은 메일에서 뺀다), `claim_event_push_recipients`(일정 편집 권한자만), `prune_push_subscription`/`touch_push_subscription` |
+| `0069_calendar_occurrences_and_reminders.sql` | `calendar_event_exceptions`(EXDATE) + `calendar_events.detached_from`·`next_reminder_at`. `delete_event_occurrence`·`detach_event_occurrence`(참석자·붙인 자료까지 복사, RSVP 는 초기화), `list_calendar_events`/`get_calendar_event`/`list_upcoming_events` 가 예외 목록과 시간대를 함께 반환, `set_next_reminder`, `app_secrets` + `get_dispatch_token`(관리자 전용), `claim_due_event_reminders`(토큰 인증 · `for update skip locked` 로 중복 발송 차단)·`set_next_reminder_by_token`·`prune_push_subscription_by_token`, `import_calendar_events`(한 문장 일괄 삽입) |
+
+### 새 파일
+
+| 파일 | 하는 일 |
+| --- | --- |
+| `lib/push.ts` | `web-push` 로 VAPID 발송. 404/410 은 죽은 구독으로 보고 지우고, 일시 장애는 구독을 남긴 채 넘어간다 |
+| `public/sw.js` | 서비스 워커 — `push`·`notificationclick`(열려 있는 창을 재사용)·`pushsubscriptionchange`. **오프라인 캐싱은 하지 않는다** |
+| `app/(app)/push/actions.ts` · `push-panel.tsx` | 구독 등록/해지, 기기 목록, 테스트 발송, 계정 단위 on/off |
+| `app/(app)/push/reminder-heartbeat.tsx` | 스케줄러가 없는 환경의 마지막 보루 — 보이는 탭이 5분마다 발송기를 두드린다 |
+| `app/api/push/dispatch/route.ts` | 일정 알림 발송기. 보낸 뒤 **다음 알림을 다시 예약**한다(반복 전개는 Node 에만 있다) |
+| `app/api/push/resubscribe/route.ts` | 브라우저가 구독을 갱신했을 때 서비스 워커가 부른다 |
+| `app/(app)/admin/dispatch-token.tsx` | 발송기 토큰 발급·회전(관리자 전용) |
+
+### 변경된 기존 코드
+
+| 파일 | 무엇이 바뀌었나 |
+| --- | --- |
+| `lib/chat-notify.ts` | `notifyChatByEmail` → **`notifyChatMessage`**. 푸시를 먼저 보내고, 받은 사람을 빼고 메일을 보낸다. 메일 문구도 "푸시가 설정되지 않아 메일로 보낸다"로 바뀌었다 |
+| `lib/recurrence.ts` | IANA 시간대 달력(Intl 기반, DST 보정 2회 수렴) · `exceptions`(EXDATE) · `nextReminderAt()` 추가 |
+| `app/(app)/calendar/actions.ts` | 저장 시 다음 알림 예약 + 초대 푸시(`after()` 안에서), `deleteOccurrence`/`detachOccurrence`, ICS 가져오기를 일괄 RPC 로 |
+| `app/(app)/calendar/event-dialog.tsx` | "이 일정만 / 전체" 선택. 반복 주기를 고쳤으면 그 선택지를 감추고 이유를 말한다 |
+| `app/(app)/calendar/calendar-shell.tsx` | 클릭한 발생을 다이얼로그로 넘긴다. **이 브라우저가 푸시를 구독 중이면 화면 안 배너 알림을 끈다**(같은 일정으로 두 번 알리지 않기 위해) |
+| `app/(app)/chat/chat-shell.tsx` | 권한을 준 순간 `access` 브로드캐스트 → 받는 쪽 카드가 그 자리에서 열린다 |
+| `components/file-preview.tsx` | 상한 상향 + `TextDecoder` 스트리밍으로 잘린 경계의 글자 깨짐 수정 |
+| `lib/supabase/middleware.ts` | (v1.5 에서 추가한) 공개 경로 목록 유지 — 푸시 라우트는 인증이 필요하므로 추가하지 않았다 |
+| `public/manifest.json` | `start_url`/`scope`/`display: standalone`/테마색/maskable 아이콘/바로가기 |
+| `vercel.json` | 5분 간격 cron → `/api/push/dispatch` |
+| `.env.example` | `VAPID_*`, `NOTIFY_DISPATCH_TOKEN`, `CRON_SECRET` |
+
+### 검증 결과 (v1.6)
+
+로컬 PostgreSQL 16 에 마이그레이션 0001~0069 를 재생하고, 사용자 3명으로 19개
+시나리오 + RLS 전용 6개 검사를 돌렸습니다.
+
+- 남의 메시지를 핑계로 다른 사람의 구독 주소를 긁을 수 없다(0행)
+- 푸시로 알린 사람은 메일 대상에서 빠진다(Bob 제외 → Carol 만)
+- 반복하지 않는 일정에는 예외를 만들 수 없고, 같은 발생을 두 번 분리할 수 없다
+- 분리한 일정은 단발이 되고 참석자가 복사되며 응답은 초기화된다
+- 발송기 토큰은 관리자만 읽고, **틀린 토큰으로는 0건**이며 그때 예약은 그대로 남는다
+- 한 번 가져간 알림은 예약이 비어 **두 번 나가지 않는다**
+- 거절(`declined`)한 참석자는 알림 대상에서 빠진다
+- 일괄 가져오기에서 날짜 없는 항목은 버리고, 거꾸로 된 시간은 바로잡고,
+  `javascript:` 링크는 제거된다
+- RLS(authenticated 롤로 직접 확인): 자기 구독만 보이고, 남의 이름으로 구독을
+  만들 수 없고, 남의 구독을 지울 수 없고, `app_secrets` 는 아무도 못 읽고,
+  남의 일정에 예외를 만들 수 없다
+
+단위 테스트 7종 전부 통과(반복 일정은 UTC · Asia/Seoul · America/New_York ·
+Europe/Berlin · Australia/Sydney · Pacific/Kiritimati 6개 시간대에서, DST 전환
+케이스 포함). `npx tsc --noEmit` 과 `npm run build` 경고 없이 통과.
+
+### 개발 중 잡은 결함 (v1.6)
+
+1. **UTC 자정 종일 일정이 어느 칸에도 안 잡힘** — 길이 0 인 일정의 범위 겹침
+   판정을 반개구간으로만 해서 생긴 문제(v1.5 에서 이미 고친 것의 연장선에서,
+   종일 반복 테스트로 재확인).
+2. **`claim_due_event_reminders` 가 알림 시각을 잃어버림** — `UPDATE … RETURNING`
+   은 새 값(비운 뒤의 null)을 돌려준다. 고를 때 옛 값을 CTE 에 먼저 담아 두도록
+   바꿨다.
+3. **일괄 가져오기가 남의 일정에까지 주최자를 붙임** — "참석자가 없는 내 일정"
+   전체를 훑던 것을, 방금 삽입한 행으로만 좁혔다.
+4. **푸시 공개키 타입** — `PushManager` 는 `SharedArrayBuffer` 가 아닌 뷰를
+   요구한다. `new Uint8Array(new ArrayBuffer(n))` 으로 좁혔다.
+5. **`list_upcoming_events` 가 시간대·예외를 안 보내 대시보드만 다른 결과를 냄**
+   — 캘린더 화면과 같은 데이터를 주도록 함수를 다시 만들었다.
 
 ---
 
@@ -483,28 +689,48 @@ Asia/Seoul · America/New_York · Europe/Berlin · Australia/Sydney 5개 시간�
    로그인 화면 HTML 을 받아 갔습니다. 그 라우트만 공개로 열고 인증은 토큰으로
    합니다.
 
-### 알려진 한계 (v1.5)
+### v1.5 에서 적었던 한계 — v1.6 에서의 상태
 
-- **알림은 앱을 켜 두고 있을 때만** 울립니다. 서비스 워커/웹 푸시는 넣지
-  않았습니다 — 못 받는 것보다 "알려 주겠다" 고 해 놓고 안 울리는 쪽이 나쁩니다.
-  초대 알림은 실시간 채널로 즉시 도착하고, 일정 자체는 ICS 로 휴대폰 기본
-  캘린더에 넣어 두면 그쪽 알림을 받을 수 있습니다.
-- **반복 일정의 "이번 것만 수정/삭제"** 는 없습니다. 규칙 전체가 바뀝니다.
-  예외 날짜(EXDATE)도 아직 저장하지 않습니다.
+| v1.5 의 한계 | 지금 |
+| --- | --- |
+| 알림이 앱을 켜 둔 동안에만 울림 | **해결.** 웹 푸시로 앱을 닫아도 도착한다(0068). 이메일은 폴백으로 남았다 |
+| 반복 일정의 "이번 것만 수정/삭제" 없음 | **해결.** EXDATE + 분리(0069). Save/Delete 가 this / all 로 갈린다 |
+| 반복이 보는 사람의 로컬 시간대로 전개됨 | **해결.** 만든 사람의 IANA 시간대로 전개(서머타임 포함 테스트) |
+| .ics 가져오기 200건 | **완화.** 2,000건 — 한 문장 삽입으로 바꿔 왕복이 한 번이다 |
+| 첨부 카드 권한이 대화를 다시 열어야 갱신됨 | **해결.** 권한을 준 순간 그 카드만 실시간으로 다시 읽는다 |
+| 텍스트 512KB · PDF 25MB 미리보기 | **완화.** 4MB · 100MB. 잘린 경계의 한글 깨짐도 수정 |
+| 재공유는 소유자만 | **유지 — 의도된 설계.** 아래 참고 |
+| ICS 내보내기는 읽기 전용 | **유지 — 범위 밖.** 아래 참고 |
+
+### 알려진 한계 (v1.6)
+
+고치지 않은 것은 아래가 전부이고, 각각 왜 그런지 함께 적습니다.
+
+- **푸시를 켜지 않은 사람에게는 여전히 이메일이 갑니다.** 이건 결함이 아니라
+  설계입니다 — 알림을 아무도 못 받는 상태를 만들지 않기 위한 폴백입니다.
+  서버에 VAPID 키가 없으면 예전과 똑같이 이메일만 나갑니다.
+- **iPhone/iPad 는 홈 화면에 설치해야 알림이 옵니다.** Safari 가 설치된 웹앱
+  에만 푸시를 허용하기 때문이고(iOS 16.4+), 우리가 우회할 수 있는 제약이
+  아닙니다. 설정 화면이 이 상황을 알아보고 그렇게 안내합니다.
+- **시간 기반 일정 알림은 밖에서 두드려 줄 것이 하나는 있어야 합니다.**
+  Vercel Cron·pg_cron·열려 있는 앱 창 중 아무것도 없으면 그 알림만 밀립니다
+  (채팅·초대 알림은 그 순간 사람이 있으므로 영향이 없습니다). 브라우저 안에서
+  미래 시각에 알림을 예약하는 표준 API 는 사실상 없습니다.
 - **반복 규칙 범위**: `FREQ`(DAILY/WEEKLY/MONTHLY/YEARLY) · `INTERVAL` ·
   `BYDAY`(주간에만) · 종료일 · `COUNT`(가져오기 시). "매월 둘째 화요일"
   (`BYDAY=2TU`) 같은 서수 규칙은 요일만 읽습니다.
-- **시간대**: 표시는 보는 사람의 로컬 시간대, 종일 일정만 UTC 자정 고정입니다.
-  다른 시간대에서 만든 반복 일정을 볼 때 요일이 달라 보일 수 있는데, 시각을
-  옮기지 않고 정확히 표시한 결과입니다(원 시간대는 `calendar_events.time_zone`).
-- **ICS 가져오기**는 한 번에 200개까지이고, 제목·시간·장소·메모·반복만 들여옵니다
-  (참석자·첨부·예외일은 버립니다). `TZID` 는 해석하지 않고 "적힌 시각 그대로" 를
-  지킵니다.
+- **ICS 가져오기**는 제목·시간·장소·메모·반복만 들여옵니다(참석자·첨부·예외일은
+  버립니다). `TZID` 는 해석하지 않고 "적힌 시각 그대로" 를 지킵니다.
 - **ICS 내보내기는 읽기 전용**입니다. 외부 캘린더에서 고친 내용은 Possion 으로
-  돌아오지 않습니다(CalDAV 양방향은 범위 밖).
-- **재공유는 소유자만** 할 수 있습니다. `edit` 공유를 받은 사람이 제3자에게
-  다시 뿌리는 경로는 일부러 만들지 않았습니다.
-- **파일 미리보기**는 텍스트 512KB · PDF 25MB 까지이며, 한글이 포함된 텍스트가
-  잘린 경계에서 한 글자가 깨질 수 있습니다(미리보기 한정).
-- **첨부 카드의 권한 상태는 대화를 여는 시점에 계산**됩니다. 보고 있는 동안
-  소유자가 권한을 줘도 그 화면은 바로 바뀌지 않습니다(대화를 다시 열면 갱신).
+  돌아오지 않습니다. 양방향은 CalDAV 서버를 구현하는 일이라 이 단계의 범위를
+  한참 넘습니다.
+- **재공유는 소유자만** 할 수 있습니다. `edit` 공유를 받은 사람이 제3자에게 다시
+  뿌리는 경로는 **일부러** 만들지 않았습니다 — 자료를 누가 볼 수 있는지는
+  소유자가 끝까지 알 수 있어야 합니다. 대신 권한이 없는 사람이 한 번의 클릭으로
+  소유자에게 요청할 수 있게 해 두었습니다.
+- **서비스 워커는 오프라인 캐싱을 하지 않습니다.** 알림만 받습니다. 이 앱의
+  화면은 대부분 서버가 권한을 확인해 그리는 것이라, 캐시된 화면을 보여 주는 것은
+  "권한이 회수된 자료를 계속 보여 주는" 일이 되기 쉽습니다.
+- **알림 본문에 메시지 내용을 넣지 않습니다.** 알림 센터와 메일함은 앱보다 통제가
+  약한 곳이고, 팀 대화 내용이 그리로 새어 나가면 되돌릴 수 없습니다. 누가 어디에
+  보냈는지만 알리고 나머지는 앱에서 보게 합니다.

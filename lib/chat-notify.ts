@@ -1,47 +1,99 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appUrl, emailConfigured, escapeHtml, sendEmail } from "./email";
+import { pushConfigured, sendPush, type PushTarget } from "./push";
 
 /**
- * 새 채팅 메시지를 못 보고 지나치지 않게, 안 보고 있는 멤버에게 메일로 알린다.
+ * 새 채팅 메시지를 못 보고 지나치지 않게 알린다.
  *
- * 누구에게 보낼지는 DB 가 정한다(claim_chat_email_recipients) — 최근에 읽은
- * 사람과 방금 알림을 받은 사람을 걸러내고, 고른 대상에 발송 시각을 같은
- * 문장에서 찍어 중복 발송을 막는다.
+ * 두 경로를 쓰되 **순서가 있다**.
+ *   1) 웹 푸시 — 브라우저를 닫아 두어도 OS 알림으로 즉시 도착한다. 기본 경로다.
+ *   2) 이메일 — 푸시를 구독하지 않았거나 푸시가 실패한 사람에게만. 폴백이다.
+ * 둘 다 받는 사람이 없어야 한다. 같은 메시지로 알림이 두 번 오면 사람들은
+ * 알림 자체를 꺼 버린다.
  *
- * 메일 본문에 메시지 전문을 넣지 않는다. 메일함은 앱보다 통제가 약한 곳이고,
- * 팀 대화 내용이 그리로 새어 나가면 되돌릴 수 없다. 누가 어디에 보냈는지만
- * 알리고 나머지는 앱에서 보게 한다.
+ * 누구에게 보낼지는 DB 가 정한다(claim_* 함수) — 지금 보고 있는 사람을 걸러
+ * 내고, 고른 대상에 발송 시각을 같은 문장에서 찍어 중복 발송을 막는다.
+ *
+ * 본문에 메시지 전문을 넣지 않는다. 알림 센터와 메일함은 앱보다 통제가 약한
+ * 곳이고, 팀 대화 내용이 그리로 새어 나가면 되돌릴 수 없다. 누가 어디에
+ * 보냈는지만 알리고 나머지는 앱에서 보게 한다.
  */
 
 type Recipient = { user_id: string; email: string; display_name: string | null };
 
-export async function notifyChatByEmail(
+export async function notifyChatMessage(
   supabase: SupabaseClient,
-  args: { messageId: string; conversationId: string; senderName: string; conversationTitle: string | null }
+  args: {
+    messageId: string;
+    conversationId: string;
+    senderName: string;
+    conversationTitle: string | null;
+  }
 ): Promise<void> {
+  const where = args.conversationTitle ? `“${args.conversationTitle}”` : "a direct message";
+  const link = `/chat?c=${encodeURIComponent(args.conversationId)}`;
+
+  // ---- 1) 푸시 ----
+  const pushed = new Set<string>();
+  if (pushConfigured()) {
+    try {
+      const { data } = await supabase.rpc("claim_chat_push_recipients", {
+        p_message: args.messageId,
+      });
+      const targets = (data ?? []) as PushTarget[];
+      if (targets.length > 0) {
+        const result = await sendPush(targets, {
+          title: args.conversationTitle ?? args.senderName,
+          body: args.conversationTitle
+            ? `${args.senderName} sent a message`
+            : "sent you a message",
+          url: link,
+          // 한 대화의 연속 알림은 서로 덮어쓴다.
+          tag: `chat:${args.conversationId}`,
+        });
+        for (const userId of result.delivered) pushed.add(userId);
+        // 죽은 구독은 즉시 치운다 — 그대로 두면 매번 실패하고, 그 사람은
+        // 푸시가 "성공한 것으로 집계돼" 메일도 못 받게 된다.
+        for (const endpoint of result.gone) {
+          await supabase.rpc("prune_push_subscription", { p_endpoint: endpoint }).then(
+            () => {},
+            () => {}
+          );
+        }
+        for (const endpoint of result.alive) {
+          await supabase.rpc("touch_push_subscription", { p_endpoint: endpoint }).then(
+            () => {},
+            () => {}
+          );
+        }
+      }
+    } catch (e) {
+      console.error("[chat-notify] push failed:", e instanceof Error ? e.message : e);
+    }
+  }
+
+  // ---- 2) 이메일(폴백) ----
   if (!emailConfigured()) return;
 
   const { data, error } = await supabase.rpc("claim_chat_email_recipients", {
     p_message: args.messageId,
+    p_exclude: [...pushed],
   });
   if (error || !data?.length) return;
 
-  const where = args.conversationTitle
-    ? `“${args.conversationTitle}”`
-    : "a direct message";
   const subject = args.conversationTitle
     ? `${args.senderName} messaged ${args.conversationTitle}`
     : `${args.senderName} sent you a message`;
   const base = appUrl();
-  const link = base ? `${base}/chat?c=${encodeURIComponent(args.conversationId)}` : "";
+  const fullLink = base ? `${base}${link}` : "";
 
   await Promise.all(
     (data as Recipient[]).map(async (r) => {
       const sent = await sendEmail({
         to: r.email,
         subject,
-        ...body(r, args.senderName, where, link, base),
+        ...body(r, args.senderName, where, fullLink, base),
       }).catch((e) => ({ error: e instanceof Error ? e.message : "unknown" }));
       // sendEmail 은 실패해도 던지지 않고 { error } 를 돌려주므로, 위 .catch
       // 만으로는 절대 못 잡는다 — 그래서 이렇게 직접 결과를 봐야 Resend 가
@@ -64,8 +116,8 @@ function body(r: Recipient, sender: string, where: string, link: string, base: s
     `${sender} sent a new message in ${where} on Possion.`,
     link ? `Open the conversation: ${link}` : "",
     "",
-    "You are receiving this because email notifications are on for your account.",
-    settings ? `Turn them off: ${settings}` : "",
+    "You are receiving this because email notifications are on and this device is not set up for push notifications.",
+    settings ? `Change it: ${settings}` : "",
     "",
     `© ${year} Yegrina Haute Group. Distributed under the Yegrina Haute Group License.`,
   ]
@@ -107,8 +159,8 @@ function body(r: Recipient, sender: string, where: string, link: string, base: s
   }
 </td></tr>
 <tr><td style="padding:22px 36px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#6e6e73;font-size:11.5px;line-height:1.7">
-  You are receiving this because email notifications are on for your account.${
-    settings ? ` <a href="${escapeHtml(settings)}" style="color:#8a8a8e">Turn them off</a>.` : ""
+  You are receiving this because email notifications are on and push notifications are not set up on your devices.${
+    settings ? ` <a href="${escapeHtml(settings)}" style="color:#8a8a8e">Change it</a>.` : ""
   }
   <br /><br />
   &copy; ${year} Yegrina Haute Group. All rights reserved.<br />

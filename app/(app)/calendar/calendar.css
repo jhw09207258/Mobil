@@ -593,3 +593,15 @@
   .cal-agenda-when { width: 62px; font-size: 11px; }
   .cal-agenda-meta { display: none; }
 }
+
+/* 반복 일정의 한 발생을 열었을 때 — 무엇에 적용되는지 미리 알려 준다. */
+.cal-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+}

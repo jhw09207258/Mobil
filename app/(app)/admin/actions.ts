@@ -87,3 +87,18 @@ export async function deleteOrphanedMedia(
   if (error) return { error: "Failed to delete media objects." };
   return { removed: data?.length ?? 0 };
 }
+
+/**
+ * 알림 발송기 토큰 — 관리자만. RPC 안에서 한 번 더 관리자 여부를 확인한다.
+ * `p_rotate` 가 true 면 새 값을 만들고 옛 값은 즉시 죽는다.
+ */
+export async function getNotifyDispatchToken(
+  rotate = false
+): Promise<{ token: string } | { error: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_dispatch_token", { p_rotate: rotate });
+  if (error || !data) {
+    return { error: "Only administrators can read the dispatch token." };
+  }
+  return { token: data };
+}

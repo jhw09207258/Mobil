@@ -12,11 +12,12 @@
 // UNTIL 은 RRULE 문자열이 아니라 calendar_events.recurrence_until 컬럼에 있다
 // (조회 범위를 SQL 에서 좁히는 데 그 값이 필요하기 때문).
 //
-// 시간대에 대하여: 전개는 실행 중인 환경의 로컬 시간대로 이루어진다. 그래서
-// "매주 화요일 09:00" 은 서머타임이 시작돼도 보는 사람의 09:00 에 그대로
-// 머무른다. 다른 시간대에서 만든 반복 일정을 볼 때 요일이 어긋나 보일 수
-// 있는데(예: 서울 08:00 을 뉴욕에서 보면 전날), 이는 시각을 옮기지 않고
-// 정확히 표시한 결과다 — 원 시간대는 calendar_events.time_zone 에 남아 있다.
+// 시간대에 대하여: 반복은 **만든 사람의 시간대**(calendar_events.time_zone)의
+// 달력으로 전개한다. "매주 화요일 09:00" 은 서울에서 만들었다면 언제 어디서
+// 보든 서울의 화요일 09:00 이고, 서머타임이 시작돼도 그 지역의 09:00 에
+// 머무른다 — 사람이 약속한 것은 절대시각이 아니라 그 지역의 벽시계이기
+// 때문이다. time_zone 이 없거나 알 수 없는 값이면 실행 환경의 로컬 시간대로
+// 물러난다. 종일 일정만 예외로 UTC 자정 기준이다(0066 참고).
 // ============================================================================
 
 export type Freq = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
@@ -124,6 +125,13 @@ export type ExpandInput = {
    * 시간대로 전개하면 서머타임 경계에서 하루가 밀리므로, UTC 달력으로 센다.
    */
   allDay?: boolean;
+  /**
+   * 일정을 만든 사람의 IANA 시간대(예: "Asia/Seoul"). 반복은 이 시간대의
+   * 벽시계로 전개된다. 비어 있으면 실행 환경의 로컬 시간대.
+   */
+  timeZone?: string | null;
+  /** 건너뛸 발생의 시작 시각(EXDATE). "이 일정만 삭제/수정" 이 여기에 쌓인다. */
+  exceptions?: (string | Date)[] | null;
 };
 
 /**
@@ -166,6 +174,98 @@ const UTC_CAL: CalendarOps = {
   millis: (d) => d.getUTCMilliseconds(),
 };
 
+// ---------------------------------------------------------------------------
+// 임의의 IANA 시간대 달력.
+//
+// Date 는 UTC 와 실행 환경 로컬, 두 가지 달력만 안다. 세 번째 달력이 필요하면
+// Intl.DateTimeFormat 으로 "그 시간대에서 이 순간의 벽시계"를 읽고, 반대로
+// 벽시계에서 순간을 만들 때는 UTC 로 가정한 뒤 그때의 실제 offset 만큼 되민다.
+// offset 은 그 순간에 따라 달라지므로(서머타임) 한 번 더 보정한다 — 두 번이면
+// 전 세계 모든 전환 규칙에서 수렴한다.
+// ---------------------------------------------------------------------------
+const PART_CACHE = new Map<string, Intl.DateTimeFormat>();
+
+function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
+  let fmt = PART_CACHE.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    PART_CACHE.set(timeZone, fmt);
+  }
+  return fmt;
+}
+
+type WallClock = { year: number; month: number; day: number; hour: number; minute: number; second: number };
+
+function wallClockIn(timeZone: string, at: Date): WallClock {
+  const parts = zoneFormatter(timeZone).formatToParts(at);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+  return {
+    year: get("year"),
+    month: get("month") - 1,
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+    second: get("second"),
+  };
+}
+
+/** 그 순간 이 시간대의 UTC 대비 오프셋(ms). */
+function zoneOffsetMs(timeZone: string, at: Date): number {
+  const w = wallClockIn(timeZone, at);
+  const asUtc = Date.UTC(w.year, w.month, w.day, w.hour, w.minute, w.second);
+  // ms 는 형식에 없으므로 원본에서 되살린다.
+  return asUtc - (at.getTime() - at.getMilliseconds());
+}
+
+function zonedCalendar(timeZone: string): CalendarOps {
+  const read = (d: Date) => wallClockIn(timeZone, d);
+  return {
+    year: (d) => read(d).year,
+    month: (d) => read(d).month,
+    day: (d) => read(d).day,
+    // 요일도 그 시간대의 날짜에서 나와야 한다 — UTC 로 만든 뒤 getUTCDay.
+    weekday: (d) => {
+      const w = read(d);
+      return new Date(Date.UTC(w.year, w.month, w.day)).getUTCDay();
+    },
+    make: (y, mo, d, h, mi, s, ms) => {
+      // 1차 추정: 벽시계를 UTC 로 읽고, 그 근방의 오프셋만큼 되민다.
+      const guess = Date.UTC(y, mo, d, h, mi, s, ms);
+      const offset1 = zoneOffsetMs(timeZone, new Date(guess));
+      const first = new Date(guess - offset1);
+      // 전환 시각을 걸친 경우 오프셋이 달라진다 — 한 번 더 맞춘다.
+      const offset2 = zoneOffsetMs(timeZone, first);
+      return offset2 === offset1 ? first : new Date(guess - offset2);
+    },
+    hours: (d) => read(d).hour,
+    minutes: (d) => read(d).minute,
+    seconds: (d) => read(d).second,
+    millis: (d) => d.getMilliseconds(),
+  };
+}
+
+/** 알 수 없는 시간대 이름으로 Intl 이 던지지 않게 미리 확인한다. */
+function calendarFor(timeZone: string | null | undefined, allDay: boolean): CalendarOps {
+  if (allDay) return UTC_CAL;
+  if (!timeZone || timeZone === "UTC") return timeZone === "UTC" ? UTC_CAL : LOCAL_CAL;
+  try {
+    zoneFormatter(timeZone).format(new Date());
+    return zonedCalendar(timeZone);
+  } catch {
+    // 저장된 시간대 이름이 이상해도 일정이 사라지면 안 된다.
+    return LOCAL_CAL;
+  }
+}
+
 /**
  * [rangeStart, rangeEnd) 와 겹치는 발생만 돌려준다.
  *
@@ -205,7 +305,14 @@ export function expandOccurrences(
   // 보고 있는 달까지 한 걸음씩 걸어오느라 MAX_STEPS 를 태우지 않도록 범위
   // 근처까지 건너뛴다. COUNT 이 있으면 번호가 곧 종료 조건이므로 처음부터 센다.
   const skip = rule.count === null ? periodsBefore(rule, baseStart, rangeStart) : 0;
-  const cal = event.allDay ? UTC_CAL : LOCAL_CAL;
+  const cal = calendarFor(event.timeZone, !!event.allDay);
+  // "이 일정만 삭제/수정" 으로 빠진 발생. 밀리초까지 정확히 같은 것만 건너뛴다 —
+  // 규칙이 만들어 내는 값을 그대로 저장했으므로 근사 비교가 필요 없다.
+  const skipped = new Set<number>();
+  for (const ex of event.exceptions ?? []) {
+    const d = toDate(ex);
+    if (d) skipped.add(d.getTime());
+  }
 
   for (const { start, index } of candidates(rule, baseStart, skip, cal)) {
     if (rule.count !== null && index >= rule.count) break;
@@ -213,6 +320,7 @@ export function expandOccurrences(
     // 후보는 시간순이므로, 범위 끝을 넘어선 순간 더 볼 것이 없다.
     if (start.getTime() >= rangeEnd.getTime()) break;
 
+    if (skipped.has(start.getTime())) continue;
     if (overlaps(start)) {
       out.push({ start, end: new Date(start.getTime() + durationMs), index });
       if (out.length >= MAX_OCCURRENCES) break;
@@ -220,6 +328,30 @@ export function expandOccurrences(
   }
 
   return out;
+}
+
+/**
+ * 다음 알림 시각 — 지금 이후 첫 발생에서 `reminderMinutes` 를 뺀 순간.
+ * 보낼 것이 없으면 null. 서버가 예약(`calendar_events.next_reminder_at`)을
+ * 채울 때와 발송 뒤 다음 것을 다시 채울 때 같은 함수를 쓴다.
+ */
+export function nextReminderAt(
+  event: ExpandInput & { reminderMinutes?: number | null },
+  from: Date = new Date()
+): Date | null {
+  const lead = event.reminderMinutes;
+  if (lead === null || lead === undefined) return null;
+
+  // 알림은 시작 전에 울려야 하므로, 지금보다 lead 만큼 앞선 발생부터 본다.
+  // 위쪽 경계는 넉넉히(2년) — 그 밖은 어차피 다음 발송 때 다시 계산한다.
+  const windowStart = new Date(from.getTime());
+  const windowEnd = new Date(from.getTime() + 2 * 365 * 24 * 60 * 60 * 1000);
+
+  for (const occ of expandOccurrences(event, windowStart, windowEnd)) {
+    const at = new Date(occ.start.getTime() - lead * 60_000);
+    if (at.getTime() > from.getTime()) return at;
+  }
+  return null;
 }
 
 /**

@@ -25,6 +25,8 @@ export type UpcomingRow = {
   recurrence: string | null;
   recurrence_until: string | null;
   my_response: string | null;
+  time_zone: string;
+  exceptions: string[];
 };
 
 export function UpcomingStrip({ rows }: { rows: UpcomingRow[] }) {
@@ -42,6 +44,8 @@ export function UpcomingStrip({ rows }: { rows: UpcomingRow[] }) {
           recurrence: row.recurrence,
           recurrenceUntil: row.recurrence_until,
           allDay: row.all_day,
+          timeZone: row.time_zone,
+          exceptions: row.exceptions,
         },
         now,
         until

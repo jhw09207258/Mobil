@@ -9,6 +9,8 @@ import { SendToChatButton } from "../send-to-chat-button";
 import { IconClose } from "../icons";
 import {
   deleteEvent,
+  deleteOccurrence,
+  detachOccurrence,
   getEvent,
   linkEventObject,
   respondToEvent,
@@ -16,6 +18,7 @@ import {
   unlinkEventObject,
   type CalendarSummary,
   type EventDetail,
+  type OccurrenceScope,
 } from "./actions";
 import { fromDateInputUtc, toDateInputLocal, toDateInputUtc, toLocalInput } from "./date-utils";
 
@@ -24,7 +27,11 @@ export type Contact = { id: string; name: string; email: string; avatar_url: str
 /** 새 일정을 열 때의 초기값(빈 칸 클릭). */
 export type DraftSeed = { start: Date; end: Date; allDay: boolean; calendarId?: string };
 
-type Mode = { kind: "new"; seed: DraftSeed } | { kind: "existing"; eventId: string };
+type Mode =
+  | { kind: "new"; seed: DraftSeed }
+  /** occurrenceStart 가 있으면 "그 발생을 눌러서 연 것" — 반복 일정에서
+   *  "이 일정만" 을 고를 수 있다. */
+  | { kind: "existing"; eventId: string; occurrenceStart?: string };
 
 const REMINDER_CHOICES: { value: number | null; label: string }[] = [
   { value: null, label: "No reminder" },
@@ -216,7 +223,22 @@ export function EventDialog({
     }
   };
 
-  const onSave = async () => {
+  /**
+   * 반복 일정을 눌러서 연 경우에만 "이 일정만 / 전체" 를 물어볼 수 있다.
+   * 규칙 자체(반복 주기·요일)를 바꾸는 것은 언제나 전체에 적용된다 — 그래서
+   * 규칙을 건드렸으면 묻지 않고 바로 전체로 저장한다.
+   */
+  const occurrenceStart = mode.kind === "existing" ? mode.occurrenceStart : undefined;
+  /** 반복 일정의 특정 발생을 눌러서 연 경우에만 범위를 물어볼 수 있다. */
+  const canScope = !!detail?.recurrence && !!occurrenceStart && editable;
+  /** 반복 규칙 자체를 고쳤다면 "이 일정만" 은 말이 안 된다 — 늘 전체다. */
+  const ruleChanged =
+    !!detail &&
+    ((recurrenceString ?? null) !== (detail.recurrence ?? null) ||
+      (repeatUntil ? fromDateInputUtc(repeatUntil, true)?.toISOString() : null) !==
+        (detail.recurrence_until ?? null));
+
+  const onSave = async (scope: OccurrenceScope = "all") => {
     if (busy) return;
     setError(null);
 
@@ -228,8 +250,23 @@ export function EventDialog({
     }
 
     setBusy(true);
+
+    // "이 일정만" — 먼저 그 발생을 단발 일정으로 떼어내고, 그 새 일정에 저장한다.
+    // 원본에는 예외가 남아 그 날짜는 더 이상 반복에서 나오지 않는다.
+    let targetId = mode.kind === "existing" ? mode.eventId : null;
+    const detaching = scope === "this" && mode.kind === "existing" && !!occurrenceStart;
+    if (detaching && mode.kind === "existing" && occurrenceStart) {
+      const detached = await detachOccurrence(mode.eventId, occurrenceStart);
+      if ("error" in detached) {
+        setBusy(false);
+        setError(detached.error);
+        return;
+      }
+      targetId = detached.id;
+    }
+
     const res = await saveEvent({
-      id: mode.kind === "existing" ? mode.eventId : null,
+      id: targetId,
       calendarId,
       title,
       startsAt: start.toISOString(),
@@ -240,8 +277,14 @@ export function EventDialog({
       conferenceUrl,
       // 반복 일정이 시차를 넘어도 원래 의도를 알 수 있게 만든 사람의 시간대를 남긴다.
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      recurrence: recurrenceString,
-      recurrenceUntil: repeatUntil ? (fromDateInputUtc(repeatUntil, true)?.toISOString() ?? null) : null,
+      // 떼어낸 일정은 더 이상 반복이 아니다 — 규칙을 다시 붙이면 원본과
+      // 겹쳐서 같은 날에 두 번 나온다.
+      recurrence: detaching ? null : recurrenceString,
+      recurrenceUntil: detaching
+        ? null
+        : repeatUntil
+          ? (fromDateInputUtc(repeatUntil, true)?.toISOString() ?? null)
+          : null,
       reminderMinutes: reminder,
       status,
       busy: busyFlag,
@@ -256,11 +299,19 @@ export function EventDialog({
     onSaved();
   };
 
-  const onDelete = async () => {
+  const onDelete = async (scope: OccurrenceScope = "all") => {
     if (mode.kind !== "existing") return;
-    if (!confirm(`Delete “${title}”? Everyone invited loses it too.`)) return;
+    const question =
+      scope === "this"
+        ? "Remove just this one occurrence?"
+        : `Delete “${title}”? Everyone invited loses it${detail?.recurrence ? ", every occurrence" : ""} too.`;
+    if (!confirm(question)) return;
+
     setBusy(true);
-    const res = await deleteEvent(mode.eventId);
+    const res =
+      scope === "this" && occurrenceStart
+        ? await deleteOccurrence(mode.eventId, occurrenceStart)
+        : await deleteEvent(mode.eventId);
     setBusy(false);
     if ("error" in res) {
       setError(res.error);
@@ -670,6 +721,24 @@ export function EventDialog({
         </div>
       )}
 
+      {/* 반복 일정의 한 발생을 눌러서 열었다면, 무엇에 적용할지 먼저 정한다.
+          Google/Outlook 이 저장 뒤에 묻는 것과 달리 미리 보여 준다 — 버튼에
+          무슨 일이 일어날지 적혀 있으면 되돌릴 일이 줄어든다. */}
+      {canScope && !ruleChanged && (
+        <div className="cal-scope">
+          <span className="label">THIS IS A REPEATING EVENT</span>
+          <span className="muted" style={{ fontSize: 12, lineHeight: 1.6 }}>
+            {describeRecurrence(detail?.recurrence ?? null, new Date(detail?.starts_at ?? Date.now()))}.
+            Choose whether your change applies to the one you opened or to every occurrence.
+          </span>
+        </div>
+      )}
+      {canScope && ruleChanged && (
+        <div className="notice notice-info">
+          You changed how often this repeats, so saving updates every occurrence.
+        </div>
+      )}
+
       <div className="cal-dialog-actions">
         {mode.kind === "existing" && detail && (
           <SendToChatButton
@@ -683,17 +752,43 @@ export function EventDialog({
         )}
         <span style={{ flex: 1 }} />
         {mode.kind === "existing" && editable && (
-          <button className="btn btn-sm btn-danger" onClick={onDelete} disabled={busy}>
-            Delete
+          <>
+            {canScope && (
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={() => onDelete("this")}
+                disabled={busy}
+              >
+                Delete this one
+              </button>
+            )}
+            <button className="btn btn-sm btn-danger" onClick={() => onDelete("all")} disabled={busy}>
+              {canScope ? "Delete all" : "Delete"}
+            </button>
+          </>
+        )}
+        {editable && canScope && !ruleChanged && (
+          <button
+            className="btn btn-sm"
+            onClick={() => onSave("this")}
+            disabled={busy || !title.trim() || !calendarId}
+          >
+            {busy ? "Saving…" : "Save this one"}
           </button>
         )}
         {editable && (
           <button
             className="btn btn-primary btn-sm"
-            onClick={onSave}
+            onClick={() => onSave("all")}
             disabled={busy || !title.trim() || !calendarId}
           >
-            {busy ? "Saving…" : mode.kind === "new" ? "Create event" : "Save"}
+            {busy
+              ? "Saving…"
+              : mode.kind === "new"
+                ? "Create event"
+                : canScope && !ruleChanged
+                  ? "Save all"
+                  : "Save"}
           </button>
         )}
       </div>

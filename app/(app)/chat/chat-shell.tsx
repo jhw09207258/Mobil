@@ -612,6 +612,21 @@ export function ChatShell({
           )
         );
       })
+      // 누군가 이 대화에 자료 권한을 줬다 — 그 카드만 다시 읽어 잠금을 푼다.
+      .on("broadcast", { event: "access" }, ({ payload }) => {
+        const p = payload as { kind?: RefKind; id?: string } | null;
+        if (!p?.kind || !p.id) return;
+        const key = cardKey(p.kind, p.id);
+        requestedCards.current.delete(key);
+        getObjectCards([{ kind: p.kind, id: p.id }]).then(
+          (rows) => {
+            if (rows.length === 0) return;
+            requestedCards.current.add(key);
+            setCards((prev) => new Map(prev).set(key, rows[0]));
+          },
+          () => {}
+        );
+      })
       .subscribe((status) => {
         // 구독이 실제로 열린 뒤에 읽음을 알린다 — 그 전에 send 하면 유실된다.
         if (status === "SUBSCRIBED") announceRead(activeId);
@@ -985,6 +1000,16 @@ export function ChatShell({
       if ("error" in res) {
         setError(res.error);
         return;
+      }
+      if (res.granted > 0) {
+        // 받는 쪽 화면의 카드는 대화를 열 때 계산된 상태로 굳어 있다. 방금
+        // 권한을 줬다는 사실을 알려 그 카드만 다시 읽게 한다 — 안 그러면
+        // "줬다는데 여전히 잠겨 있다" 가 된다.
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "access",
+          payload: { kind: ref.kind, id: ref.id },
+        });
       }
       setNotice(
         !res.canGrant

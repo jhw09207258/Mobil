@@ -1205,3 +1205,10 @@ svg {
 .dropzone-icon {
   display: flex;
 }
+
+/* 설정 화면에서 한 패널 안의 서로 다른 주제를 가르는 선(알림: 푸시 / 메일). */
+.settings-sep {
+  height: 1px;
+  background: var(--border-0);
+  margin: 18px 0;
+}

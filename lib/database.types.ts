@@ -46,6 +46,7 @@ export interface Database {
           address_public: boolean;
           phone_public: boolean;
           email_chat_notifications: boolean;
+          push_notifications: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -69,6 +70,7 @@ export interface Database {
           address_public?: boolean;
           phone_public?: boolean;
           email_chat_notifications?: boolean;
+          push_notifications?: boolean;
         };
         Relationships: [];
       };
@@ -668,6 +670,44 @@ export interface Database {
         Update: Record<string, never>;
         Relationships: [];
       };
+      // ---- 0068: 웹 푸시 ----
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent: string | null;
+          created_at: string;
+          last_used_at: string | null;
+          failure_count: number;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent?: string | null;
+          failure_count?: number;
+        };
+        Update: {
+          p256dh?: string;
+          auth?: string;
+          user_agent?: string | null;
+          last_used_at?: string | null;
+          failure_count?: number;
+        };
+        Relationships: [];
+      };
+      // 발송기 토큰 등 — RLS 로 직접 접근이 막혀 있고 RPC 로만 읽는다.
+      app_secrets: {
+        Row: { name: string; value: string; updated_at: string };
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -1030,6 +1070,77 @@ export interface Database {
           event_count: number;
         }[];
       };
+      // ---- 0068: 웹 푸시 ----
+      /** 푸시로 알린 사람은 p_exclude 로 넘겨 메일에서 뺀다(중복 알림 방지). */
+      claim_chat_email_recipients: {
+        Args: { p_message: string; p_exclude?: string[] };
+        Returns: { user_id: string; email: string; display_name: string | null }[];
+      };
+      claim_chat_push_recipients: {
+        Args: { p_message: string };
+        Returns: { user_id: string; endpoint: string; p256dh: string; auth: string }[];
+      };
+      claim_event_push_recipients: {
+        Args: { p_event: string; p_users?: string[] | null };
+        Returns: { user_id: string; endpoint: string; p256dh: string; auth: string }[];
+      };
+      prune_push_subscription: {
+        Args: { p_endpoint: string };
+        Returns: undefined;
+      };
+      touch_push_subscription: {
+        Args: { p_endpoint: string };
+        Returns: undefined;
+      };
+
+      // ---- 0069: 반복 예외 · 알림 예약 · 일괄 가져오기 ----
+      delete_event_occurrence: {
+        Args: { p_event: string; p_occurrence_start: string };
+        Returns: undefined;
+      };
+      detach_event_occurrence: {
+        Args: { p_event: string; p_occurrence_start: string };
+        Returns: string;
+      };
+      set_next_reminder: {
+        Args: { p_event: string; p_at: string | null };
+        Returns: undefined;
+      };
+      set_next_reminder_by_token: {
+        Args: { p_token: string; p_event: string; p_at: string };
+        Returns: undefined;
+      };
+      prune_push_subscription_by_token: {
+        Args: { p_token: string; p_endpoint: string };
+        Returns: undefined;
+      };
+      get_dispatch_token: {
+        Args: { p_rotate?: boolean };
+        Returns: string;
+      };
+      claim_due_event_reminders: {
+        Args: { p_token: string; p_limit?: number };
+        Returns: {
+          event_id: string;
+          title: string;
+          starts_at: string;
+          ends_at: string;
+          all_day: boolean;
+          location: string | null;
+          time_zone: string;
+          recurrence: string | null;
+          recurrence_until: string | null;
+          reminder_minutes: number | null;
+          reminder_at: string;
+          exceptions: string[] | null;
+          recipients: Json;
+        }[];
+      };
+      import_calendar_events: {
+        Args: { p_calendar: string; p_events: Json };
+        Returns: number;
+      };
+
       list_calendar_events: {
         Args: { p_from: string; p_to: string };
         Returns: {
@@ -1060,6 +1171,8 @@ export interface Database {
           is_invited: boolean;
           link_count: number;
           can_edit: boolean;
+          exceptions: string[];
+          detached_from: string | null;
         }[];
       };
       get_calendar_event: {
@@ -1157,6 +1270,8 @@ export interface Database {
           recurrence_until: string | null;
           my_response: string | null;
           reminder_minutes: number | null;
+          time_zone: string;
+          exceptions: string[];
         }[];
       };
     };

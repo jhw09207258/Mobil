@@ -54,9 +54,26 @@ export function previewMode(
 }
 
 /** 텍스트 미리보기로 받아올 최대 바이트 — 큰 로그를 통째로 메모리에 올리지 않는다. */
-const MAX_TEXT_BYTES = 512 * 1024;
+const MAX_TEXT_BYTES = 4 * 1024 * 1024;
 /** blob 으로 받아 띄우는 PDF 의 상한. 이보다 크면 다운로드를 권한다. */
-const MAX_PDF_BYTES = 25 * 1024 * 1024;
+const MAX_PDF_BYTES = 100 * 1024 * 1024;
+
+/**
+ * 잘라낸 바이트를 글자 손상 없이 문자열로.
+ *
+ * 그냥 `slice(0, n).text()` 를 쓰면 UTF-8 멀티바이트 문자(한글은 3바이트)의
+ * 한가운데서 끊겨 마지막 글자가 U+FFFD 로 깨진다. TextDecoder 를 스트리밍
+ * 모드로 돌리면 미완성 바이트열을 버려 주므로, 깨진 글자 대신 그 글자 하나가
+ * 빠진 상태로 끝난다.
+ */
+async function decodeTruncated(blob: Blob, limit: number): Promise<{ text: string; truncated: boolean }> {
+  const truncated = blob.size > limit;
+  const bytes = new Uint8Array(await blob.slice(0, limit).arrayBuffer());
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  // stream: true → 끝에 남은 불완전 시퀀스를 출력하지 않는다.
+  const text = decoder.decode(bytes, { stream: truncated });
+  return { text, truncated };
+}
 
 export function FilePreview({
   target,
@@ -128,10 +145,9 @@ export function FilePreview({
         if (!res.ok) throw new Error(String(res.status));
         if (kind === "text") {
           const body = await res.blob();
-          const slice = body.slice(0, MAX_TEXT_BYTES);
-          const content = await slice.text();
+          const { text: content, truncated } = await decodeTruncated(body, MAX_TEXT_BYTES);
           if (!cancelled && alive.current) {
-            setText(body.size > MAX_TEXT_BYTES ? `${content}\n\n… (truncated preview)` : content);
+            setText(truncated ? `${content}\n\n… (preview truncated — download for the rest)` : content);
           }
         } else {
           const body = await res.blob();

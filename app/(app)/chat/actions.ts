@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedUser as requireUser } from "@/lib/auth";
-import { notifyChatByEmail } from "@/lib/chat-notify";
+import { notifyChatMessage } from "@/lib/chat-notify";
 import type { Json } from "@/lib/database.types";
 
 export type ChatConversation = {
@@ -93,8 +93,9 @@ export async function sendChatMessage(
   });
   if (!rows?.[0]) return { error: "Message sent, but couldn't load it back." };
 
-  // 안 보고 있는 멤버에게 메일로 알린다. 응답을 붙잡지 않도록 after() 안에서
-  // 돌리고, 실패해도 메시지 전송 결과에는 손대지 않는다 — 알림은 부가 기능이다.
+  // 안 보고 있는 멤버에게 알린다(푸시 우선, 못 받는 사람만 메일). 응답을
+  // 붙잡지 않도록 after() 안에서 돌리고, 실패해도 메시지 전송 결과에는 손대지
+  // 않는다 — 알림은 부가 기능이다.
   const sent = toChatMessage(rows[0]);
   after(async () => {
     try {
@@ -103,7 +104,7 @@ export async function sendChatMessage(
         .select("kind, title")
         .eq("id", conversationId)
         .maybeSingle();
-      await notifyChatByEmail(supabase, {
+      await notifyChatMessage(supabase, {
         messageId: sent.id,
         conversationId,
         senderName: sent.sender_name || "Someone",

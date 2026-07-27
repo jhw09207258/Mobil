@@ -87,7 +87,7 @@ export function CalendarShell({
   const [notice, setNotice] = useState<string | null>(null);
   const [dialog, setDialog] = useState<
     | { kind: "new"; seed: DraftSeed }
-    | { kind: "existing"; eventId: string }
+    | { kind: "existing"; eventId: string; occurrenceStart?: string }
     | null
   >(null);
   const [calendarDialog, setCalendarDialog] = useState<CalendarSummary | "new" | null>(null);
@@ -95,6 +95,8 @@ export function CalendarShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // 이미 알린 발생 — 같은 알림이 매 틱 반복되지 않게 한다.
   const notified = useRef<Set<string>>(new Set());
+  // 이 브라우저가 웹 푸시를 구독 중인가. 그렇다면 화면 안 배너는 띄우지 않는다.
+  const [pushActive, setPushActive] = useState(false);
 
   const range = useMemo(() => visibleRange(anchor, view), [anchor, view]);
 
@@ -171,6 +173,10 @@ export function CalendarShell({
           recurrence: row.recurrence,
           recurrenceUntil: row.recurrence_until,
           allDay: row.all_day,
+          // 반복은 만든 사람의 시간대로 전개한다 — 시차·서머타임에서 요일이
+          // 어긋나지 않게. "이 일정만 삭제" 로 빠진 발생도 여기서 걸러진다.
+          timeZone: row.time_zone,
+          exceptions: row.exceptions,
         },
         range.from,
         range.to
@@ -228,10 +234,26 @@ export function CalendarShell({
   );
 
   // ---- 알림 ----
-  // 앱을 보고 있는 동안 다가오는 일정을 한 번씩 알린다. 브라우저를 닫아 두면
-  // 울리지 않는다 — 서비스 워커/푸시는 이 단계의 범위 밖이고, 못 받는 것보다
-  // 잘못된 약속을 하는 쪽이 나쁘다.
+  // 화면 안 배너 알림. 이 브라우저가 웹 푸시를 구독하고 있으면 **끈다** —
+  // 같은 일정으로 OS 알림과 배너가 동시에 뜨면 사람들은 알림을 통째로 꺼 버린다.
+  // 푸시를 안 켠 사람에게는 이것이 유일한 알림이므로 남겨 둔다.
   useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    let cancelled = false;
+    navigator.serviceWorker
+      .getRegistration()
+      .then((reg) => reg?.pushManager.getSubscription())
+      .then((sub) => {
+        if (!cancelled) setPushActive(!!sub);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pushActive) return;
     const tick = () => {
       const now = Date.now();
       for (const occ of occurrences) {
@@ -254,7 +276,7 @@ export function CalendarShell({
     tick();
     const timer = setInterval(tick, 30_000);
     return () => clearInterval(timer);
-  }, [occurrences]);
+  }, [occurrences, pushActive]);
 
   useEffect(() => {
     if (!notice) return;
@@ -437,7 +459,7 @@ export function CalendarShell({
               dayOccurrences={dayOccurrences}
               eventColor={eventColor}
               onPickDay={(d) => openNewAt(d, true)}
-              onOpen={(occ) => setDialog({ kind: "existing", eventId: occ.event.id })}
+              onOpen={(occ) => setDialog({ kind: "existing", eventId: occ.event.id, occurrenceStart: occ.start.toISOString() })}
               onExpandDay={(d) => {
                 setAnchor(d);
                 setView("day");
@@ -455,7 +477,7 @@ export function CalendarShell({
               eventColor={eventColor}
               onPickSlot={(d) => openNewAt(d, false)}
               onPickAllDay={(d) => openNewAt(d, true)}
-              onOpen={(occ) => setDialog({ kind: "existing", eventId: occ.event.id })}
+              onOpen={(occ) => setDialog({ kind: "existing", eventId: occ.event.id, occurrenceStart: occ.start.toISOString() })}
             />
           )}
           {view === "agenda" && (
@@ -463,7 +485,7 @@ export function CalendarShell({
               from={range.from}
               occurrences={occurrences}
               eventColor={eventColor}
-              onOpen={(occ) => setDialog({ kind: "existing", eventId: occ.event.id })}
+              onOpen={(occ) => setDialog({ kind: "existing", eventId: occ.event.id, occurrenceStart: occ.start.toISOString() })}
             />
           )}
         </div>
