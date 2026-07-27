@@ -10,8 +10,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname === "/login" || pathname === "/signup";
+  // ICS 구독 피드는 로그인 없이 열려야 한다 — Google/Apple 캘린더가 우리
+  // 세션 쿠키를 갖고 올 리가 없다. 인증은 그 라우트가 쿼리의 토큰으로 직접
+  // 한다(app/api/calendar/feed/route.ts). 여기서 막으면 캘린더 앱이 로그인
+  // 화면 HTML 을 받아 가 구독이 통째로 실패한다.
+  const isFeedRoute = pathname === "/api/calendar/feed";
   const isPublicRoute =
-    pathname === "/" || isAuthRoute || pathname.startsWith("/auth");
+    pathname === "/" || isAuthRoute || isFeedRoute || pathname.startsWith("/auth");
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

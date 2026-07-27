@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { GenerateCode } from "./generate-code";
 import { MediaGc } from "./media-gc";
+import { DispatchToken } from "./dispatch-token";
 import { PendingApprovals } from "./pending-approvals";
 import { listUsersByApproval } from "./actions";
 
@@ -59,6 +60,15 @@ export default async function AdminConsolePage() {
           </div>
           <div className="panel-body">
             <GenerateCode />
+          </div>
+        </div>
+
+        <div className="panel" style={{ marginBottom: 24 }}>
+          <div className="panel-header">
+            <span className="label">EVENT REMINDER DISPATCH</span>
+          </div>
+          <div className="panel-body">
+            <DispatchToken />
           </div>
         </div>
 

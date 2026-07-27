@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
@@ -23,13 +24,11 @@ import {
   setBigBrother,
   getChatMessages,
   leaveConversation,
-  listAttachableItems,
   listChatConversations,
   markChatRead,
   sendChatMessage,
   startDm,
   toggleReaction,
-  type AttachableItem,
   type ChatContact,
   type ChatConversation,
   type ChatMemberInfo,
@@ -41,19 +40,171 @@ import {
   onOpenConversation,
   setActiveConversation,
 } from "./chat-bus";
-import { parseMessage, UUID_PATTERN, type InlineToken } from "./markdown-parse";
+import {
+  extractRefs,
+  parseMessage,
+  UUID_PATTERN,
+  type InlineToken,
+  type RefKind,
+} from "./markdown-parse";
+import {
+  getObjectCards,
+  getPreviewUrl,
+  listAttachables,
+  requestAccess,
+  shareWithConversation,
+  type AttachableObject,
+  type ObjectCard,
+} from "../sharing/actions";
+import { FilePreview, type PreviewTarget } from "@/components/file-preview";
+import { getSignedUrl } from "../files/actions";
+import { triggerDownload } from "@/lib/download-file";
+import { formatBytes } from "@/lib/format";
 import "./chat.css";
 
 // ---------------------------------------------------------------------------
 // 메시지 본문 — 경량 마크다운(markdown-parse.ts) 블록/인라인 토큰을 렌더링.
 // 첨부 토큰([[kind:uuid|Title]])/내부 경로는 워크스페이스 탭 칩으로.
 // ---------------------------------------------------------------------------
-type RefToken = { kind: TabKind; id: string; title: string };
+type RefToken = { kind: RefKind; id: string; title: string };
+
+/** 첨부 카드가 필요로 하는 것들 — 트리 깊숙이 prop 을 흘리지 않도록 Context 로. */
+type RefCardApi = {
+  cards: Map<string, ObjectCard>;
+  selfId: string;
+  onOpen: (ref: RefToken) => void;
+  onShareHere: (ref: RefToken) => void;
+  onRequest: (ref: RefToken) => void;
+  busy: string | null;
+};
+const RefCardContext = createContext<RefCardApi | null>(null);
+
+const KIND_LABEL: Record<RefKind, string> = {
+  document: "Doc",
+  code: "Code",
+  sheet: "Table",
+  mindmap: "Link Graph",
+  file: "File",
+  event: "Event",
+};
+
+function cardKey(kind: string, id: string): string {
+  return `${kind}:${id}`;
+}
+
+/** 카드 부제 — 종류마다 그 자리에서 알고 싶은 것이 다르다. */
+function cardSubtitle(kind: RefKind, card: ObjectCard | undefined): string | null {
+  if (!card) return null;
+  if (kind === "file") {
+    const bits = [card.mime_type, card.size_bytes != null ? formatBytes(card.size_bytes) : null];
+    return bits.filter(Boolean).join(" · ") || null;
+  }
+  if (kind === "event" && card.subtitle) {
+    const when = new Date(card.subtitle);
+    return Number.isNaN(when.getTime())
+      ? null
+      : when.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+  if (card.updated_at) {
+    return `Updated ${new Date(card.updated_at).toLocaleDateString()}`;
+  }
+  return card.subtitle;
+}
+
+/**
+ * 첨부 카드. 이름만 있는 칩이 아니라 "무엇인지 / 누구 것인지 / 열 수 있는지"
+ * 를 보여 준다. 열 수 없으면 그 자리에서 요청까지 할 수 있고, 내가 소유자면
+ * 그 자리에서 이 대화에 권한을 줄 수 있다.
+ */
+function RefCard({ token }: { token: RefToken }) {
+  const api = useContext(RefCardContext);
+  const card = api?.cards.get(cardKey(token.kind, token.id));
+  const busy = api?.busy === cardKey(token.kind, token.id);
+  const title = card?.title || (token.title === token.kind ? "Untitled" : token.title);
+
+  // 메타데이터가 아직 안 왔으면 예전처럼 이름만 있는 칩으로 둔다 — 목록이
+  // 로딩되는 동안 레이아웃이 크게 흔들리지 않게.
+  if (!card) {
+    return (
+      <button className="chat-ref-chip" onClick={() => api?.onOpen(token)} title={`Open ${token.kind}`}>
+        <span className="chat-ref-kind">{KIND_LABEL[token.kind] ?? token.kind}</span>
+        {title}
+      </button>
+    );
+  }
+
+  if (!card.object_exists) {
+    return (
+      <span className="chat-ref-card gone">
+        <span className="chat-ref-kind">{KIND_LABEL[token.kind] ?? token.kind}</span>
+        <span className="chat-ref-body">
+          <span className="chat-ref-title">No longer available</span>
+          <span className="chat-ref-sub">It was deleted or moved to trash.</span>
+        </span>
+      </span>
+    );
+  }
+
+  if (!card.can_view) {
+    // 일정은 권한 테이블이 아니라 초대로 열린다 — "요청하기" 를 걸어 봐야
+    // 줄 수 있는 것이 없으므로, 누구에게 말해야 하는지만 알려 준다.
+    const canAsk = token.kind !== "event";
+    return (
+      <span className="chat-ref-card locked">
+        <span className="chat-ref-kind">{KIND_LABEL[token.kind] ?? token.kind}</span>
+        <span className="chat-ref-body">
+          <span className="chat-ref-title">
+            {canAsk ? "You don't have access" : "You're not invited to this event"}
+          </span>
+          <span className="chat-ref-sub">
+            {canAsk ? "Owned by " : "Organised by "}
+            {card.owner_name ?? "another member"}
+          </span>
+        </span>
+        {canAsk && (
+          <button
+            className="btn btn-sm chat-ref-action"
+            disabled={busy}
+            onClick={() => api?.onRequest(token)}
+          >
+            {busy ? "Asking…" : "Request access"}
+          </button>
+        )}
+      </span>
+    );
+  }
+
+  const subtitle = cardSubtitle(token.kind, card);
+
+  return (
+    <span className="chat-ref-card">
+      <span className="chat-ref-kind">{KIND_LABEL[token.kind] ?? token.kind}</span>
+      <button className="chat-ref-body chat-ref-open" onClick={() => api?.onOpen(token)}>
+        <span className="chat-ref-title">{title}</span>
+        <span className="chat-ref-sub">
+          {[card.owner_name, subtitle].filter(Boolean).join(" · ")}
+        </span>
+      </button>
+      {/* 권한을 줄 수 있는 사람은 소유자뿐이다(0065). edit 공유를 받은 사람에게
+          버튼을 보여 주면 눌러도 아무 일이 없다 — 아예 내보내지 않는다. */}
+      {token.kind !== "event" && card.owner_id === api?.selfId && (
+        <button
+          className="btn btn-ghost btn-sm chat-ref-action"
+          disabled={busy}
+          title="Give everyone in this chat access"
+          onClick={() => api?.onShareHere(token)}
+        >
+          {busy ? "…" : "Share here"}
+        </button>
+      )}
+    </span>
+  );
+}
 
 // 대화 목록 미리보기에서 첨부 토큰을 "[attachment]" 로 치환.
 const PREVIEW_ATTACH_RE = new RegExp(
-  `\\[\\[(?:document|code|sheet|mindmap):${UUID_PATTERN}\\|[^\\]]{1,160}\\]\\]` +
-    `|(?:https?://[^\\s]*)?/(?:documents|code|sheets|mindmap)/${UUID_PATTERN}`,
+  `\\[\\[(?:document|code|sheet|mindmap|file|event):${UUID_PATTERN}\\|[^\\]]{1,160}\\]\\]` +
+    `|(?:https?://[^\\s]*)?/(?:documents|code|sheets|mindmap|files|calendar)/${UUID_PATTERN}`,
   "gi"
 );
 function previewText(raw: string): string {
@@ -66,13 +217,7 @@ function previewText(raw: string): string {
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024; // 10MB
 
-function InlineTokens({
-  tokens,
-  onOpenRef,
-}: {
-  tokens: InlineToken[];
-  onOpenRef: (ref: RefToken) => void;
-}) {
+function InlineTokens({ tokens }: { tokens: InlineToken[] }) {
   return (
     <>
       {tokens.map((tok, i) => {
@@ -111,17 +256,7 @@ function InlineTokens({
               </a>
             );
           case "ref":
-            return (
-              <button
-                key={i}
-                className="chat-ref-chip"
-                onClick={() => onOpenRef(tok as RefToken)}
-                title={`Open ${tok.kind} in workspace`}
-              >
-                <span className="chat-ref-kind">{tok.kind}</span>
-                {tok.title === tok.kind ? "open ↗" : tok.title}
-              </button>
-            );
+            return <RefCard key={i} token={tok as RefToken} />;
           default:
             return <span key={i}>{tok.text}</span>;
         }
@@ -130,13 +265,7 @@ function InlineTokens({
   );
 }
 
-function MessageBody({
-  content,
-  onOpenRef,
-}: {
-  content: string;
-  onOpenRef: (ref: RefToken) => void;
-}) {
+function MessageBody({ content }: { content: string }) {
   const blocks = useMemo(() => parseMessage(content), [content]);
   return (
     <>
@@ -157,7 +286,7 @@ function MessageBody({
                     {item.marker === "-" || item.marker === "*" ? "•" : item.marker}
                   </span>
                   <span className="chat-li-body">
-                    <InlineTokens tokens={item.tokens} onOpenRef={onOpenRef} />
+                    <InlineTokens tokens={item.tokens} />
                   </span>
                 </div>
               ))}
@@ -168,7 +297,7 @@ function MessageBody({
           <div key={i} className="chat-para">
             {b.lines.map((line, j) => (
               <div key={j} className="chat-para-line">
-                {line.length === 0 ? " " : <InlineTokens tokens={line} onOpenRef={onOpenRef} />}
+                {line.length === 0 ? " " : <InlineTokens tokens={line} />}
               </div>
             ))}
           </div>
@@ -182,21 +311,15 @@ function MessageBody({
 const COLLAPSE_CHARS = 700;
 const COLLAPSE_LINES = 12;
 
-function CollapsibleBody({
-  content,
-  onOpenRef,
-}: {
-  content: string;
-  onOpenRef: (ref: RefToken) => void;
-}) {
+function CollapsibleBody({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
   const isLong =
     content.length > COLLAPSE_CHARS || content.split("\n").length > COLLAPSE_LINES;
-  if (!isLong) return <MessageBody content={content} onOpenRef={onOpenRef} />;
+  if (!isLong) return <MessageBody content={content} />;
   return (
     <>
       <div className={`chat-msg-clip ${expanded ? "" : "clipped"}`}>
-        <MessageBody content={content} onOpenRef={onOpenRef} />
+        <MessageBody content={content} />
       </div>
       <button className="chat-expand-btn" onClick={() => setExpanded((v) => !v)}>
         {expanded ? "Show less ▲" : "Show more ▼"}
@@ -279,6 +402,7 @@ export function ChatShell({
   variant?: "page" | "float";
 }) {
   const { openTab } = useWorkspace();
+  const router = useRouter();
   const isMobile = useIsMobile();
   const [conversations, setConversations] = useState(initialConversations);
   const [activeId, setActiveId] = useState<string | null>(
@@ -304,7 +428,16 @@ export function ChatShell({
   const [fmtOpen, setFmtOpen] = useState(false);
   // 컴포저 옵션은 전부 + 버튼 하나 뒤의 계층 메뉴로 모은다(공간 절약).
   const [menu, setMenu] = useState<"root" | "attach" | "emoji" | "mention" | null>(null);
-  const [attachables, setAttachables] = useState<AttachableItem[] | null>(null);
+  const [attachables, setAttachables] = useState<AttachableObject[] | null>(null);
+  const [attachQuery, setAttachQuery] = useState("");
+  // 첨부 카드 메타데이터 — 화면에 보이는 메시지의 참조를 한 번에 모아 받는다.
+  const [cards, setCards] = useState<Map<string, ObjectCard>>(() => new Map());
+  // 이미 물어본 참조. 응답이 비어 있어도 다시 묻지 않기 위한 것(아래 주석 참고).
+  const requestedCards = useRef<Set<string>>(new Set());
+  const [cardBusy, setCardBusy] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  // 성공 안내(권한이 나갔다 등) — 오류와 달리 잠깐만 띄운다.
+  const [notice, setNotice] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   // 답장 대상 — 컴포저 위 배너에 표시되고, 전송 시 reply_to_id 로 붙는다.
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -389,6 +522,11 @@ export function ChatShell({
     setEditText("");
     setLinkUrl(null);
     setMenu(null);
+    setNotice(null);
+    // 대화가 바뀌면 첨부 카드 캐시를 버린다 — 그 사이 권한이 바뀌었을 수 있고,
+    // "권한 없음" 이 남아 있는 것이 다시 받아오는 비용보다 나쁘다.
+    setCards(new Map());
+    requestedCards.current = new Set();
     if (!activeId) {
       setMessages([]);
       setMembers([]);
@@ -472,6 +610,21 @@ export function ChatShell({
               ? { ...m, reactions: applyReactionUpdate(m.reactions, p.emoji!, !!p.active, p.user_id === selfId) }
               : m
           )
+        );
+      })
+      // 누군가 이 대화에 자료 권한을 줬다 — 그 카드만 다시 읽어 잠금을 푼다.
+      .on("broadcast", { event: "access" }, ({ payload }) => {
+        const p = payload as { kind?: RefKind; id?: string } | null;
+        if (!p?.kind || !p.id) return;
+        const key = cardKey(p.kind, p.id);
+        requestedCards.current.delete(key);
+        getObjectCards([{ kind: p.kind, id: p.id }]).then(
+          (rows) => {
+            if (rows.length === 0) return;
+            requestedCards.current.add(key);
+            setCards((prev) => new Map(prev).set(key, rows[0]));
+          },
+          () => {}
         );
       })
       .subscribe((status) => {
@@ -591,11 +744,27 @@ export function ChatShell({
     if (!text || sending || !activeId) return;
     setSending(true);
     setError(null);
+
+    // 첨부가 있으면 **먼저** 권한을 넘긴다. 링크만 던지고 "권한 없음" 을 보게
+    // 하는 것이 지금까지의 문제였다 — 알림이 뜬 순간 이미 열려야 한다.
+    // 실패해도 메시지는 보낸다(카드에서 요청할 수 있다).
+    const refs = extractRefs([text]);
+    let grantedTotal = 0;
+    for (const ref of refs) {
+      const outcome = await shareWithConversation(ref.kind, ref.id, activeId, "view");
+      if (!("error" in outcome)) grantedTotal += outcome.granted;
+    }
+
     const res = await sendChatMessage(activeId, text, replyTo?.id ?? null);
     setSending(false);
     if ("error" in res) {
       setError(res.error);
       return;
+    }
+    if (grantedTotal > 0) {
+      setNotice(
+        `Access granted to ${grantedTotal} ${grantedTotal === 1 ? "person" : "people"} — they can open the attachment right away.`
+      );
     }
     setInput("");
     setReplyTo(null);
@@ -766,8 +935,111 @@ export function ChatShell({
 
   const openAttachMenu = () => {
     setMenu("attach");
-    if (!attachables) listAttachableItems().then(setAttachables);
+    if (!attachables) listAttachables().then(setAttachables, () => setAttachables([]));
   };
+
+  // 첨부 후보 검색 — 최근 40개 안에 없는 것을 찾을 수 있어야 한다. 타이핑마다
+  // 서버를 때리지 않도록 짧게 미룬다.
+  useEffect(() => {
+    if (menu !== "attach") return;
+    const q = attachQuery.trim();
+    const timer = setTimeout(() => {
+      listAttachables(q).then(setAttachables, () => {});
+    }, q ? 220 : 0);
+    return () => clearTimeout(timer);
+  }, [attachQuery, menu]);
+
+  // 안내는 잠깐만 — 오류와 달리 사용자가 치울 것을 요구하지 않는다.
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  // ---- 첨부 카드 ----
+  // 보이는 메시지들의 참조를 모아, 아직 물어보지 않은 것만 한 번에 조회한다.
+  //
+  // "아직 **물어보지** 않은" 이 중요하다. 서버가 어떤 참조에 대해 행을 돌려주지
+  // 않으면(모르는 종류 등) 그 키는 cards 에 영영 안 들어가는데, 조건을 cards
+  // 기준으로 잡으면 응답이 올 때마다 상태가 바뀌고 → 다시 없는 것을 묻고 →
+  // 무한 반복이 된다. 요청한 키를 따로 기억해 한 번씩만 묻는다.
+  useEffect(() => {
+    const refs = extractRefs(messages.map((m) => m.content));
+    const missing = refs.filter((r) => !requestedCards.current.has(cardKey(r.kind, r.id)));
+    if (missing.length === 0) return;
+    for (const r of missing) requestedCards.current.add(cardKey(r.kind, r.id));
+
+    let cancelled = false;
+    getObjectCards(missing).then(
+      (rows) => {
+        if (cancelled || rows.length === 0) return;
+        setCards((prev) => {
+          const next = new Map(prev);
+          for (const row of rows) next.set(cardKey(row.kind, row.id), row);
+          return next;
+        });
+      },
+      () => {
+        // 실패한 것은 다시 물어볼 수 있게 표시를 지운다.
+        for (const r of missing) requestedCards.current.delete(cardKey(r.kind, r.id));
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [messages]);
+
+  const onShareRefHere = useCallback(
+    async (ref: RefToken) => {
+      if (!activeIdRef.current) return;
+      const key = cardKey(ref.kind, ref.id);
+      setCardBusy(key);
+      setError(null);
+      const res = await shareWithConversation(ref.kind, ref.id, activeIdRef.current, "view");
+      setCardBusy(null);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      if (res.granted > 0) {
+        // 받는 쪽 화면의 카드는 대화를 열 때 계산된 상태로 굳어 있다. 방금
+        // 권한을 줬다는 사실을 알려 그 카드만 다시 읽게 한다 — 안 그러면
+        // "줬다는데 여전히 잠겨 있다" 가 된다.
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "access",
+          payload: { kind: ref.kind, id: ref.id },
+        });
+      }
+      setNotice(
+        !res.canGrant
+          ? "Only the owner can grant access to this item."
+          : res.granted > 0
+            ? `${res.granted} ${res.granted === 1 ? "person" : "people"} in this chat can now open it.`
+            : res.members === 0
+              ? "No one else is in this conversation yet."
+              : "Everyone here could already open it."
+      );
+    },
+    []
+  );
+
+  const onRequestRefAccess = useCallback(
+    async (ref: RefToken) => {
+      const key = cardKey(ref.kind, ref.id);
+      setCardBusy(key);
+      setError(null);
+      const res = await requestAccess(ref.kind, ref.id);
+      setCardBusy(null);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setNotice(`Asked ${res.ownerName} for access — check your chat with them.`);
+      refreshList();
+    },
+    [refreshList]
+  );
 
   // 사진 전송 — 문서 에디터와 같은 공개 media 버킷({uid}/... 경로 정책)에
   // 올리고 이미지 토큰(![alt](url))으로 삽입한다.
@@ -801,15 +1073,51 @@ export function ChatShell({
     }
   };
 
-  const insertAttachment = (item: AttachableItem) => {
+  const insertAttachment = (item: AttachableObject) => {
     setMenu(null);
     setInput((v) => `${v}${v && !v.endsWith(" ") ? " " : ""}[[${item.kind}:${item.id}|${item.title.replaceAll("]", "")}]] `);
     inputRef.current?.focus();
   };
 
-  const openRef = (seg: { kind: TabKind; id: string; title: string }) => {
-    openTab(seg.kind, seg.id, seg.title === seg.kind ? "Loading…" : seg.title);
-  };
+  /**
+   * 첨부를 연다. 문서/코드/시트/링크그래프는 워크스페이스 탭으로, 파일은
+   * 미리보기 모달로(내려받지 않고 그 자리에서), 일정은 캘린더로 보낸다.
+   */
+  const openRef = useCallback(
+    (seg: RefToken) => {
+      const card = cards.get(cardKey(seg.kind, seg.id));
+      const title = card?.title || (seg.title === seg.kind ? "Loading…" : seg.title);
+
+      if (seg.kind === "file") {
+        setPreview({ id: seg.id, name: title, mime: card?.mime_type ?? null, size: card?.size_bytes ?? null });
+        return;
+      }
+      if (seg.kind === "event") {
+        router.push(`/calendar?event=${seg.id}`);
+        return;
+      }
+      openTab(seg.kind as TabKind, seg.id, title);
+    },
+    [cards, openTab, router]
+  );
+
+  const downloadFile = useCallback(async (fileId: string) => {
+    const res = await getSignedUrl(fileId);
+    if ("url" in res) triggerDownload(res.url);
+    else setError(res.error);
+  }, []);
+
+  const refCardApi = useMemo<RefCardApi>(
+    () => ({
+      cards,
+      selfId,
+      onOpen: openRef,
+      onShareHere: onShareRefHere,
+      onRequest: onRequestRefAccess,
+      busy: cardBusy,
+    }),
+    [cards, selfId, openRef, onShareRefHere, onRequestRefAccess, cardBusy]
+  );
 
   // ---- 서식 도구: textarea 선택 영역을 마크다운 문법으로 감싸거나 접두사를 붙인다 ----
   const applyWrap = (before: string, after = before, placeholder = "text") => {
@@ -888,6 +1196,7 @@ export function ChatShell({
   const showThread = !single || !!activeId;
 
   return (
+    <RefCardContext.Provider value={refCardApi}>
     <div className={`chat-shell ${variant === "float" ? "float" : ""} ${single ? "single" : ""}`}>
       {/* ------------------------------------------------ conversation list */}
       {showList && (
@@ -1048,6 +1357,21 @@ export function ChatShell({
             </div>
           )}
 
+          {notice && (
+            <div style={{ padding: "10px 20px 0" }}>
+              <div className="notice notice-ok chat-notice" style={{ margin: 0 }}>
+                <span>{notice}</span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setNotice(null)}
+                  aria-label="Dismiss"
+                >
+                  <IconClose size={11} />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="chat-messages" ref={scrollRef}>
             {!activeId && (
               <div className="chat-empty">Select a conversation, or start a new one.</div>
@@ -1118,7 +1442,7 @@ export function ChatShell({
                           </div>
                         ) : (
                           <>
-                            <CollapsibleBody content={m.content} onOpenRef={openRef} />
+                            <CollapsibleBody content={m.content} />
                             {m.edited_at && <span className="chat-edited">(edited)</span>}
                           </>
                         )}
@@ -1328,10 +1652,19 @@ export function ChatShell({
                       <button className="chat-attach-item chat-menu-back" onClick={() => setMenu("root")}>
                         <IconChevronLeft size={13} /> Back
                       </button>
-                      <div className="chat-attach-head label">ATTACH WORKSPACE ITEM</div>
+                      <div className="chat-attach-head label">ATTACH — DOCS, FILES, EVENTS</div>
+                      <input
+                        className="input chat-attach-search"
+                        placeholder="Search by name…"
+                        value={attachQuery}
+                        onChange={(e) => setAttachQuery(e.target.value)}
+                        autoFocus
+                      />
                       {!attachables && <div className="chat-empty" style={{ padding: 14 }}>Loading…</div>}
                       {attachables?.length === 0 && (
-                        <div className="chat-empty" style={{ padding: 14 }}>Nothing to attach yet.</div>
+                        <div className="chat-empty" style={{ padding: 14 }}>
+                          {attachQuery.trim() ? "Nothing matches." : "Nothing to attach yet."}
+                        </div>
                       )}
                       {attachables?.map((item) => (
                         <button
@@ -1339,10 +1672,13 @@ export function ChatShell({
                           className="chat-attach-item"
                           onClick={() => insertAttachment(item)}
                         >
-                          <span className="chat-ref-kind">{item.kind}</span>
+                          <span className="chat-ref-kind">{KIND_LABEL[item.kind] ?? item.kind}</span>
                           <span className="chat-attach-title">{item.title}</span>
                         </button>
                       ))}
+                      <div className="chat-attach-foot">
+                        Sending an attachment also gives everyone here access to it.
+                      </div>
                     </div>
                   )}
                   {menu === "emoji" && (
@@ -1462,7 +1798,16 @@ export function ChatShell({
           </button>
         </Modal>
       )}
+      {preview && (
+        <FilePreview
+          target={preview}
+          loadUrl={getPreviewUrl}
+          onDownload={() => downloadFile(preview.id)}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
+    </RefCardContext.Provider>
   );
 }
 

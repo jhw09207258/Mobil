@@ -11,6 +11,7 @@ import {
   IconMindmap,
   IconCoworkers,
   IconChat,
+  IconCalendar,
   IconEye,
   IconKey,
   IconConsole,
@@ -30,6 +31,7 @@ const MAIN: Item[] = [
   { href: "/mindmap", label: "Link Graph", icon: <IconMindmap /> },
   { href: "/big-brother", label: "Big Brother", icon: <IconEye /> },
   { href: "/chat", label: "Chat", icon: <IconChat /> },
+  { href: "/calendar", label: "Calendar", icon: <IconCalendar /> },
   { href: "/coworkers", label: "Co-workers", icon: <IconCoworkers /> },
 ];
 

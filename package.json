@@ -65,6 +65,7 @@
     "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "web-push": "^3.6.7",
     "y-codemirror.next": "^0.3.5",
     "y-monaco": "^0.1.6",
     "yjs": "^13.6.31"
@@ -75,6 +76,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/web-push": "^3.6.4",
     "eslint-config-next": "^15.5.20",
     "typescript": "^5.5.3"
   },

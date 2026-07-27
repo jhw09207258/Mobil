@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { OpenItemButton } from "../workspace/open-item-button";
+import { SendToChatButton } from "../send-to-chat-button";
 import { ShareDialog } from "@/components/share-dialog";
 import { shareMindMap, revokeMindMapShare, listMindMapShares } from "./actions";
 
@@ -87,6 +88,13 @@ export function MindMapList({ maps, userId }: { maps: MapRow[]; userId: string }
                         Share
                       </button>
                     )}
+                    <SendToChatButton
+                      kind="mindmap"
+                      id={m.id}
+                      title={m.title || "Untitled map"}
+                      canGrant={m.owner_id === userId}
+                      label="Chat"
+                    />
                     <OpenItemButton kind="mindmap" id={m.id} title={m.title || "Untitled map"} className="btn btn-ghost btn-sm">
                       Open
                     </OpenItemButton>

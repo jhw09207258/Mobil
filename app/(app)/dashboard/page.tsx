@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { Copyable } from "@/components/copyable";
 import { StorageBreakdownChart, StorageShareBar } from "./storage-chart";
 import { NetMonitor } from "./net-monitor";
+import { UpcomingStrip } from "./upcoming-strip";
 import "./dashboard.css";
 
 export default async function DashboardPage() {
@@ -20,6 +21,9 @@ export default async function DashboardPage() {
       supabase.rpc("my_content_breakdown"),
       supabase.rpc("platform_content_breakdown"),
     ]);
+
+  // 다음 일정 — 반복 규칙은 그대로 내려보내고 전개는 화면에서 한다.
+  const { data: upcoming } = await supabase.rpc("list_upcoming_events", { p_days: 7 });
 
   const fileCount = filesRes.count ?? 0;
   const docCount = docsRes.count ?? 0;
@@ -99,6 +103,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <UpcomingStrip rows={upcoming ?? []} />
     </div>
   );
 }

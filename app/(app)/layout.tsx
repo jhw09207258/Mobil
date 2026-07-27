@@ -12,6 +12,7 @@ import { NoZoom } from "./no-zoom";
 import { UploadToasts } from "./uploads/upload-toasts";
 import { ViewportFit } from "@/components/viewport-fit";
 import { AgentToasts } from "./big-brother/agent-toasts";
+import { ReminderHeartbeat } from "./push/reminder-heartbeat";
 
 export default async function AppLayout({
   children,
@@ -53,6 +54,7 @@ export default async function AppLayout({
           <ViewportFit />
           <UploadToasts />
           <AgentToasts />
+          <ReminderHeartbeat />
         </div>
       </WorkspaceProvider>
     </MobileNavProvider>

@@ -27,6 +27,10 @@ export function buildSecurityHeaders(pathname: string): [string, string][] {
     `script-src 'self' 'unsafe-inline'${needsEval ? " 'unsafe-eval'" : ""}`,
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
     "worker-src 'self' blob:",
+    // 파일 미리보기(PDF)는 Storage 도메인을 프레임에 직접 걸지 않는다 — 내용을
+    // 받아 blob: URL 로 바꿔 넣으므로 blob: 만 허용하면 된다. 원격 오리진을
+    // 프레임에 허용하는 것보다 좁다.
+    "frame-src 'self' blob:",
   ].join("; ");
 
   return [

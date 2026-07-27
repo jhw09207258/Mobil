@@ -9,7 +9,12 @@
 export const UUID_PATTERN =
   "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
-export type RefKind = "document" | "code" | "sheet" | "mindmap";
+/**
+ * 첨부 칩으로 그릴 수 있는 종류.
+ * file/event 는 워크스페이스 탭이 없다 — 파일은 미리보기 모달로, 일정은
+ * 캘린더로 연다(chat-shell 의 onOpenRef 가 분기한다).
+ */
+export type RefKind = "document" | "code" | "sheet" | "mindmap" | "file" | "event";
 
 export type InlineToken =
   | { t: "text"; text: string }
@@ -28,7 +33,13 @@ const ROUTE_TO_KIND: Record<string, RefKind> = {
   code: "code",
   sheets: "sheet",
   mindmap: "mindmap",
+  files: "file",
+  calendar: "event",
 };
+
+/** 토큰/경로 양쪽에서 쓰는 종류 목록 — 한 곳에서만 늘린다. */
+const REF_KINDS = "document|code|sheet|mindmap|file|event";
+const REF_ROUTES = "documents|code|sheets|mindmap|files|calendar";
 
 const INLINE_RE = new RegExp(
   "(?<code>`[^`\\n]+`)" +
@@ -38,18 +49,18 @@ const INLINE_RE = new RegExp(
     "|(?<strike>~~[^~\\n]+~~)" +
     "|(?<img>!\\[[^\\]\\n]*\\]\\(https?://[^\\s)]+\\))" +
     "|(?<link>\\[[^\\]\\n]+\\]\\(https?://[^\\s)]+\\))" +
-    `|(?<reftok>\\[\\[(?:document|code|sheet|mindmap):${UUID_PATTERN}\\|[^\\]]{1,160}\\]\\])` +
-    `|(?<refpath>(?:https?://[^\\s]*)?/(?:documents|code|sheets|mindmap)/${UUID_PATTERN})` +
+    `|(?<reftok>\\[\\[(?:${REF_KINDS}):${UUID_PATTERN}\\|[^\\]]{1,160}\\]\\])` +
+    `|(?<refpath>(?:https?://[^\\s]*)?/(?:${REF_ROUTES})/${UUID_PATTERN})` +
     "|(?<url>https?://[^\\s]+)" +
     "|(?<mention>@[\\p{L}\\p{N}_.-]+)",
   "gu"
 );
 
 const REFTOK_RE = new RegExp(
-  `\\[\\[(document|code|sheet|mindmap):(${UUID_PATTERN})\\|([^\\]]{1,160})\\]\\]`,
+  `\\[\\[(${REF_KINDS}):(${UUID_PATTERN})\\|([^\\]]{1,160})\\]\\]`,
   "i"
 );
-const REFPATH_RE = new RegExp(`/(documents|code|sheets|mindmap)/(${UUID_PATTERN})`, "i");
+const REFPATH_RE = new RegExp(`/(${REF_ROUTES})/(${UUID_PATTERN})`, "i");
 const LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/;
 const IMG_RE = /!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/;
 
@@ -122,6 +133,31 @@ function parseTextChunk(chunk: string, out: Block[]): void {
   }
   flushPara();
   flushList();
+}
+
+/**
+ * 메시지들에 등장하는 첨부 참조를 전부 모은다 — 카드 메타데이터를 한 번에
+ * 받아 오기 위한 것. 같은 항목이 여러 번 나와도 한 번만 담는다.
+ */
+export function extractRefs(contents: string[]): { kind: RefKind; id: string }[] {
+  const seen = new Set<string>();
+  const out: { kind: RefKind; id: string }[] = [];
+  for (const content of contents) {
+    for (const block of parseMessage(content)) {
+      const lines =
+        block.t === "para" ? block.lines : block.t === "list" ? block.items.map((i) => i.tokens) : [];
+      for (const line of lines) {
+        for (const tok of line) {
+          if (tok.t !== "ref") continue;
+          const key = `${tok.kind}:${tok.id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push({ kind: tok.kind, id: tok.id });
+        }
+      }
+    }
+  }
+  return out;
 }
 
 export function parseMessage(content: string): Block[] {
