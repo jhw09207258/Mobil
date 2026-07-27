@@ -1,8 +1,8 @@
-# Possion (H-1 Prototype, beta v1.6)
+# Possion (H-1 Prototype, beta v1.6.1)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 27, v1.6 by Haewon Jeong
+Last Update in July 27, v1.6.1 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
@@ -332,6 +332,7 @@ lib/recurrence.ts    반복 일정 전개(RRULE 부분집합 · IANA 시간대 �
 lib/ics.ts           iCalendar 읽기/쓰기(접기·이스케이프·종일 경계) — ics.test.mjs
 lib/push.ts          웹 푸시 발송(VAPID) — 죽은 구독 판별
 public/sw.js         서비스 워커 — 알림 수신만(오프라인 캐싱 없음)
+instrumentation.ts   서버 오류를 digest + 원문으로 로그에 남긴다(원인 추적용)
 components/          공용 UI (모달 · 공유 다이얼로그 · 복사 필드)
 supabase/migrations/ DB 마이그레이션
 docs/                구축 지시서
@@ -475,8 +476,13 @@ NOTIFY_DISPATCH_TOKEN=<관리자 콘솔에서 복사한 값>
 두드리는 주체는 셋 중 아무것이나 됩니다(여러 개여도 안전합니다 — 대상 선정이
 원자적이라 같은 알림이 두 번 나가지 않습니다).
 
-- **Vercel Cron** — `vercel.json` 에 이미 5분 간격으로 들어 있습니다. 배포만
-  하면 켜집니다(Hobby 플랜은 하루 1회로 제한되니 Pro 이상에서 의미가 있습니다).
+- **Vercel Cron** — `vercel.json` 에 아래 한 블록을 더하면 됩니다. **기본으로
+  넣어 두지 않았습니다** — Hobby 플랜은 하루 1회보다 잦은 cron 을 거부하고,
+  그 경우 배포 자체가 실패하기 때문입니다. Pro 이상에서만 추가하세요.
+
+  ```json
+  "crons": [{ "path": "/api/push/dispatch", "schedule": "*/5 * * * *" }]
+  ```
 - **pg_cron + pg_net** — Supabase 만으로 끝내고 싶을 때. SQL Editor 에서 한 번:
 
   ```sql
@@ -511,7 +517,21 @@ npm run dev
 3. Supabase Auth 의 Redirect URL 에 배포 도메인의 `/auth/callback` 추가
 4. (선택) 알림을 쓰려면 `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` · `VAPID_SUBJECT`,
    시간 기반 일정 알림까지 쓰려면 `NOTIFY_DISPATCH_TOKEN` — 위 "알림 설정" 참고.
-   `vercel.json` 의 cron 이 5분마다 `/api/push/dispatch` 를 부릅니다.
+
+> **미리보기(preview) 배포에도 환경 변수를 넣어야 합니다.** Vercel 은 변수마다
+> Production/Preview/Development 를 따로 켭니다. Preview 에 `NEXT_PUBLIC_SUPABASE_*`
+> 가 없으면 그 배포에서는 로그인 자체가 되지 않습니다.
+
+### 서버 오류의 실제 원인 보기
+
+프로덕션 빌드는 브라우저에 `An error occurred in the Server Components render`
+와 `digest: <숫자>` 만 보냅니다. 실제 메시지는 서버 로그에 있습니다 —
+`instrumentation.ts` 의 `onRequestError` 가 **digest 와 원문을 한 줄에 같이**
+찍습니다.
+
+- Vercel: Deployments → 해당 배포 → **Logs** 에서 `[possion:error]` 로 검색.
+  화면에서 본 digest 와 같은 값을 찾으면 그 줄에 원인이 적혀 있습니다.
+- 로컬: `npm run build && npm start` 후 같은 문자열이 콘솔에 나옵니다.
 
 ## 범위
 
@@ -580,6 +600,40 @@ npm run dev
 단위 테스트 7종 전부 통과(반복 일정은 UTC · Asia/Seoul · America/New_York ·
 Europe/Berlin · Australia/Sydney · Pacific/Kiritimati 6개 시간대에서, DST 전환
 케이스 포함). `npx tsc --noEmit` 과 `npm run build` 경고 없이 통과.
+
+### 배포 후 잡은 결함 (v1.6.1)
+
+배포된 화면에서 `/login` 이 Server Components 오류로 죽는다는 보고를 받고
+들여다보다, **미들웨어 matcher 가 정적 공개 파일까지 가로채고 있던 것**을
+찾았습니다. 미인증 요청을 `/login` 으로 307 시키는 미들웨어가 `.json`/`.js`
+는 걸러 내지 않아서, 이런 일이 벌어지고 있었습니다.
+
+| 요청 | 받던 것 | 결과 |
+| --- | --- | --- |
+| `/sw.js` | `/login` **HTML** | 브라우저가 MIME 타입을 이유로 서비스워커 등록 거부 → **웹 푸시가 통째로 동작 불가** |
+| `/manifest.json` | `/login` **HTML** | PWA 설치 정보 무시 → iOS 는 홈 화면 설치가 푸시의 전제라 **알림이 아예 불가능** |
+| `/browserconfig.xml` | `/login` HTML | Windows 타일 설정 무시 |
+
+즉 v1.6 의 알림 기능은 **배포 환경에서 한 번도 켜질 수 없는 상태**였습니다.
+matcher 에 파일명을 직접 적어 다시 새지 않게 했고, 보호된 경로(`/dashboard`
+`/settings` `/admin` `/api/*` 등 12개)가 여전히 로그인으로 튕기는지 함께
+확인했습니다.
+
+함께 손본 것:
+
+- **`vercel.json` 의 5분 cron 을 뺐습니다.** Hobby 플랜은 하루 1회보다 잦은
+  cron 을 거부하고 그때 **배포 자체가 실패**합니다 — 플랜을 모르는 채로 배포를
+  깨뜨릴 수 있는 파일을 두는 것보다, 필요한 사람이 한 블록 붙이는 편이 낫습니다.
+- **`instrumentation.ts` 추가** — digest 와 실제 오류 메시지를 한 줄에 함께
+  로그에 남깁니다. 이제 화면의 digest 로 원인을 바로 찾을 수 있습니다.
+- **`app/(auth)/error.tsx` 추가** — 로그인 화면에서 오류가 나도 루트 레이아웃째
+  날아가지 않고 "다시 시도 / 로그인으로" 가 남습니다.
+
+> 정직하게 적어 둡니다: 보고된 digest `3290735100` 자체는 로컬 프로덕션 빌드
+> (`/login`, `/login?redirect=…`, RSC 내비게이션, 환경 변수 있음·없음, 도달
+> 불가한 Supabase 주소 — 모두 200)에서 **재현하지 못했습니다.** 위 세 가지는
+> 재현·확인된 실제 결함이라 고쳤고, 원인이 그 밖에 있다면 이제
+> `[possion:error]` 로그가 그것을 이름으로 말해 줍니다.
 
 ### 개발 중 잡은 결함 (v1.6)
 
