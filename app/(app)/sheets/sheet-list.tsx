@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { OpenItemButton } from "../workspace/open-item-button";
 import { StarButton } from "../star-button";
+import { SendToChatButton } from "../send-to-chat-button";
 import { ShareDialog } from "@/components/share-dialog";
 import { shareSheet, revokeSheetShare, listSheetShares } from "./actions";
 
@@ -130,6 +131,13 @@ export function SheetList({
                         Share
                       </button>
                     )}
+                    <SendToChatButton
+                      kind="sheet"
+                      id={s.id}
+                      title={s.title || "Untitled sheet"}
+                      canGrant={s.owner_id === userId}
+                      label="Chat"
+                    />
                     <OpenItemButton kind="sheet" id={s.id} title={s.title || "Untitled sheet"} className="btn btn-ghost btn-sm">
                       Open
                     </OpenItemButton>

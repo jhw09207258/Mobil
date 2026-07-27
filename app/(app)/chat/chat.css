@@ -314,6 +314,84 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-3);
+  flex: none;
+}
+
+/* ---- 첨부 카드 ----
+   이름만 있는 칩에서 "무엇인지 / 누구 것인지 / 열 수 있는지" 까지 보여 주는
+   카드로 올렸다. 채팅에서 자료를 받은 사람이 그 자리에서 판단할 수 있어야
+   경로를 말로 불러 주는 일이 사라진다. */
+.chat-ref-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  padding: 8px 10px;
+  max-width: 380px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius);
+  vertical-align: middle;
+}
+.chat-ref-card.locked { border-style: dashed; }
+.chat-ref-card.gone { opacity: 0.65; }
+.chat-ref-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+}
+.chat-ref-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.chat-ref-open:hover .chat-ref-title { color: var(--steel-hover); }
+.chat-ref-title {
+  font-size: 13px;
+  color: var(--text-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s var(--ease-spring);
+}
+.chat-ref-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-ref-action { flex: none; }
+
+.chat-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chat-notice > span { flex: 1; }
+
+.chat-attach-search {
+  height: 30px;
+  margin: 4px 10px 6px;
+  width: calc(100% - 20px);
+  font-size: 12.5px;
+}
+.chat-attach-foot {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-0);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
+@media (max-width: 640px) {
+  .chat-ref-card { max-width: 100%; }
 }
 
 /* ---- 입력 바 + 서식/첨부 메뉴 ---- */

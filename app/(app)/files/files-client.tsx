@@ -8,8 +8,12 @@ import { startUploads, useUploads } from "../uploads/upload-store";
 import { ShareDialog } from "@/components/share-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { Modal } from "@/components/modal";
+import { FilePreview, previewMode, type PreviewTarget } from "@/components/file-preview";
 import { StarButton } from "../star-button";
-import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconDownload, IconChevronLeft } from "../icons";
+import { SendToChatButton } from "../send-to-chat-button";
+import { getPreviewUrl } from "../sharing/actions";
+import { triggerDownload } from "@/lib/download-file";
+import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconDownload, IconChevronLeft, IconEye } from "../icons";
 
 const KIND_ICON = {
   document: IconDocuments,
@@ -97,6 +101,8 @@ export function FilesClient({
   const [repoDialog, setRepoDialog] = useState<{ mode: "create" | "rename"; id?: string; name: string } | null>(null);
   // 파일 이름변경 모달(prompt 는 Tauri 웹뷰에서 동작하지 않음).
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
+  // 내려받지 않고 그 자리에서 보는 미리보기.
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
   const dragDepth = useRef(0);
   const [pending, start] = useTransition();
 
@@ -294,18 +300,12 @@ export function FilesClient({
   const download = (id: string) =>
     start(async () => {
       const res = await getSignedUrl(id);
-      if ("url" in res) {
-        // window.location.href 는 하드 네비게이션 — 데스크톱(Tauri 웹뷰)에서는
-        // 앱 화면 자체가 서명 URL 로 이동해버린다. 앵커 클릭으로 다운로드만
-        // 트리거한다(웹/데스크톱 동일 동작).
-        const a = document.createElement("a");
-        a.href = res.url;
-        a.download = "";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } else setError(res.error);
+      if ("url" in res) triggerDownload(res.url);
+      else setError(res.error);
     });
+
+  const openPreview = (f: FileRow) =>
+    setPreviewTarget({ id: f.id, name: f.file_name, mime: f.mime_type, size: f.size_bytes });
 
   const rename = (row: FileRow) => setRenameTarget({ id: row.id, name: row.file_name });
 
@@ -520,6 +520,12 @@ export function FilesClient({
                                   <OpenItemButton kind={item.kind} id={item.id} title={item.label} className="btn btn-ghost btn-sm">
                                     Open
                                   </OpenItemButton>
+                                  <SendToChatButton
+                                    kind={item.kind}
+                                    id={item.id}
+                                    title={item.label || "Untitled"}
+                                    label="Chat"
+                                  />
                                   {repoView !== "null" && (
                                     <button
                                       className="btn btn-ghost btn-sm"
@@ -625,7 +631,19 @@ export function FilesClient({
                         onChange={(v) => setStarred(f.id, v)}
                       />
                     </td>
-                    <td>{f.file_name}</td>
+                    <td>
+                      {previewMode(f.file_name, f.mime_type) === "none" ? (
+                        f.file_name
+                      ) : (
+                        <button
+                          className="link-btn"
+                          onClick={() => openPreview(f)}
+                          title="Preview without downloading"
+                        >
+                          {f.file_name}
+                        </button>
+                      )}
+                    </td>
                     <td className="mono muted col-hide-mobile" style={{ fontSize: 12 }}>
                       {f.mime_type || "—"}
                     </td>
@@ -652,6 +670,22 @@ export function FilesClient({
                             ))}
                           </select>
                         )}
+                        {previewMode(f.file_name, f.mime_type) !== "none" && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => openPreview(f)}
+                            title="Preview without downloading"
+                          >
+                            <IconEye size={13} /> Preview
+                          </button>
+                        )}
+                        <SendToChatButton
+                          kind="file"
+                          id={f.id}
+                          title={f.file_name}
+                          canGrant={owned}
+                          label="Chat"
+                        />
                         <button
                           className="btn btn-ghost btn-sm"
                           onClick={() => download(f.id)}
@@ -726,6 +760,15 @@ export function FilesClient({
           onConfirm={() => deleteFile(deleteTarget.id)}
           onDeleted={() => router.refresh()}
           onClose={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {previewTarget && (
+        <FilePreview
+          target={previewTarget}
+          loadUrl={getPreviewUrl}
+          onDownload={() => download(previewTarget.id)}
+          onClose={() => setPreviewTarget(null)}
         />
       )}
 

@@ -195,3 +195,61 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---- 다음 일정 ----
+   대시보드는 데스크톱에서 세로 스크롤이 없어야 하므로, 일정이 있을 때만
+   나타나는 얇은 한 줄로 둔다(없으면 컴포넌트가 아무것도 렌더하지 않는다). */
+.dash-upnext {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  padding: 8px 12px;
+  margin-top: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-0);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+.dash-upnext-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  min-width: 0;
+}
+.dash-upnext-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: none;
+  max-width: 260px;
+  padding: 4px 10px;
+  border-left: 3px solid var(--create);
+  border-radius: 4px;
+  background: var(--bg-3);
+  color: var(--text-1);
+  text-decoration: none;
+  font-size: 12px;
+  transition: background 0.15s var(--ease-spring);
+}
+.dash-upnext-item:hover { background: var(--bg-4); }
+.dash-upnext-when { color: var(--text-3); font-size: 11px; flex: none; }
+.dash-upnext-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-upnext-rsvp {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  padding: 0 5px;
+  flex: none;
+}
+@media (max-width: 640px) {
+  .dash-upnext { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .dash-upnext-list { width: 100%; }
+}

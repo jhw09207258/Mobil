@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { formatDate } from "@/lib/format";
 import { OpenItemButton } from "../workspace/open-item-button";
 import { StarButton } from "../star-button";
+import { SendToChatButton } from "../send-to-chat-button";
 import { ShareDialog } from "@/components/share-dialog";
 import { shareDocument, revokeDocumentShare, listDocumentShares } from "./actions";
 
@@ -132,6 +133,13 @@ export function DocumentsList({
                         Share
                       </button>
                     )}
+                    <SendToChatButton
+                      kind="document"
+                      id={d.id}
+                      title={d.title || "Untitled"}
+                      canGrant={d.owner_id === userId}
+                      label="Chat"
+                    />
                     <OpenItemButton kind="document" id={d.id} title={d.title || "Untitled"} className="btn btn-ghost btn-sm">
                       Open
                     </OpenItemButton>

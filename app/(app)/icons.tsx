@@ -122,6 +122,14 @@ export function IconChat({ size }: P) {
     </svg>
   );
 }
+export function IconCalendar({ size }: P) {
+  return (
+    <svg {...base(size)}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  );
+}
 export function IconPlus({ size }: P) {
   return (
     <svg {...base(size)}>
