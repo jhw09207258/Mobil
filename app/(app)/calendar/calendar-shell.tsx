@@ -586,7 +586,12 @@ function MonthView({
             <div
               key={dayKey(day)}
               className={`cal-cell ${outside ? "outside" : ""} ${sameDay(day, today) ? "today" : ""}`}
-              onDoubleClick={() => onPickDay(day)}
+              onDoubleClick={(e) => {
+                // 알약이나 버튼을 더블클릭한 것이면 새 일정을 만들지 않는다 —
+                // 그러지 않으면 "일정 열기" 와 "새 일정" 이 동시에 뜬다.
+                if ((e.target as HTMLElement).closest("button")) return;
+                onPickDay(day);
+              }}
             >
               <div className="cal-cell-head">
                 <button
@@ -688,7 +693,10 @@ function TimeGridView({
             <div
               key={dayKey(d)}
               className="cal-tg-allday-cell"
-              onDoubleClick={() => onPickAllDay(d)}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest(".cal-pill")) return;
+                onPickAllDay(d);
+              }}
             >
               {list.map((occ) => (
                 <button
@@ -721,7 +729,9 @@ function TimeGridView({
               <div
                 key={dayKey(d)}
                 className={`cal-tg-col ${sameDay(d, today) ? "today" : ""}`}
-                onDoubleClick={(e) => {
+                onClick={(e) => {
+                  // 일정 블록을 누른 것이면 그 일정을 여는 동작이므로 만들지 않는다.
+                  if ((e.target as HTMLElement).closest(".cal-block")) return;
                   const box = e.currentTarget.getBoundingClientRect();
                   const minutes = Math.floor(((e.clientY - box.top) / HOUR_PX) * 60 / 15) * 15;
                   const at = new Date(d.getFullYear(), d.getMonth(), d.getDate());

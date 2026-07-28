@@ -1,8 +1,8 @@
-# Possion (H-1 Prototype, beta v1.6.2)
+# Possion (H-1 Prototype, beta v1.6.3)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 28, v1.6.2 by Haewon Jeong
+Last Update in July 28, v1.6.3 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
@@ -111,6 +111,8 @@ Google/Apple Calendar 의 **달력·색·반복·ICS**, Teams/Outlook 의 **참�
 붙여 두기** 를 Possion 이 이미 가진 것들과 이어 붙였습니다.
 
 - **월 / 주 / 일 / 아젠다** 4가지 보기, 지금 시각 선, 겹치는 일정 나란히 배치
+- 주/일 보기의 **빈 칸을 한 번 탭**하면 그 시각(15분 단위)으로 새 일정이 열립니다
+  — 마우스와 터치가 같은 동작입니다
 - 달력 여러 개(색 구분) · **다른 사람에게 공유(viewer/editor)** · 체크박스로 보기 토글
 - **참석자 초대 + RSVP**(Going / Maybe / Can't go), 초대는 실시간 알림으로 도착
 - **반복 일정**(매일·매주·매달·매년, N 간격, 요일 지정, 종료일) — 규칙만 저장하고
@@ -576,7 +578,7 @@ curl https://<배포주소>/api/health
 
 ---
 
-## v1.6 상세 변경 기록 (v1.6.1 · v1.6.2 포함)
+## v1.6 상세 변경 기록 (v1.6.1 · v1.6.2 · v1.6.3 포함)
 
 ### 추가된 마이그레이션
 
@@ -584,6 +586,7 @@ curl https://<배포주소>/api/health
 | --- | --- |
 | `0068_web_push.sql` | `push_subscriptions`(구독 정보 — RLS 로 본인만) + `profiles.push_notifications`. `claim_chat_push_recipients`(보낸 사람 본인만 호출 가능, 45초 이내 읽은 사람 제외 — 이메일의 15분 쿨다운은 두지 않는다), `claim_chat_email_recipients` 를 **`p_exclude` 인자를 받도록 재정의**(푸시로 알린 사람은 메일에서 뺀다), `claim_event_push_recipients`(일정 편집 권한자만), `prune_push_subscription`/`touch_push_subscription` |
 | `0069_calendar_occurrences_and_reminders.sql` | `calendar_event_exceptions`(EXDATE) + `calendar_events.detached_from`·`next_reminder_at`. `delete_event_occurrence`·`detach_event_occurrence`(참석자·붙인 자료까지 복사, RSVP 는 초기화), `list_calendar_events`/`get_calendar_event`/`list_upcoming_events` 가 예외 목록과 시간대를 함께 반환, `set_next_reminder`, `app_secrets` + `get_dispatch_token`(관리자 전용), `claim_due_event_reminders`(토큰 인증 · `for update skip locked` 로 중복 발송 차단)·`set_next_reminder_by_token`·`prune_push_subscription_by_token`, `import_calendar_events`(한 문장 일괄 삽입) |
+| `0070_push_claim_is_idempotent.sql` (v1.6.3) | `chat_members.last_push_message` 추가. `claim_chat_push_recipients` 가 **같은 메시지를 두 번 청구해도 한 번만** 대상을 돌려주도록 재정의 — 아래 [전 기능 검증](#전-기능-검증-v163) 참고 |
 
 ### 새 파일
 
@@ -610,7 +613,9 @@ curl https://<배포주소>/api/health
 | `components/file-preview.tsx` | 상한 상향 + `TextDecoder` 스트리밍으로 잘린 경계의 글자 깨짐 수정 |
 | `lib/supabase/middleware.ts` | (v1.5 에서 추가한) 공개 경로 목록 유지 — 푸시 라우트는 인증이 필요하므로 추가하지 않았다 |
 | `public/manifest.json` | `start_url`/`scope`/`display: standalone`/테마색/maskable 아이콘/바로가기 |
-| `vercel.json` | 5분 간격 cron → `/api/push/dispatch` |
+| `app/(app)/calendar/calendar-shell.tsx` (v1.6.3) | 주/일 보기의 빈 칸을 **한 번 탭**하면 일정이 열린다(15분 단위 스냅). 일정 블록·알약 위의 클릭은 걸러 낸다 |
+| `app/api/health/route.ts` (v1.6.3) | 마이그레이션 상태를 `true`/`false`/`"unknown"` 3값으로. "함수 없음" 은 연결 성공으로 분류하고, `ok` 가 스키마까지 본다 |
+| `vercel.json` | 5분 간격 cron → `/api/push/dispatch` — **v1.6.1 에서 도로 뺐습니다**(Hobby 플랜이 거부해 배포가 통째로 실패). 지금은 수동 설정 항목입니다 |
 | `.env.example` | `VAPID_*`, `NOTIFY_DISPATCH_TOKEN`, `CRON_SECRET` |
 
 ### 검증 결과 (v1.6)
@@ -728,6 +733,98 @@ reduce` 에서는 이 전환을 전부 끕니다.
 > 남겨 둔 것: 주/일 보기의 빈 시간대를 **더블클릭**해 일정을 만드는 동작은
 > 데스크톱 전용입니다(터치에는 더블클릭이 없습니다). 모바일에서는 상단의
 > "New event" 와 월 보기 날짜 칸의 `+` 로 만들 수 있어 막다른 길은 없습니다.
+> → **v1.6.3 에서 해결했습니다.** 아래 참고.
+
+### 전 기능 검증 (v1.6.3)
+
+v1.6.2 에서 "남겨 둔 것" 으로 적었던 항목을 없애고, 그 김에 앱 전체를 한 번 더
+훑었습니다. 검증 과정에서 **결함 두 개**가 새로 나왔고 둘 다 고쳤습니다.
+
+**1) 터치로 일정 만들기 (남겨 둔 항목 해결).** 주/일 보기의 빈 칸을 **한 번
+탭**하면 그 시각으로 새 일정이 열립니다(구글 캘린더와 같은 동작). 더블클릭을
+기다릴 이유가 원래 없었습니다 — 빈 칸에는 다른 뜻의 클릭이 없기 때문입니다.
+
+- 시간 격자: 누른 y 좌표를 **15분 단위로 내림**해 그 시각으로 엽니다.
+- 종일 줄: 그 날짜의 종일 일정으로 엽니다.
+- 이미 있는 일정 블록/알약을 눌렀을 때는 "새로 만들기" 가 뜨면 안 되므로
+  `closest(".cal-block")` / `closest(".cal-pill")` 로 걸러냅니다.
+- 월 보기는 더블클릭을 유지하되(칸 자체가 날짜 선택을 겸합니다) 알약이나 `+`
+  버튼 위의 더블클릭은 무시합니다 — 그러지 않으면 "일정 열기" 와 "새 일정" 이
+  **동시에** 뜹니다. 이 겹침은 v1.6.2 에도 있던 버그입니다.
+
+**2) 같은 알림이 두 번 갈 수 있었다** (`0070_push_claim_is_idempotent.sql`).
+
+0068 은 `chat_members.last_push_at` 을 **쓰기만 하고 조건에서 읽지 않았습니다.**
+이름은 `claim_…`(가져가면 남에게 안 준다)인데 실제로는 아무것도 claim 하지
+않아, 같은 메시지로 두 번 부르면 같은 사람이 두 번 나왔습니다.
+
+평소에는 메시지당 한 번만 부르니 드러나지 않지만, 이 호출은 Next 의 `after()`
+안에서 **응답을 보낸 뒤에** 돌기 때문에 재시도(콜드 스타트 타임아웃, 배포 중
+인스턴스 교체)가 실제로 일어납니다. 이메일 쪽은 15분 쿨다운이 우연히 이 역할을
+해 주고 있었지만, 푸시는 "메시지마다 즉시" 가 정상 동작이라 쿨다운을 둘 수
+없습니다.
+
+그래서 쿨다운이 아니라 **멱등성**으로 막았습니다. 마지막으로 청구한 메시지 id
+(`last_push_message`)를 기억해 같은 메시지면 거릅니다.
+
+> 처음엔 시각 비교(`last_push_at < 메시지의 created_at`)로 짰다가 되돌렸습니다.
+> 한 트랜잭션 안에서는 `now()` 가 고정이라 "보낸 시각 == 청구 시각" 이 되어
+> **뒤이은 진짜 메시지가 조용히 삼켜졌습니다.** 알림이 두 번 가는 것보다 안 가는
+> 쪽이 나쁩니다. 메시지 동일성으로 판단하면 시계와 무관하게 둘 다 맞습니다.
+
+**3) `/api/health` 가 거짓 안심을 줬다.** 마이그레이션 적용 여부를
+`error.code !== "42883"` 로 판정하고 있었습니다. DB 에 **닿지도 못했을 때**의
+오류는 코드가 42883 이 아니므로 `"0067_calendar_integrations": true` — 즉
+"적용됨" 으로 보고했습니다. 배포가 깨졌을 때 이 화면을 보는 사람이
+마이그레이션을 후보에서 지워 버리게 되는데, 이 엔드포인트가 막으려던 바로 그
+오진입니다. 이제 **3값**(`true` / `false` / `"unknown"`)으로 답하고,
+"함수가 없다" 는 **연결은 성공**으로 분류하며(`reachable: true` + 스키마만
+뒤처짐), `ok` 는 연결과 스키마를 모두 봅니다.
+
+#### 검증 범위와 결과
+
+| 검사 | 결과 |
+| --- | --- |
+| 마이그레이션 0001~0070 을 **빈 PostgreSQL 16 에 처음부터** 재생 | 70개 전부 오류 없음 |
+| 시나리오 단언 75건 — 공유 15 · 캘린더 24 · 푸시 5 · 반복 예외/알림/가져오기 18 | 전부 통과 |
+| RLS 를 `authenticated` 롤로 직접 확인 13건 | 전부 통과 |
+| 단위 테스트 8개 파일 | 전부 통과 |
+| `npx tsc --noEmit` · `npm run build` | 경고 없이 통과 (20 라우트) |
+| 프로덕션 서버 라우트 스모크 15개 | 아래 참고 |
+| 앱이 부르는 **RPC 이름 69개 · 테이블 26개**가 스키마에 실제로 있는가 | 전부 존재 |
+| 그 RPC 들의 **인자 이름**이 DB 시그니처와 맞는가 | 전부 일치 |
+
+마지막 두 줄이 이번에 새로 넣은 검사입니다. `supabase.rpc("이름", { p_x: … })`
+는 문자열이라 **타입 검사가 오타를 잡지 못하고**, 틀리면 런타임에 404 로만
+드러납니다. 그래서 실제 스키마에서 `pg_proc` 을 읽어 호출부와 대조하고,
+기본값 없는 인자를 빠뜨린 호출도 함께 봅니다.
+
+라우트 스모크에서 확인한 것(프로덕션 빌드 + 미들웨어를 그대로 태운 상태):
+
+- `/sw.js` → `200 application/javascript`, `/manifest.json` → `200 application/json`
+  — v1.6.1 에서 고친 미들웨어 매처가 유지되고 있습니다. 이 둘이 로그인 HTML 로
+  돌아오면 웹 푸시와 PWA 설치가 통째로 죽습니다.
+- `/login` `/signup` → 200. **Supabase 호스트가 응답하지 않는 상태에서도** 200
+  입니다(v1.6.1 의 digest 3290735100 방어가 살아 있음).
+- `/dashboard` `/calendar` `/chat` `/files` `/settings` `/admin` → `307 → /login?redirect=…`
+- `/api/health` → 200 JSON. 값은 싣지 않고 존재 여부만.
+- `/api/calendar/feed` → 토큰이 없거나 틀리면 404(존재 여부를 흘리지 않음).
+
+#### 검증하면서 확인한 "버그가 아닌 것"
+
+돌려 보고 예상과 달랐지만 코드가 맞았던 것들입니다. 다음에 같은 자리에서
+멈추지 않도록 적어 둡니다.
+
+- `list_calendar_members` 는 **소유자를 빼고** 돌려줍니다. 소유자는
+  `calendars.owner_id` 이지 `calendar_members` 행이 아니고, 화면도 "SHARED
+  WITH" 로 같은 뜻으로 씁니다.
+- `share_object_with_conversation` 의 `members` 는 **나를 뺀** 대화 상대 수입니다.
+- `claim_chat_push_recipients` 가 방금 대화를 연 사람을 건너뛰는 것은 45초
+  "지금 보고 있는 중" 창입니다. 보고 있는 화면에 알림을 겹쳐 띄우지 않습니다.
+- `prune_push_subscription` 이 24자 미만 엔드포인트를 무시하는 것은 의도된
+  가드입니다(진짜 푸시 엔드포인트는 그보다 훨씬 깁니다).
+- 달력을 `viewer` 로 공유받은 사람은 `calendar_event_exceptions` 를 **읽을 수
+  있어야 합니다.** 취소된 회차를 모르면 그 사람 화면에만 유령 일정이 남습니다.
 
 ### JSON 관련 전수 점검 (v1.6.1)
 
