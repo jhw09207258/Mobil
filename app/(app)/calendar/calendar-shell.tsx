@@ -13,6 +13,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconClose,
+  IconMore,
   IconPlus,
   IconRefresh,
 } from "../icons";
@@ -436,7 +437,7 @@ export function CalendarShell({
                   aria-label={`Manage ${c.name}`}
                   title="Manage & share"
                 >
-                  ⋯
+                  <IconMore size={14} />
                 </button>
               )}
             </div>
@@ -455,6 +456,7 @@ export function CalendarShell({
         <div className="cal-main">
           {view === "month" && (
             <MonthView
+              maxPills={isMobile ? 2 : 3}
               anchor={anchor}
               dayOccurrences={dayOccurrences}
               eventColor={eventColor}
@@ -553,6 +555,7 @@ function MonthView({
   onPickDay,
   onOpen,
   onExpandDay,
+  maxPills,
 }: {
   anchor: Date;
   dayOccurrences: (d: Date) => Occurrence[];
@@ -560,6 +563,8 @@ function MonthView({
   onPickDay: (d: Date) => void;
   onOpen: (o: Occurrence) => void;
   onExpandDay: (d: Date) => void;
+  /** 한 칸에 보여 줄 일정 개수 — 좁은 화면에서는 칸이 낮아 더 적게 넣는다. */
+  maxPills: number;
 }) {
   const gridStart = startOfMonthGrid(anchor);
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
@@ -576,7 +581,7 @@ function MonthView({
         {days.map((day) => {
           const list = dayOccurrences(day);
           const outside = day.getMonth() !== anchor.getMonth();
-          const shown = list.slice(0, 3);
+          const shown = list.slice(0, maxPills);
           return (
             <div
               key={dayKey(day)}
@@ -597,7 +602,7 @@ function MonthView({
                   aria-label={`Add an event on ${day.toDateString()}`}
                   title="Add an event"
                 >
-                  +
+                  <IconPlus size={12} />
                 </button>
               </div>
               {shown.map((occ) => (
@@ -654,8 +659,16 @@ function TimeGridView({
   }, []);
 
   return (
-    // 열 개수는 CSS 가 알 수 없다(주=7, 일=1) — 커스텀 속성으로 넘긴다.
-    <div className="cal-timegrid" style={{ ["--cal-days" as string]: days.length }}>
+    // 열 개수와 "이 격자가 필요로 하는 최소 폭" 은 CSS 가 알 수 없다(주=7,
+    // 일=1). 좁은 화면에서 한 열이 최소 84px 은 되도록 최소 폭을 함께 넘기고,
+    // CSS 는 그 값으로 가로 스크롤 여부를 스스로 정한다.
+    <div
+      className="cal-timegrid"
+      style={{
+        ["--cal-days" as string]: days.length,
+        ["--cal-min-width" as string]: `calc(var(--cal-gutter, 58px) + ${days.length} * 84px)`,
+      }}
+    >
       <div className="cal-tg-head">
         <div className="cal-tg-gutter" />
         {days.map((d) => (
@@ -863,23 +876,38 @@ function AgendaView({
             })}
           </div>
           {list.map((occ) => (
-            <button key={occ.key} className="cal-agenda-row" onClick={() => onOpen(occ)}>
-              <span className="cal-dot" style={{ background: eventColor(occ) }} />
-              <span className="cal-agenda-when">
-                {occ.event.all_day ? "All day" : formatTime(occ.start)}
-              </span>
-              <span className="cal-agenda-title">{occ.event.title}</span>
-              <span className="cal-agenda-meta">
-                {[
-                  occ.event.location,
-                  occ.event.attendee_count > 1 ? `${occ.event.attendee_count} guests` : null,
-                  occ.event.link_count > 0 ? `${occ.event.link_count} attached` : null,
-                  occ.event.my_response === "needs_action" && occ.event.is_invited ? "Needs reply" : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </button>
+            <div key={occ.key} className="cal-agenda-item">
+              <button className="cal-agenda-row" onClick={() => onOpen(occ)}>
+                <span className="cal-dot" style={{ background: eventColor(occ) }} />
+                <span className="cal-agenda-when">
+                  {occ.event.all_day ? "All day" : formatTime(occ.start)}
+                </span>
+                <span className="cal-agenda-title">{occ.event.title}</span>
+                <span className="cal-agenda-meta">
+                  {[
+                    occ.event.location,
+                    occ.event.attendee_count > 1 ? `${occ.event.attendee_count} guests` : null,
+                    occ.event.link_count > 0 ? `${occ.event.link_count} attached` : null,
+                    occ.event.my_response === "needs_action" && occ.event.is_invited ? "Needs reply" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </button>
+              {/* 회의 직전에 목록에서 바로 들어갈 수 있어야 한다 — 일정을 열고
+                  링크를 찾는 단계가 있으면 아무도 안 쓴다. */}
+              {occ.event.conference_url && /^https?:\/\//i.test(occ.event.conference_url) && (
+                <a
+                  className="btn btn-sm cal-agenda-join"
+                  href={occ.event.conference_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Join
+                </a>
+              )}
+            </div>
           ))}
         </div>
       ))}

@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { describeRecurrence, formatRecurrence, parseRecurrence, DAY_LABELS, type Freq } from "@/lib/recurrence";
-import { listAttachables, type AttachableObject, type ObjectKind } from "../sharing/actions";
+import {
+  getObjectCards,
+  listAttachables,
+  type AttachableObject,
+  type ObjectCard,
+  type ObjectKind,
+} from "../sharing/actions";
+import { OpenItemButton } from "../workspace/open-item-button";
 import { SendToChatButton } from "../send-to-chat-button";
 import { IconClose } from "../icons";
 import {
@@ -111,8 +118,11 @@ export function EventDialog({
   const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
   const [repeatUntil, setRepeatUntil] = useState("");
 
-  // 붙어 있는 자료.
+  // 붙어 있는 자료. id 만으로는 사용자가 무엇인지 알 수 없으므로 제목까지
+  // 받아 온다 — "회의 전에 읽을 것을 그 자리에 둔다" 가 이 기능의 목적인데,
+  // 무엇인지 못 읽으면 목적을 이루지 못한다.
   const [links, setLinks] = useState<{ kind: string; id: string }[]>([]);
+  const [linkCards, setLinkCards] = useState<Map<string, ObjectCard>>(() => new Map());
   const [linkPicker, setLinkPicker] = useState(false);
   const [attachables, setAttachables] = useState<AttachableObject[] | null>(null);
   const [attachQuery, setAttachQuery] = useState("");
@@ -167,6 +177,29 @@ export function EventDialog({
       cancelled = true;
     };
   }, [mode]);
+
+  // 붙어 있는 자료의 제목/소유자 — 한 번에 받아 온다.
+  useEffect(() => {
+    const missing = links.filter((l) => !linkCards.has(`${l.kind}:${l.id}`));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    getObjectCards(missing).then(
+      (rows) => {
+        if (cancelled || rows.length === 0) return;
+        setLinkCards((prev) => {
+          const next = new Map(prev);
+          for (const row of rows) next.set(`${row.kind}:${row.id}`, row);
+          return next;
+        });
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+    // linkCards 를 의존성에 넣으면 서버가 못 돌려준 항목에서 무한 반복이 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [links]);
 
   // ---- 첨부 후보 ----
   useEffect(() => {
@@ -475,15 +508,29 @@ export function EventDialog({
         </div>
         <div className="field">
           <label className="label" htmlFor="cal-url">MEETING LINK</label>
-          <input
-            id="cal-url"
-            className="input"
-            value={conferenceUrl}
-            maxLength={500}
-            disabled={!editable}
-            placeholder="https://…"
-            onChange={(e) => setConferenceUrl(e.target.value)}
-          />
+          <div className="row" style={{ gap: 6 }}>
+            <input
+              id="cal-url"
+              className="input"
+              style={{ flex: 1, minWidth: 0 }}
+              value={conferenceUrl}
+              maxLength={500}
+              disabled={!editable}
+              placeholder="https://…"
+              onChange={(e) => setConferenceUrl(e.target.value)}
+            />
+            {/* 링크를 넣어 두기만 하고 열 수 없으면 그 필드는 존재할 이유가 없다. */}
+            {/^https?:\/\//i.test(conferenceUrl.trim()) && (
+              <a
+                className="btn btn-sm"
+                href={conferenceUrl.trim()}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Join
+              </a>
+            )}
+          </div>
         </div>
       </div>
 
@@ -666,22 +713,40 @@ export function EventDialog({
                 Nothing attached — add the doc everyone should read before this meeting.
               </span>
             )}
-            {links.map((l) => (
-              <span key={`${l.kind}:${l.id}`} className="cal-link-chip">
-                <span className="chat-ref-kind">{KIND_LABEL[l.kind] ?? l.kind}</span>
-                <span className="cal-link-id mono">{l.id.slice(0, 8)}</span>
-                {editable && (
-                  <button
-                    type="button"
-                    className="cal-link-x"
-                    onClick={() => removeLink(l.kind, l.id)}
-                    aria-label="Remove"
-                  >
-                    <IconClose size={10} />
-                  </button>
-                )}
-              </span>
-            ))}
+            {links.map((l) => {
+              const card = linkCards.get(`${l.kind}:${l.id}`);
+              const label = card?.title ?? (card ? "No access" : "Loading…");
+              return (
+                <span
+                  key={`${l.kind}:${l.id}`}
+                  className={`cal-link-chip ${card && !card.can_view ? "locked" : ""}`}
+                >
+                  <span className="chat-ref-kind">{KIND_LABEL[l.kind] ?? l.kind}</span>
+                  {l.kind === "file" || !card?.can_view ? (
+                    <span className="cal-link-name" title={label}>{label}</span>
+                  ) : (
+                    <OpenItemButton
+                      kind={l.kind as "document" | "code" | "sheet" | "mindmap"}
+                      id={l.id}
+                      title={label}
+                      className="cal-link-name link-btn"
+                    >
+                      {label}
+                    </OpenItemButton>
+                  )}
+                  {editable && (
+                    <button
+                      type="button"
+                      className="cal-link-x"
+                      onClick={() => removeLink(l.kind, l.id)}
+                      aria-label={`Remove ${label}`}
+                    >
+                      <IconClose size={10} />
+                    </button>
+                  )}
+                </span>
+              );
+            })}
           </div>
           {editable && (
             <div style={{ marginTop: 8 }}>

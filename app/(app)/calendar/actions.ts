@@ -6,7 +6,6 @@ import { requireApprovedUser as requireUser } from "@/lib/auth";
 import { parseIcs } from "@/lib/ics";
 import { nextReminderAt } from "@/lib/recurrence";
 import { pushConfigured, sendPush, type PushTarget } from "@/lib/push";
-import { sendChatMessage } from "../chat/actions";
 
 /**
  * 캘린더 서버 액션.
@@ -491,26 +490,6 @@ export async function unlinkEventObject(
     p_id: objectId,
   });
   if (error) return { error: "Could not remove that item." };
-  return { ok: true };
-}
-
-// ---------------------------------------------------------------- 채팅 연동
-
-/** 일정을 대화로 보낸다 — 참석자 초대와는 별개로, 그냥 알리는 경로. */
-export async function sendEventToChat(
-  eventId: string,
-  title: string,
-  conversationId: string,
-  note?: string
-): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
-  if (!UUID_RE.test(eventId) || !UUID_RE.test(conversationId)) {
-    return { error: "Invalid target." };
-  }
-  const safe = (title || "Event").replace(/[[\]|\n]/g, " ").trim().slice(0, 120);
-  const body = [note?.trim(), `[[event:${eventId}|${safe || "Event"}]]`].filter(Boolean).join("\n");
-  const sent = await sendChatMessage(conversationId, body);
-  if ("error" in sent) return { error: sent.error };
   return { ok: true };
 }
 

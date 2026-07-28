@@ -288,31 +288,6 @@ export async function listChatContacts(): Promise<ChatContact[]> {
   }));
 }
 
-/** 메시지에 첨부할 수 있는 내 워크스페이스 항목(문서/코드/시트/마인드맵).
- * RLS 가 접근 가능 범위를 강제하므로 여기서는 최근 항목만 모은다. */
-export type AttachableItem = {
-  kind: "document" | "code" | "sheet" | "mindmap";
-  id: string;
-  title: string;
-};
-
-export async function listAttachableItems(): Promise<AttachableItem[]> {
-  await requireUser();
-  const supabase = await createClient();
-  const [docs, code, sheets, maps] = await Promise.all([
-    supabase.from("documents").select("id, title").order("updated_at", { ascending: false }).limit(25),
-    supabase.from("code_files").select("id, name").order("updated_at", { ascending: false }).limit(25),
-    supabase.from("sheets").select("id, title").order("updated_at", { ascending: false }).limit(25),
-    supabase.from("mind_maps").select("id, title").order("updated_at", { ascending: false }).limit(25),
-  ]);
-  const out: AttachableItem[] = [];
-  for (const d of docs.data ?? []) out.push({ kind: "document", id: d.id, title: d.title || "Untitled" });
-  for (const c of code.data ?? []) out.push({ kind: "code", id: c.id, title: c.name });
-  for (const s of sheets.data ?? []) out.push({ kind: "sheet", id: s.id, title: s.title || "Untitled" });
-  for (const m of maps.data ?? []) out.push({ kind: "mindmap", id: m.id, title: m.title || "Untitled" });
-  return out;
-}
-
 /** 이 대화에 Big Brother 가 들어와 있는지. */
 export async function getBigBrotherEnabled(conversationId: string): Promise<boolean> {
   await requireUser();
