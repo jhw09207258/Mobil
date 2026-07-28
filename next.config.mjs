@@ -19,6 +19,10 @@ const nextConfig = {
   poweredByHeader: false,
   compress: true,
   productionBrowserSourceMaps: false,
+  // web-push 는 서버에서만 쓰는 CommonJS 패키지다. 번들러가 끌어안으면 배포
+  // 환경(서버리스)에서만 로드에 실패하는 부류의 문제가 생길 수 있으므로,
+  // 번들에 넣지 말고 런타임에 Node 가 직접 require 하게 둔다.
+  serverExternalPackages: ["web-push"],
   experimental: {
     // 대형 CodeMirror/Tiptap/fortune-sheet 임포트를 트리셰이킹 친화적으로 최적화
     optimizePackageImports: [

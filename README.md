@@ -320,6 +320,7 @@ app/
   api/calendar/feed/ ICS 구독 피드(로그인 없이, 토큰으로만 인증)
   api/push/dispatch/ 일정 알림 발송기(cron·pg_net·열린 창 중 무엇이 불러도 됨)
   api/push/resubscribe/ 브라우저가 구독을 갱신했을 때 서비스 워커가 부르는 곳
+  api/health/        배포 환경 진단(로그인 없이, 값은 절대 싣지 않음)
   auth/              콜백 · 로그아웃 라우트
 components/codemirror/ 코드 에디터 래퍼 · 테마 · 언어 매핑
 components/file-preview.tsx 파일을 내려받지 않고 보는 미리보기 모달
@@ -330,7 +331,8 @@ lib/ontology-links.ts 마인드맵/문서 콘텐츠에서 온톨로지 링크 �
 lib/use-media-query.ts SSR 안전 반응형 훅(useIsMobile 등)
 lib/recurrence.ts    반복 일정 전개(RRULE 부분집합 · IANA 시간대 · EXDATE) — recurrence.test.mjs
 lib/ics.ts           iCalendar 읽기/쓰기(접기·이스케이프·종일 경계) — ics.test.mjs
-lib/push.ts          웹 푸시 발송(VAPID) — 죽은 구독 판별
+lib/push.ts          웹 푸시 발송(VAPID) — 죽은 구독 판별, web-push 는 지연 로드
+lib/fetch-json.ts    API 응답을 방어적으로 읽는다(로그인 리다이렉트/HTML 구분)
 public/sw.js         서비스 워커 — 알림 수신만(오프라인 캐싱 없음)
 instrumentation.ts   서버 오류를 digest + 원문으로 로그에 남긴다(원인 추적용)
 components/          공용 UI (모달 · 공유 다이얼로그 · 복사 필드)
@@ -522,16 +524,48 @@ npm run dev
 > Production/Preview/Development 를 따로 켭니다. Preview 에 `NEXT_PUBLIC_SUPABASE_*`
 > 가 없으면 그 배포에서는 로그인 자체가 되지 않습니다.
 
-### 서버 오류의 실제 원인 보기
+### 배포에서만 나는 오류를 잡는 법
 
-프로덕션 빌드는 브라우저에 `An error occurred in the Server Components render`
-와 `digest: <숫자>` 만 보냅니다. 실제 메시지는 서버 로그에 있습니다 —
-`instrumentation.ts` 의 `onRequestError` 가 **digest 와 원문을 한 줄에 같이**
-찍습니다.
+**digest 는 왜 재현이 안 되는가.** 프로덕션 빌드는 브라우저에
+`An error occurred in the Server Components render` 와 `digest: <숫자>` 만
+보냅니다. digest 는 서버가 오류 내용으로 만든 **해시**라 되돌릴 수 없고,
+같은 오류가 나야만 같은 값이 나옵니다. 즉 digest 만으로는 원인을 알 수도,
+로컬에서 같은 상황을 만들 수도 없습니다 — 그 오류를 일으킨 **환경**을 알아야
+합니다. 그래서 다음 세 가지를 갖춰 두었습니다.
+
+**① `/api/health` — 배포 환경이 지금 무엇을 갖고 있는지 한 번에.**
+
+로그인 없이 열립니다(로그인이 깨졌을 때 봐야 하는 창이므로). **값은 절대
+싣지 않고** 설정 여부(true/false)와 그 결과 켜지는 기능만 말합니다.
+
+```bash
+curl https://<배포주소>/api/health
+```
+
+```jsonc
+{
+  "ok": false,                       // core 가 false 면 앱이 정상일 수 없다
+  "runtime": { "node": "v22.x", "env": "preview" },
+  "env": { "NEXT_PUBLIC_SUPABASE_URL": true, "VAPID_PUBLIC_KEY": false, … },
+  "webPush": { "loads": true, "error": null },   // 라이브러리 로드 가능 여부
+  "db": { "reachable": true, "error": null,
+          "migrations": { "0067_calendar_integrations": true } },
+  "features": { "core": true, "webPush": false, "eventReminders": false }
+}
+```
+
+이 한 번의 호출로 네 가지가 갈립니다 — **환경 변수 누락 / 라이브러리 로드 실패
+/ DB 도달 불가 / 마이그레이션 미적용**. `db.error` 가 `missing-function` 이면
+마이그레이션이 덜 돌았다는 뜻입니다.
+
+**② `instrumentation.ts` — digest 옆에 실제 메시지를 찍는다.**
 
 - Vercel: Deployments → 해당 배포 → **Logs** 에서 `[possion:error]` 로 검색.
   화면에서 본 digest 와 같은 값을 찾으면 그 줄에 원인이 적혀 있습니다.
 - 로컬: `npm run build && npm start` 후 같은 문자열이 콘솔에 나옵니다.
+
+**③ 오류 경계** — `app/(auth)/error.tsx` 와 `app/global-error.tsx` 가 digest 를
+화면에 함께 보여 줍니다. 그 값을 ①②와 맞추면 됩니다.
 
 ## 범위
 
@@ -631,9 +665,50 @@ matcher 에 파일명을 직접 적어 다시 새지 않게 했고, 보호된 �
 
 > 정직하게 적어 둡니다: 보고된 digest `3290735100` 자체는 로컬 프로덕션 빌드
 > (`/login`, `/login?redirect=…`, RSC 내비게이션, 환경 변수 있음·없음, 도달
-> 불가한 Supabase 주소 — 모두 200)에서 **재현하지 못했습니다.** 위 세 가지는
-> 재현·확인된 실제 결함이라 고쳤고, 원인이 그 밖에 있다면 이제
-> `[possion:error]` 로그가 그것을 이름으로 말해 줍니다.
+> 불가한 Supabase 주소 — 모두 200)에서 **재현하지 못했습니다.** digest 는 오류
+> 내용의 해시라 되돌릴 수 없고, 같은 오류를 일으키는 **환경**을 알아야 재현이
+> 되기 때문입니다. 그래서 원인을 추측으로 좁히는 대신 배포 환경이 스스로
+> 답하게 만들었습니다 — 위 [배포에서만 나는 오류를 잡는 법](#배포에서만-나는-오류를-잡는-법) 의
+> `/api/health` 와 `[possion:error]` 로그입니다.
+
+### JSON 관련 전수 점검 (v1.6.1)
+
+이번 사건이 "JSON 이어야 할 응답이 HTML 로 왔다" 였으므로, 같은 부류를 전부
+훑었습니다.
+
+**정적 JSON/XML 파일** — 저장소의 8개 JSON(`package.json` `tsconfig.json`
+`vercel.json` `public/manifest.json` `src-tauri/tauri.conf.json`
+`src-tauri/capabilities/default.json` `.vscode/settings.json` `package-lock.json`)과
+`public/browserconfig.xml` 을 전부 파싱해 확인했습니다 — 모두 정상.
+
+**JSON 을 읽는 코드 23곳** — 전부 확인했고, 보호가 없던 두 곳을 고쳤습니다.
+문제의 모양은 사건과 똑같습니다: 세션이 만료되면 미들웨어가 `/api/...` 요청을
+`/login` 으로 튕기고, fetch 는 리다이렉트를 따라가 **로그인 페이지 HTML** 을
+받습니다. 그걸 그대로 `res.json()` 하면 사용자에게 `Unexpected token '<'` 이
+그대로 나옵니다.
+
+| 위치 | 전 | 후 |
+| --- | --- | --- |
+| `big-brother/agent-store.ts` | `res.json()` 직행 | `fetchJson` — "Your session expired — sign in again." |
+| `code/[id]/assist-panel.tsx` | `res.json()` 직행 | 〃 |
+
+공통 경로를 `lib/fetch-json.ts` 로 뽑았습니다. 로그인 리다이렉트·HTML 오류
+페이지·깨진 JSON·네트워크 실패를 각각 구분해 사람이 읽을 수 있는 말로 바꾸고,
+**HTML 조각이나 파서의 불평이 화면에 새어 나가지 않게** 합니다. 단위 테스트
+(`lib/fetch-json.test.mjs`) 10건으로 그 동작을 고정했습니다.
+
+같은 점검에서 함께 고친 것:
+
+- `agent-store.ts` 가 시작 응답의 `interactionId` 를 확인하지 않고 폴링을
+  시작하던 것 — 값이 없으면 `undefined` 로 계속 폴링하며 알 수 없는 오류를
+  냈습니다. 응답 타입을 `StartedTurn`/`PolledTurn` 실제 타입으로 바꾸고,
+  없으면 그 자리에서 이유를 말하도록 했습니다.
+- **`lib/push.ts` 의 `web-push` 를 동적 import 로.** 최상위 import 는 이
+  모듈을 참조하는 모든 라우트의 서버 번들에 딸려 들어가서, 그 라이브러리가
+  어떤 배포 환경에서 로드에 실패하면 **알림과 무관한 페이지의 렌더까지 죽습니다**.
+  알림 라이브러리가 로그인 화면을 무너뜨릴 수 있어서는 안 됩니다. 함께
+  `next.config.mjs` 에 `serverExternalPackages: ["web-push"]` 를 넣어 번들링
+  자체를 피했고, `/api/health` 의 `webPush.loads` 로 밖에서 확인할 수 있습니다.
 
 ### 개발 중 잡은 결함 (v1.6)
 

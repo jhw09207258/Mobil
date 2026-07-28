@@ -1,7 +1,13 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { AGENT_MODELS, type AgentStep } from "@/lib/antigravity";
+import { fetchJson } from "@/lib/fetch-json";
+import {
+  AGENT_MODELS,
+  type AgentStep,
+  type PolledTurn,
+  type StartedTurn,
+} from "@/lib/antigravity";
 
 // ============================================================================
 // Agent 실행 상태 — React 트리 밖의 모듈 싱글톤.
@@ -185,15 +191,29 @@ export function setPersister(fn: Persist) {
   persist = fn;
 }
 
+/**
+ * /api/antigravity 의 응답 — 시작(StartedTurn)과 폴링(PolledTurn) 두 모양이
+ * 같은 엔드포인트로 나온다. 어느 쪽이 올지는 보낸 action 이 정하므로 둘의
+ * 합집합으로 받고, 실제로 쓰기 전에 필요한 필드가 왔는지 확인한다.
+ */
+type AgentApiReply = Partial<PolledTurn> &
+  Partial<StartedTurn> & {
+    mountedCount?: number;
+    skipped?: string[];
+    error?: string;
+  };
+
 async function call(spaceId: string, model: string, payload: Record<string, unknown>) {
-  const res = await fetch("/api/antigravity", {
+  // fetchJson 을 쓰는 이유: 세션이 만료되면 이 요청은 로그인 페이지 HTML 을
+  // 받아 오고, 그대로 res.json() 하면 "Unexpected token '<'" 이 사용자에게
+  // 그대로 튀어나온다. 진짜 원인("다시 로그인하세요")을 말해 주어야 한다.
+  const res = await fetchJson<AgentApiReply>("/api/antigravity", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ spaceId, model, ...payload }),
   });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || `Request failed (${res.status})`);
-  return json;
+  if (!res.ok) throw new Error(res.error);
+  return res.data;
 }
 
 /**
@@ -236,6 +256,11 @@ export async function startRun(spaceId: string, text: string) {
       }
     }
 
+    // 시작 응답에 interactionId 가 없으면 폴링할 대상이 없다 — 예전에는
+    // undefined 로 계속 폴링해 알 수 없는 오류가 났다.
+    if (!started.interactionId) {
+      throw new Error("The agent did not start — no interaction was returned.");
+    }
     let id: string = started.interactionId;
     let env: string | undefined = started.environmentId ?? run.environmentId;
     let printedId = "";
@@ -307,7 +332,9 @@ export async function startRun(spaceId: string, text: string) {
         break;
       }
 
-      if (p.interactionId !== id) {
+      // 도구를 실행하면 다음 interaction 으로 넘어간다. 값이 없으면 넘어갈
+      // 곳이 없다는 뜻이므로 지금 id 를 그대로 유지한다.
+      if (p.interactionId && p.interactionId !== id) {
         id = p.interactionId;
         printedCount = 0;
       }
