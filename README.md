@@ -1,8 +1,8 @@
-# Possion (H-1 Prototype, beta v1.6.3)
+# Possion (H-1 Prototype, beta v1.6.4)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 28, v1.6.3 by Haewon Jeong
+Last Update in July 29, v1.6.4 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
@@ -578,6 +578,108 @@ curl https://<배포주소>/api/health
 
 ---
 
+## 꼬리 지연(tail latency) 측정과 개선 — v1.6.4
+
+기능별 응답시간을 **백분위**로 재고, 꼬리를 만드는 구조를 찾아 고쳤습니다.
+산술평균은 쓰지 않았습니다 — 이 시스템에서 평균은 존재하지 않는 요청을 묘사합니다
+(통합 검색은 드문 낱말 1.1 ms, 흔한 낱말 298 ms 였고, 그 평균 75 ms 인 요청은 없습니다).
+
+### 측정 방법과 그 한계
+
+**프로덕션 텔레메트리가 없습니다**(APM·요청 로그 미설치). 그래서 배포 환경의 실제
+백분위는 이 문서에 없습니다. 대신 재현 가능한 환경에서 측정했습니다.
+
+- 스키마 0001–0072 를 빈 PostgreSQL 16 에 재생하고, 50명이 1년 쓴 규모를 넣었습니다
+  (메시지 40,000 · 일정 6,000 · 참석자 24,000 · 문서 3,000 · 파일 4,000 · 권한 9,000).
+- **`authenticated` 롤로** 실행했습니다. 슈퍼유저로 재면 RLS 를 통째로 건너뛰어
+  사용자가 겪는 시간이 나오지 않습니다 — 처음에 이 실수를 했고, 결과가 달라져 다시 쟀습니다.
+- 표본은 기능당 5,000~20,000건입니다. **p999 는 꼬리 표본이 n/1000 개뿐**이라
+  아래 표에는 언제나 n 을 함께 적었습니다. n=2,000 의 p999 는 꼬리 두 건으로 나온 값입니다.
+- HTTP 는 프로덕션 빌드에 `getrusage(2)`·`PerformanceObserver` 관찰자를 붙여 측정했습니다.
+
+### 무엇이 꼬리를 만들고 있었나
+
+세 가지 모두 같은 병이었습니다 — **행마다, 한 건씩, 차례로.**
+
+| 구조 | 증상 |
+| --- | --- |
+| 권한 판정이 행마다 함수 호출 | `can_view_calendar` · `can_view_object` 는 SECURITY DEFINER 라 플래너가 인라인할 수 없습니다. WHERE 에 두면 인덱스로 행을 줄이지 못하고 전체를 훑으며 행마다 함수를 부릅니다. 통합 검색은 후보 3,000행에 3,000번 호출했습니다 |
+| 같은 테이블을 행마다 네 번 | `attendee_count`/`accepted_count`/`my_response`/`is_invited` 가 각각 상관 서브쿼리라, 일정 하나마다 참석자 테이블을 네 번 훑었습니다. 376행에 shared buffer 25,405회 — 행당 68회 |
+| 비싼 계산이 필터보다 앞 | 검색이 union **뒤에** 권한 필터를 두어, 버려질 행의 스니펫(문서 본문 전체 파싱)까지 이미 계산한 뒤였습니다 |
+
+**꼬리는 사용자 편차를 따라 증폭됩니다.** 이 비용은 범위 안의 행 수에 비례하고,
+달력을 여러 개 공유받은 사람일수록 행이 많습니다 — 그 사람이 바로 p99·p999 에 앉아
+있는 사용자입니다. 즉 꼬리를 만든 것은 시스템 잡음이 아니라 **입력 분포**였습니다.
+
+### 고친 결과 (같은 DB · 같은 데이터 · 같은 하네스)
+
+| 기능 | p50 | p99 | p999 | 배율(p999) |
+| --- | --- | --- | --- | --- |
+| 통합 검색 — 이전 (n=2,000) | 211.6 ms | 268.1 ms | 371.6 ms | |
+| 통합 검색 — 이후 (n=5,000) | **4.3 ms** | **5.9 ms** | **8.1 ms** | **46×** |
+| 캘린더 한 달 조회 — 이전 (n=2,000) | 136.5 ms | 195.0 ms | 218.7 ms | |
+| 캘린더 한 달 조회 — 이후 (n=5,000) | **5.3 ms** | **7.7 ms** | **10.1 ms** | **21.6×** |
+| 다가오는 일정 — 이전 (n=2,000) | 101.4 ms | 122.6 ms | 145.2 ms | |
+| 다가오는 일정 — 이후 (n=5,000) | **2.8 ms** | **4.6 ms** | **5.3 ms** | **27.4×** |
+
+버퍼 접근은 25,405 → 4,083 으로 줄었습니다. 드문 낱말 검색만 0.9 → 1.4 ms 로
+조금 느려졌는데, p999 를 363 ms 줄이는 대가로는 받아들일 만합니다.
+
+> **반환 결과가 같은지 따로 검증했습니다.** 빨라졌는데 답이 달라졌으면 최적화가
+> 아니라 버그입니다. 캘린더 두 함수는 50명 × 6기간을 전 컬럼 대조해 **차이 0건**
+> 이었습니다(처음 시도에서 44,470건 차이가 나 원인을 찾아 고쳤습니다 — 초대만
+> 받고 달력은 공유받지 않은 일정의 달력 이름이 NULL 이 되고 있었습니다).
+> 검색은 동점 처리가 원본부터 임의라 계약으로 검증했습니다 — 350건에서 행 수 일치,
+> rank 분포 일치, **권한 없는 행 0건**.
+
+### head-of-line blocking — 한 건이 나머지를 막던 자리
+
+| 위치 | 무슨 일이 있었나 | 고침 |
+| --- | --- | --- |
+| `app/api/push/dispatch/route.ts` | 회수한 알림 50건을 `for … await` 로 하나씩 처리. 푸시는 외부 서비스(FCM/APNs) 호출이라 한 건이 몇 초 걸리는 일이 드물지 않고, 그 뒤로 49건이 전부 대기. 09:00 회의 알림이 남의 느린 엔드포인트 때문에 늦는 구조 | 상한 8의 동시 처리. 한 건이 느려도 그 작업자만 붙잡힌다 |
+| `lib/chat-notify.ts` | 푸시 후 죽은 구독 정리·생존 표시를 한 건씩. 12명 그룹이면 왕복 24번이고 그 **맨 뒤에 이메일 폴백**이 걸린다 | `Promise.all` |
+| `lib/auth.ts` · `lib/supabase/server.ts` | `requireUser()` 는 호출마다 직렬 왕복 2번(`auth.getUser()` 는 GoTrue 에 실제 요청을 보낸다). 125곳이 부르고 레이아웃·페이지가 각각 부른다 — 미들웨어까지 합쳐 `/dashboard` 한 장이 인증 왕복 6번으로 시작했고 그중 4번은 같은 질문의 반복 | React `cache()` 로 요청당 한 번 |
+
+### 부하와 큐 — "응답시간"의 대부분은 일하는 시간이 아니었다
+
+프로덕션 빌드의 `/login` 을 동시성 1 → 32 로 올리며 측정했습니다.
+
+| 동시성 | 처리량 | p50 | p99 | p999 |
+| --- | --- | --- | --- | --- |
+| 1 | 107.8 req/s | 8.4 ms | 19.4 ms | 45.9 ms |
+| 8 | 129.5 req/s | 59.4 ms | 110.3 ms | 148.8 ms |
+| 32 | 137.7 req/s | 227.5 ms | 347.1 ms | 428.7 ms |
+
+**동시성을 32배 올렸는데 처리량은 1.28배만 늘었습니다.** 나머지는 전부 큐입니다.
+리틀의 법칙으로 확인하면 동시성 32의 예상 체류시간 = 32 ÷ 137.7 = 232 ms, 실측 p50 은
+227.5 ms — 거의 정확히 일치합니다. 이 화면의 **진짜 서비스 시간은 동시성 1의 8.4 ms**
+이고 나머지는 기다린 시간입니다.
+
+### 컨텍스트 스위치 · 페이지 폴트 · GC 정지 · TCP 재전송
+
+워커 프로세스 안에서 직접 수집한 값입니다(밖에서 `/proc` 을 긁은 것이 아닙니다).
+
+| 후보 | 실측 | 주원인인가 |
+| --- | --- | --- |
+| **큐 대기** | 동시성 32의 p50 227.5 ms 중 219 ms | **예 — 가장 큰 원인** |
+| **쿼리 구조** | 최대 366 ms (검색 371.6 → 8.1) | **예 — 고쳤음** |
+| GC 정지 | 전체 시간의 0.86%, scavenge 5,314회 p50 3.46 ms, major 최대 **80 ms** | 일부. 동시성 1의 max 103 ms 같은 단발 이상치는 설명하지만, p999−p50 = 313 ms 격차는 설명하지 못한다 |
+| 컨텍스트 스위치 | 비자발적(선점) 110,990회 = 초당 52회 | 일부. 포화의 *결과*이자 지터의 원인이지만 단독으로 수백 ms 를 만들지 않는다 |
+| 페이지 폴트 | **메이저 0건** (minor 418,529 · RSS 462 MB) | 아니오. 디스크로 내려간 적이 없다 |
+| TCP 재전송 | 51건 / 388,176 세그먼트 = **0.011%**, 타임아웃 0건 | 아니오. 다만 이 측정은 루프백이라 **하한값**이고, 배포 환경의 인터넷 구간은 따로 확인해야 한다 |
+
+### 아직 하지 않은 것
+
+- **`getClaims()` 로 인증 왕복 없애기.** supabase-js 2.110 의 `getClaims()` 는 JWKS 로
+  JWT 를 로컬 검증하므로(비대칭 서명 키를 쓰는 프로젝트라면) 미들웨어의 네트워크
+  왕복 한 번이 통째로 사라집니다. 서명 검증을 하므로 `getSession()` 과 달리 안전합니다.
+  **하지 않았습니다** — 인증은 앱 전체의 보안 경계이고, 실제 Supabase 없이 지연 개선을
+  이유로 검증 원시연산을 바꾸는 것은 눈 감고 하는 변경입니다. 선행 조건(프로젝트가
+  비대칭 서명 키로 이전했는지) 확인 후 별도로 진행할 일입니다.
+- **SLO 목표치 설정.** 목표를 정하려면 배포 환경의 실제 분포가 필요합니다. 그 전까지
+  이 문서의 숫자는 "구조가 이렇다"는 근거이지 "우리는 이렇다"는 값이 아닙니다.
+- **`sharing: 첨부 후보 검색`(p999 13.4 ms)** 이 이제 가장 느린 기능입니다. 다음 차례.
+
 ## v1.6 상세 변경 기록 (v1.6.1 · v1.6.2 · v1.6.3 포함)
 
 ### 추가된 마이그레이션
@@ -587,6 +689,8 @@ curl https://<배포주소>/api/health
 | `0068_web_push.sql` | `push_subscriptions`(구독 정보 — RLS 로 본인만) + `profiles.push_notifications`. `claim_chat_push_recipients`(보낸 사람 본인만 호출 가능, 45초 이내 읽은 사람 제외 — 이메일의 15분 쿨다운은 두지 않는다), `claim_chat_email_recipients` 를 **`p_exclude` 인자를 받도록 재정의**(푸시로 알린 사람은 메일에서 뺀다), `claim_event_push_recipients`(일정 편집 권한자만), `prune_push_subscription`/`touch_push_subscription` |
 | `0069_calendar_occurrences_and_reminders.sql` | `calendar_event_exceptions`(EXDATE) + `calendar_events.detached_from`·`next_reminder_at`. `delete_event_occurrence`·`detach_event_occurrence`(참석자·붙인 자료까지 복사, RSVP 는 초기화), `list_calendar_events`/`get_calendar_event`/`list_upcoming_events` 가 예외 목록과 시간대를 함께 반환, `set_next_reminder`, `app_secrets` + `get_dispatch_token`(관리자 전용), `claim_due_event_reminders`(토큰 인증 · `for update skip locked` 로 중복 발송 차단)·`set_next_reminder_by_token`·`prune_push_subscription_by_token`, `import_calendar_events`(한 문장 일괄 삽입) |
 | `0070_push_claim_is_idempotent.sql` (v1.6.3) | `chat_members.last_push_message` 추가. `claim_chat_push_recipients` 가 **같은 메시지를 두 번 청구해도 한 번만** 대상을 돌려주도록 재정의 — 아래 [전 기능 검증](#전-기능-검증-v163) 참고 |
+| `0071_calendar_read_path_latency.sql` (v1.6.4) | `list_calendar_events` · `list_upcoming_events` 재작성 — 권한을 행마다 함수로 묻지 않고 한 번에 집합으로 구한 뒤 인덱스를 타게 하고, 참석자 통계 네 개를 LATERAL 한 번으로 합쳤다. `calendar_events_starts_idx` 추가. p999 218.7 → 10.1 ms · 145.2 → 5.3 ms, 결과는 전 컬럼 동일 |
+| `0072_search_latency.sql` (v1.6.4) | `search_ontology` 재작성 — 행마다 부르던 `can_view_object` 를 각 브랜치 안의 집합 조건으로 내리고, 브랜치마다 `limit 30`(전체 상위 30에 한 브랜치가 30개 넘게 기여할 수 없으므로 결과 동일), 스니펫은 살아남은 30행에만 계산. p999 371.6 → 8.1 ms |
 
 ### 새 파일
 
@@ -615,6 +719,9 @@ curl https://<배포주소>/api/health
 | `public/manifest.json` | `start_url`/`scope`/`display: standalone`/테마색/maskable 아이콘/바로가기 |
 | `app/(app)/calendar/calendar-shell.tsx` (v1.6.3) | 주/일 보기의 빈 칸을 **한 번 탭**하면 일정이 열린다(15분 단위 스냅). 일정 블록·알약 위의 클릭은 걸러 낸다 |
 | `app/api/health/route.ts` (v1.6.3) | 마이그레이션 상태를 `true`/`false`/`"unknown"` 3값으로. "함수 없음" 은 연결 성공으로 분류하고, `ok` 가 스키마까지 본다 |
+| `lib/auth.ts` · `lib/supabase/server.ts` (v1.6.4) | `requireUser()` 와 `createClient()` 를 React `cache()` 로 감쌌다 — 화면 한 장이 같은 인증 왕복을 세 번 하던 것을 한 번으로 |
+| `lib/chat-notify.ts` (v1.6.4) | 푸시 뒷정리(prune·touch)를 `for … await` 에서 `Promise.all` 로. 이메일 폴백이 남의 구독 정리 뒤에 줄 서지 않는다 |
+| `app/api/push/dispatch/route.ts` (v1.6.4) | 알림 발송을 상한 8의 동시 처리로. 느린 엔드포인트 하나가 나머지 49건을 막지 않는다 |
 | `vercel.json` | 5분 간격 cron → `/api/push/dispatch` — **v1.6.1 에서 도로 뺐습니다**(Hobby 플랜이 거부해 배포가 통째로 실패). 지금은 수동 설정 항목입니다 |
 | `.env.example` | `VAPID_*`, `NOTIFY_DISPATCH_TOKEN`, `CRON_SECRET` |
 

@@ -55,18 +55,26 @@ export async function notifyChatMessage(
         for (const userId of result.delivered) pushed.add(userId);
         // 죽은 구독은 즉시 치운다 — 그대로 두면 매번 실패하고, 그 사람은
         // 푸시가 "성공한 것으로 집계돼" 메일도 못 받게 된다.
-        for (const endpoint of result.gone) {
-          await supabase.rpc("prune_push_subscription", { p_endpoint: endpoint }).then(
-            () => {},
-            () => {}
-          );
-        }
-        for (const endpoint of result.alive) {
-          await supabase.rpc("touch_push_subscription", { p_endpoint: endpoint }).then(
-            () => {},
-            () => {}
-          );
-        }
+        //
+        // 전에는 이 뒷정리를 for + await 로 **한 건씩 차례로** 했다. 12명짜리
+        // 그룹이면 기기 24대 = 왕복 24번이고, 그 줄 맨 뒤에 이메일 폴백이
+        // 걸린다 — 푸시를 못 받은 사람의 메일이 남의 구독을 정리하는 동안
+        // 기다리는 구조다(전형적인 head-of-line blocking). 서로 독립적인
+        // 작업이므로 한꺼번에 보낸다.
+        await Promise.all([
+          ...result.gone.map((endpoint) =>
+            supabase.rpc("prune_push_subscription", { p_endpoint: endpoint }).then(
+              () => {},
+              () => {}
+            )
+          ),
+          ...result.alive.map((endpoint) =>
+            supabase.rpc("touch_push_subscription", { p_endpoint: endpoint }).then(
+              () => {},
+              () => {}
+            )
+          ),
+        ]);
       }
     } catch (e) {
       console.error("[chat-notify] push failed:", e instanceof Error ? e.message : e);

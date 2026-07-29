@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isNextControlFlowError } from "@/lib/next-control-flow";
 import type { Database } from "@/lib/database.types";
@@ -9,8 +10,20 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"];
  * 현재 인증된 사용자와 프로필을 반환한다. 미인증 시 로그인으로 리다이렉트.
  * 프로필은 auth.users 트리거(0003)로 항상 존재하지만, 복제 지연 등에 대비해
  * 이메일 폴백을 둔다.
+ *
+ * ── 왜 cache() 로 감쌌는가 ──────────────────────────────────────────────────
+ * 이 함수는 호출마다 **직렬 네트워크 왕복 두 번**을 한다: auth.getUser() 는
+ * GoTrue 에 실제로 요청을 보내고(로컬 토큰 해독이 아니다), 그 다음 프로필을
+ * PostgREST 에서 읽는다. 그런데 화면 한 장을 그릴 때 이 함수는 여러 번 불린다
+ * — 레이아웃에서 한 번, 페이지에서 한 번, 그 페이지가 쓰는 서버 컴포넌트마다
+ * 또 한 번. /dashboard 는 레이아웃+페이지만 해도 두 번이라 왕복 4번이었다.
+ *
+ * 같은 요청 안에서 같은 답이 나올 수밖에 없는 조회다. cache() 의 수명은 요청
+ * 하나이므로 사용자끼리 섞이지 않고, 세션이 바뀌면 다음 요청에서 다시 읽는다.
+ * 꼬리(p99)에서 특히 크다 — 직렬 왕복이 하나 줄면 "그중 하나가 느릴 확률"이
+ * 통째로 사라지기 때문이다.
  */
-export async function requireUser(): Promise<{
+export const requireUser = cache(async function requireUser(): Promise<{
   userId: string;
   email: string;
   profile: Profile;
@@ -69,7 +82,7 @@ export async function requireUser(): Promise<{
         updated_at: new Date().toISOString(),
       } as Profile),
   };
-}
+});
 
 /**
  * requireUser() + 승인 여부까지 강제한다.

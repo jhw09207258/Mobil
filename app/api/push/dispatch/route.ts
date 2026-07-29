@@ -90,7 +90,24 @@ async function handle(request: NextRequest) {
   let sent = 0;
   let pruned = 0;
 
-  for (const row of rows) {
+  // ── 왜 순차 for 를 버렸는가 ────────────────────────────────────────────────
+  // 전에는 회수한 알림을 for + await 로 하나씩 처리했다. 알림 하나가
+  // (푸시 발송 → 죽은 구독 정리 → 다음 예약) 을 다 끝내야 다음 알림이 시작된다.
+  // 그런데 푸시 발송은 외부 서비스(FCM/APNs/Mozilla) 호출이라 한 건이 몇 초씩
+  // 걸리는 일이 드물지 않다 — 그 한 건 뒤에 **나머지 49건이 전부 줄을 선다.**
+  // 09:00 시작 회의 알림이 남의 느린 엔드포인트 때문에 09:03 에 가는 식이고,
+  // 이것이 이 시스템에서 가장 뚜렷한 head-of-line blocking 이었다.
+  //
+  // 알림끼리는 서로 독립적이므로 동시에 처리한다. 다만 무제한 병렬은 곤란하다
+  // — 50건을 한꺼번에 열면 서버리스 인스턴스의 소켓과 메모리를 한 번에 쓰고,
+  // 푸시 서비스 쪽 레이트리밋에도 걸린다. 그래서 상한을 둔 동시 실행으로 간다.
+  const CONCURRENCY = 8;
+  // 위의 !token 가드로 좁혀진 타입은 중첩 함수 안까지 따라오지 않는다.
+  const dispatchToken: string = token;
+
+  // 바깥 handle(request) 와 이름이 겹치지 않게 한다 — 겹치면 읽는 사람이
+  // 어느 쪽이 불리는지 매번 되짚어야 한다.
+  async function dispatchOne(row: DueRow) {
     const targets = (row.recipients ?? []) as PushTarget[];
 
     if (targets.length > 0) {
@@ -112,16 +129,19 @@ async function handle(request: NextRequest) {
         tag: `event:${row.event_id}`,
       });
       sent += result.delivered.length;
-      for (const endpoint of result.gone) {
-        await supabase
-          .rpc("prune_push_subscription_by_token", { p_token: token, p_endpoint: endpoint })
-          .then(
-            () => {
-              pruned += 1;
-            },
-            () => {}
-          );
-      }
+      // 죽은 구독 정리도 서로 독립적이다 — 한 건씩 기다릴 이유가 없다.
+      await Promise.all(
+        result.gone.map((endpoint) =>
+          supabase
+            .rpc("prune_push_subscription_by_token", { p_token: dispatchToken, p_endpoint: endpoint })
+            .then(
+              () => {
+                pruned += 1;
+              },
+              () => {}
+            )
+        )
+      );
     }
 
     // 다음 알림을 다시 예약한다. 반복 전개는 여기(Node)에서만 할 수 있으므로
@@ -142,7 +162,7 @@ async function handle(request: NextRequest) {
     if (next) {
       await supabase
         .rpc("set_next_reminder_by_token", {
-          p_token: token,
+          p_token: dispatchToken,
           p_event: row.event_id,
           p_at: next.toISOString(),
         })
@@ -152,6 +172,26 @@ async function handle(request: NextRequest) {
         );
     }
   }
+
+  // 상한을 둔 동시 실행 — 작업자 CONCURRENCY 명이 같은 큐에서 하나씩 집어 간다.
+  // 한 건이 느려도 그 작업자만 붙잡히고 나머지는 계속 흘러간다.
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, rows.length) }, async () => {
+      while (cursor < rows.length) {
+        const row = rows[cursor++];
+        // 한 건이 던져도 나머지 발송을 멈추지 않는다 — 알림은 서로 남남이다.
+        try {
+          await dispatchOne(row);
+        } catch (e) {
+          console.error(
+            `[push:dispatch] event ${row.event_id} failed:`,
+            e instanceof Error ? e.message : e
+          );
+        }
+      }
+    })
+  );
 
   return NextResponse.json({ ok: true, due: rows.length, sent, pruned });
 }
