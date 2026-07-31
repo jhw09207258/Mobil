@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedUser as requireUser } from "@/lib/auth";
+import { isNextControlFlowError } from "@/lib/next-control-flow";
 import { notifyChatMessage } from "@/lib/chat-notify";
 import type { Json } from "@/lib/database.types";
 
@@ -277,15 +278,24 @@ export async function getChatBootstrap(): Promise<{
 }
 
 export async function listChatContacts(): Promise<ChatContact[]> {
-  await requireUser();
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("list_coworkers");
-  return (data ?? []).map((c) => ({
-    id: c.id,
-    display_name: c.display_name,
-    email: c.email,
-    avatar_url: c.avatar_url,
-  }));
+  try {
+    await requireUser();
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("list_coworkers");
+    return (data ?? []).map((c) => ({
+      id: c.id,
+      display_name: c.display_name,
+      email: c.email,
+      avatar_url: c.avatar_url,
+    }));
+  } catch (e) {
+    if (isNextControlFlowError(e)) throw e;
+    // 캘린더 페이지가 이 함수를 listCalendars() 와 Promise.all 로 함께
+    // 부른다(app/(app)/calendar/page.tsx) — 여기서 던지면 캘린더 페이지
+    // 전체가 렌더되지 않는다. 연락처는 부가 정보이므로 빈 목록으로 넘어간다.
+    console.error("[chat:listChatContacts] unexpected failure:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 /** 이 대화에 Big Brother 가 들어와 있는지. */

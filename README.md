@@ -1,12 +1,61 @@
-# Possion (H-1 Prototype, beta v1.6.8)
+# Possion (H-1 Prototype, beta v1.6.9)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 29, v1.6.8 by Haewon Jeong
+Last Update in July 31, v1.6.9 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## "달력 추가조차 안 된다" — 캘린더 액션이 실패를 삼켜 무한 로딩 (v1.6.9)
+
+**증상**: 캘린더 화면에서 "New calendar" 로 이름/색을 넣고 저장을 누르면 버튼이
+"Saving…" 에 멈춘 채 아무 반응이 없다 — 성공도 실패도 아닌, 그냥 멈춘다.
+일정 저장·삭제·초대 응답·구독 링크 발급 등 캘린더의 다른 조작도 같은 증상을
+보일 수 있다.
+
+**원인**: `app/(app)/calendar/actions.ts` 의 18개 Server Action 전부가
+`requireUser()`/`createClient()`/Supabase 호출을 어떤 것도 `try/catch` 로
+감싸지 않았다. 이 파일 안쪽에서 `after()` 로 응답 뒤에 실행되는 두 헬퍼
+(`scheduleNextReminder`, `notifyInvitees`) 만 이미 감싸여 있었다 — 정작
+사용자가 직접 누르는 액션들은 하나도 감싸여 있지 않았던 것이다. 네트워크
+순간 장애나(v1.6.8 에서 고친) 환경변수 문제 같은 것으로 이 호출들 중 하나가
+던지면 Server Action 의 미처리 예외가 되어 브라우저로 응답 자체가 오지
+않는다. `calendar-shell.tsx`/`event-dialog.tsx` 쪽 버튼 핸들러(`save`,
+`remove`, `share`, `onSave`, `onDelete`, `onRespond` 등)는 응답이 온다는
+전제로 `setBusy(true)` 다음에 곧장 `await` 했으므로, 응답이 영영 안 오면
+`setBusy(false)` 도 영영 불리지 않는다 — 이것이 "저장 중…" 에 멈춘 버튼의
+정체다. 로그인에서 실제로 있었던 것과 같은 구조의 버그다(v1.6.5 참고) —
+다만 캘린더는 오류 화면조차 뜨지 않고 조용히 멈춘다는 점이 더 나빴다.
+
+**조치**:
+- `app/(app)/calendar/actions.ts` — 18개 exported action 전부에
+  `try/catch` 를 둘렀다. `redirect()` 가 던지는 `NEXT_REDIRECT` 는
+  `isNextControlFlowError()` 로 가려 그대로 다시 던지고(로그인 액션들과
+  같은 원칙, `lib/auth.ts`/`lib/next-control-flow.ts`), 그 밖의 예상 밖
+  실패는 로그로 원인을 남기고 함수의 반환 타입에 맞는 안전한 값(조회는
+  `[]`/`null`, 변경은 `{ error: "..." }`)으로 응답한다 — 이제 이 파일의
+  어떤 액션도 던지지 않는다.
+- `app/(app)/calendar/calendar-shell.tsx`, `app/(app)/calendar/event-dialog.tsx`
+  — `CalendarDialog` 의 `save`/`remove`/`share`/`unshare`, `SubscribeDialog`
+  의 `loadToken`/`onFile`, `EventDialog` 의 `onSave`/`onDelete`/`onRespond`/
+  `addLink`/`removeLink` 를 `try/finally` (또는 `try/catch/finally`) 로
+  다시 감쌌다. 서버가 이제 던지지 않더라도, 브라우저↔서버 요청 자체가
+  네트워크 순간 장애로 reject 할 가능성은 여전히 남아 있다 — 그 경우까지
+  `busy` 상태가 반드시 풀리고 일반 오류 문구가 뜨도록 방어했다.
+- `app/(app)/chat/actions.ts` 의 `listChatContacts()` 도 같은 방식으로
+  감쌌다 — 캘린더 페이지(`app/(app)/calendar/page.tsx`)가 이 함수를
+  `listCalendars()` 와 `Promise.all` 로 함께 부르기 때문에, 이 함수 하나가
+  던지면 캘린더 페이지 전체가 렌더되지 않았다. (참고: `chat/actions.ts`
+  의 나머지 액션들은 이번 수정 범위 밖이다 — 채팅 화면 자체의 동작으로
+  보고된 문제가 없어 캘린더 페이지의 직접 의존성인 이 함수만 손댔다.)
+
+**검증**: `npx tsc --noEmit`, `node lib/observability.test.mjs`(4/4 통과),
+`npm run build` 모두 정상 — 빌드 로그에 찍히는 두 줄의
+`[possion] NEXT_PUBLIC_SUPABASE_URL/...` 오류는 이 샌드박스에 Supabase
+환경변수가 없어 정적 생성 중 `requireUser()` 가 예상대로 방어에 들어간
+것이지 회귀가 아니다(v1.6.8 의 가드가 의도한 동작 그대로).
 
 ## 배포 후 장애 — "Sign-in screen could not load" (v1.6.5)
 

@@ -952,37 +952,63 @@ function CalendarDialog({
     listCalendarMembers(cal.id).then(setMembers, () => setMembers([]));
   }, [cal]);
 
+  // 서버 액션은 이제 던지지 않고 항상 {error}/결과로 응답한다(actions.ts 의
+  // try/catch). 그래도 브라우저↔서버 사이의 네트워크 순간 장애 등으로 이
+  // await 자체가 reject 할 수 있다 — 그런 경우까지 잡아 busy 를 반드시
+  // 풀어준다. 안 그러면 버튼이 "Saving…" 에서 영원히 멈춘다("달력 추가조차
+  // 안 된다" 로 보고된 증상).
   const save = async () => {
     setBusy(true);
     setError(null);
-    const res = isNew ? await createCalendar(name, color) : await renameCalendar(cal!.id, name, color);
-    setBusy(false);
-    if ("error" in res) setError(res.error);
-    else onChanged();
+    try {
+      const res = isNew
+        ? await createCalendar(name, color)
+        : await renameCalendar(cal!.id, name, color);
+      if ("error" in res) setError(res.error);
+      else onChanged();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const remove = async () => {
     if (!cal) return;
     if (!confirm(`Delete “${cal.name}”? Its ${cal.event_count} event(s) go with it.`)) return;
     setBusy(true);
-    const res = await deleteCalendar(cal.id);
-    setBusy(false);
-    if ("error" in res) setError(res.error);
-    else onChanged();
+    setError(null);
+    try {
+      const res = await deleteCalendar(cal.id);
+      if ("error" in res) setError(res.error);
+      else onChanged();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const share = async (userId: string, role: "viewer" | "editor") => {
     if (!cal) return;
-    const res = await shareCalendar(cal.id, userId, role);
-    if ("error" in res) setError(res.error);
-    else listCalendarMembers(cal.id).then(setMembers, () => {});
+    try {
+      const res = await shareCalendar(cal.id, userId, role);
+      if ("error" in res) setError(res.error);
+      else listCalendarMembers(cal.id).then(setMembers, () => {});
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   const unshare = async (userId: string) => {
     if (!cal) return;
-    const res = await unshareCalendar(cal.id, userId);
-    if ("error" in res) setError(res.error);
-    else setMembers((prev) => (prev ?? []).filter((m) => m.user_id !== userId));
+    try {
+      const res = await unshareCalendar(cal.id, userId);
+      if ("error" in res) setError(res.error);
+      else setMembers((prev) => (prev ?? []).filter((m) => m.user_id !== userId));
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   const memberIds = new Set((members ?? []).map((m) => m.user_id));
@@ -1109,13 +1135,18 @@ function SubscribeDialog({
   const loadToken = useCallback(async (rotate: boolean) => {
     setBusy(true);
     setError(null);
-    const res = await getFeedToken(rotate);
-    setBusy(false);
-    if ("error" in res) {
-      setError(res.error);
-      return;
+    try {
+      const res = await getFeedToken(rotate);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setFeedUrl(`${window.location.origin}/api/calendar/feed?token=${res.token}`);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    setFeedUrl(`${window.location.origin}/api/calendar/feed?token=${res.token}`);
   }, []);
 
   useEffect(() => {
@@ -1134,22 +1165,27 @@ function SubscribeDialog({
     }
     setBusy(true);
     setError(null);
-    const text = await file.text();
-    const res = await importIcs(target, text);
-    setBusy(false);
-    if (fileRef.current) fileRef.current.value = "";
-    if ("error" in res) {
-      setError(res.error);
-      return;
+    try {
+      const text = await file.text();
+      const res = await importIcs(target, text);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      onImported(
+        `Imported ${res.imported} event${res.imported === 1 ? "" : "s"}` +
+          (res.skipped > 0 ? ` — ${res.skipped} could not be read` : "") +
+          (res.truncated > 0
+            ? ` — ${res.truncated} left out (max ${res.imported + res.skipped} per import; run it again for the rest)`
+            : "") +
+          "."
+      );
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
-    onImported(
-      `Imported ${res.imported} event${res.imported === 1 ? "" : "s"}` +
-        (res.skipped > 0 ? ` — ${res.skipped} could not be read` : "") +
-        (res.truncated > 0
-          ? ` — ${res.truncated} left out (max ${res.imported + res.skipped} per import; run it again for the rest)`
-          : "") +
-        "."
-    );
   };
 
   return (

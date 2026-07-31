@@ -284,52 +284,60 @@ export function EventDialog({
 
     setBusy(true);
 
-    // "이 일정만" — 먼저 그 발생을 단발 일정으로 떼어내고, 그 새 일정에 저장한다.
-    // 원본에는 예외가 남아 그 날짜는 더 이상 반복에서 나오지 않는다.
-    let targetId = mode.kind === "existing" ? mode.eventId : null;
-    const detaching = scope === "this" && mode.kind === "existing" && !!occurrenceStart;
-    if (detaching && mode.kind === "existing" && occurrenceStart) {
-      const detached = await detachOccurrence(mode.eventId, occurrenceStart);
-      if ("error" in detached) {
-        setBusy(false);
-        setError(detached.error);
+    // 서버 액션은 던지지 않지만(actions.ts) 브라우저↔서버 왕복 자체가 네트워크
+    // 순간 장애로 reject 할 수 있다 — try/finally 로 감싸 어느 경우든 busy 를
+    // 반드시 풀어준다. 안 그러면 "Saving…" 에서 멈춘 채 다시 시도할 방법이
+    // 없다.
+    try {
+      // "이 일정만" — 먼저 그 발생을 단발 일정으로 떼어내고, 그 새 일정에 저장한다.
+      // 원본에는 예외가 남아 그 날짜는 더 이상 반복에서 나오지 않는다.
+      let targetId = mode.kind === "existing" ? mode.eventId : null;
+      const detaching = scope === "this" && mode.kind === "existing" && !!occurrenceStart;
+      if (detaching && mode.kind === "existing" && occurrenceStart) {
+        const detached = await detachOccurrence(mode.eventId, occurrenceStart);
+        if ("error" in detached) {
+          setError(detached.error);
+          return;
+        }
+        targetId = detached.id;
+      }
+
+      const res = await saveEvent({
+        id: targetId,
+        calendarId,
+        title,
+        startsAt: start.toISOString(),
+        endsAt: end.toISOString(),
+        allDay,
+        description,
+        location,
+        conferenceUrl,
+        // 반복 일정이 시차를 넘어도 원래 의도를 알 수 있게 만든 사람의 시간대를 남긴다.
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        // 떼어낸 일정은 더 이상 반복이 아니다 — 규칙을 다시 붙이면 원본과
+        // 겹쳐서 같은 날에 두 번 나온다.
+        recurrence: detaching ? null : recurrenceString,
+        recurrenceUntil: detaching
+          ? null
+          : repeatUntil
+            ? (fromDateInputUtc(repeatUntil, true)?.toISOString() ?? null)
+            : null,
+        reminderMinutes: reminder,
+        status,
+        busy: busyFlag,
+        attendees: [...attendees],
+      });
+
+      if ("error" in res) {
+        setError(res.error);
         return;
       }
-      targetId = detached.id;
+      onSaved();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
     }
-
-    const res = await saveEvent({
-      id: targetId,
-      calendarId,
-      title,
-      startsAt: start.toISOString(),
-      endsAt: end.toISOString(),
-      allDay,
-      description,
-      location,
-      conferenceUrl,
-      // 반복 일정이 시차를 넘어도 원래 의도를 알 수 있게 만든 사람의 시간대를 남긴다.
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      // 떼어낸 일정은 더 이상 반복이 아니다 — 규칙을 다시 붙이면 원본과
-      // 겹쳐서 같은 날에 두 번 나온다.
-      recurrence: detaching ? null : recurrenceString,
-      recurrenceUntil: detaching
-        ? null
-        : repeatUntil
-          ? (fromDateInputUtc(repeatUntil, true)?.toISOString() ?? null)
-          : null,
-      reminderMinutes: reminder,
-      status,
-      busy: busyFlag,
-      attendees: [...attendees],
-    });
-    setBusy(false);
-
-    if ("error" in res) {
-      setError(res.error);
-      return;
-    }
-    onSaved();
   };
 
   const onDelete = async (scope: OccurrenceScope = "all") => {
@@ -341,46 +349,64 @@ export function EventDialog({
     if (!confirm(question)) return;
 
     setBusy(true);
-    const res =
-      scope === "this" && occurrenceStart
-        ? await deleteOccurrence(mode.eventId, occurrenceStart)
-        : await deleteEvent(mode.eventId);
-    setBusy(false);
-    if ("error" in res) {
-      setError(res.error);
-      return;
+    try {
+      const res =
+        scope === "this" && occurrenceStart
+          ? await deleteOccurrence(mode.eventId, occurrenceStart)
+          : await deleteEvent(mode.eventId);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      onSaved();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    onSaved();
   };
 
   const onRespond = async (response: "accepted" | "declined" | "tentative") => {
     if (mode.kind !== "existing") return;
     setBusy(true);
-    const res = await respondToEvent(mode.eventId, response);
-    setBusy(false);
-    if ("error" in res) {
-      setError(res.error);
-      return;
+    try {
+      const res = await respondToEvent(mode.eventId, response);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setDetail((d) => (d ? { ...d, my_response: response } : d));
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    setDetail((d) => (d ? { ...d, my_response: response } : d));
   };
 
   const addLink = useCallback(
     async (item: AttachableObject) => {
       if (mode.kind !== "existing") return;
       setLinkPicker(false);
-      const res = await linkEventObject(mode.eventId, item.kind, item.id);
-      if ("error" in res) setError(res.error);
-      else setLinks((prev) => [...prev, { kind: item.kind, id: item.id }]);
+      try {
+        const res = await linkEventObject(mode.eventId, item.kind, item.id);
+        if ("error" in res) setError(res.error);
+        else setLinks((prev) => [...prev, { kind: item.kind, id: item.id }]);
+      } catch {
+        setError("Something went wrong. Please try again.");
+      }
     },
     [mode]
   );
 
   const removeLink = async (kind: string, id: string) => {
     if (mode.kind !== "existing") return;
-    const res = await unlinkEventObject(mode.eventId, kind, id);
-    if ("error" in res) setError(res.error);
-    else setLinks((prev) => prev.filter((l) => !(l.kind === kind && l.id === id)));
+    try {
+      const res = await unlinkEventObject(mode.eventId, kind, id);
+      if ("error" in res) setError(res.error);
+      else setLinks((prev) => prev.filter((l) => !(l.kind === kind && l.id === id)));
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   const myResponse = detail?.my_response;
