@@ -22,6 +22,13 @@ export type LinkedObject = {
   via_title: string | null;
 };
 
+export type Backlink = {
+  kind: string;
+  id: string;
+  title: string;
+  link_source: string;
+};
+
 export type SemanticResult = {
   kind: string;
   id: string;
@@ -83,6 +90,16 @@ export async function getLinkedObjects(kind: string, id: string): Promise<Linked
     p_id: id,
     p_depth: 2,
   });
+  if (error || !data) return [];
+  return data.map((r) => ({ ...r, title: r.title ?? "Untitled" }));
+}
+
+/** 백링크 — 이 항목을 가리키는(내가 아니라 남이 건) 링크만, 1단계
+ * (Obsidian 의 Backlinks 패널과 같은 개념. get_linked_objects 와 달리
+ * 방향을 하나로 좁힌다 — 본문을 읽어서는 알 수 없는 쪽이라 이 방향이 궁금하다). */
+export async function getBacklinks(kind: string, id: string): Promise<Backlink[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_backlinks", { p_kind: kind, p_id: id });
   if (error || !data) return [];
   return data.map((r) => ({ ...r, title: r.title ?? "Untitled" }));
 }

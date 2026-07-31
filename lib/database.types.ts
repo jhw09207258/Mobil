@@ -840,6 +840,10 @@ export interface Database {
         Args: { p_kind: string; p_id: string };
         Returns: { kind: string; id: string; title: string; link_source: string }[];
       };
+      get_backlinks: {
+        Args: { p_kind: string; p_id: string };
+        Returns: { kind: string; id: string; title: string | null; link_source: string }[];
+      };
       sync_object_links: {
         Args: {
           p_source: string;

@@ -1,12 +1,42 @@
-# Possion (H-1 Prototype, beta v1.6.12)
+# Possion (H-1 Prototype, beta v1.6.13)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 31, v1.6.12 by Haewon Jeong
+Last Update in July 31, v1.6.13 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## Obsidian 에서 가져온 것 2 — 문서 에디터 백링크 패널 (v1.6.13)
+
+**배경**: `get_linked_objects`(0015)는 이미 있었지만 방향을 섞어서
+돌려준다 — 내가 이 문서에서 건 링크와, 나를 가리키는 링크가 한
+목록에 같이 나온다. `header-search.tsx`의 "연결된 항목"처럼 방향을
+가릴 필요가 없는 자리에는 맞지만, Obsidian 의 백링크 패널이 유용한
+이유는 정확히 그 반대다: 문서 본문을 아무리 읽어도 "누가 나를
+참조하는지"는 알 수 없다(내가 건 링크는 이미 본문에 칩으로 보인다).
+
+**추가한 것**: `get_backlinks(kind, id)`
+(`supabase/migrations/0077_backlinks.sql`) — `object_links` 에서
+`to_kind/to_id` 가 이 문서인 행만 걸러 1단계로 돌려준다
+(Obsidian 기본 백링크 패널도 1단계다, `get_linked_objects` 처럼
+다단계로 펴지 않는다). `can_view_object` 로 보이지 않는 것은 걸러진다
+— owner 단계 문서(v1.6.10)를 참조한 게 있어도 볼 권한이 없으면
+백링크 목록에 나타나지 않는다.
+
+문서 에디터 툴바에 "Backlinks" 토글을 추가했다(`backlinks-panel.tsx`)
+— 기존 "Activity" 패널과 똑같은 열고 닫는 자리·같은 CSS 를 그대로
+쓴다(새 패턴을 만들지 않았다). `object_links` 는 이미 문서를 저장할
+때마다 `sync_object_links` 로 갱신되고 있었으므로(`saveDocument`,
+0015), 이번 v1.6.12 의 위키링크 자동 갱신과 `[[` 트리거로 만든 참조도
+저장되는 즉시 백링크로 잡힌다 — 별도 배치 작업이 필요 없다.
+
+**검증**: 로컬 Postgres 에 0001~0077 을 재생해, 문서 A 가
+`sync_object_links` 로 문서 B 를 참조하게 만든 뒤 `get_backlinks`
+를 양쪽에서 각각 호출 — B 쪽에서는 A 가 나오고, A 쪽에서는 아무것도
+안 나오는 것(방향이 실제로 한쪽으로만 잡히는 것)을 직접 확인했다.
+`npx tsc --noEmit`, `npm run build` 모두 정상.
 
 ## Obsidian 에서 가져온 것 1 — 위키링크 자동 갱신 + `[[` 트리거, 중첩 태그 (v1.6.12)
 

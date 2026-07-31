@@ -47,6 +47,7 @@ import type { ContributorRow } from "../../contributors/actions";
 import { RepositoryPicker } from "../../repositories/repository-picker";
 import type { Repository } from "../../repositories/actions";
 import { ActivityPanel } from "./activity-panel";
+import { BacklinksPanel } from "./backlinks-panel";
 import { createMindmapFromDocument } from "../../convert-actions";
 import { getObjectCards } from "../../sharing/actions";
 import { usePresence } from "@/lib/use-presence";
@@ -135,6 +136,7 @@ export function DocumentEditor({
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [showBacklinks, setShowBacklinks] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [converting, setConverting] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -496,6 +498,13 @@ export function DocumentEditor({
             )}
           </div>
           <button
+            className={`btn btn-sm ${showBacklinks ? "chat-tool-active" : ""}`}
+            onClick={() => setShowBacklinks((v) => !v)}
+            title="Show what links here"
+          >
+            Backlinks
+          </button>
+          <button
             className={`btn btn-sm ${showActivity ? "chat-tool-active" : ""}`}
             onClick={() => setShowActivity((v) => !v)}
             title="Show edit activity (who changed what, when)"
@@ -532,6 +541,13 @@ export function DocumentEditor({
             <EditorContent editor={editor} />
           </div>
         </div>
+        <BacklinksPanel
+          kind="document"
+          id={docId}
+          open={showBacklinks}
+          onClose={() => setShowBacklinks(false)}
+          refreshToken={saveState}
+        />
         <ActivityPanel
           docId={docId}
           open={showActivity}
