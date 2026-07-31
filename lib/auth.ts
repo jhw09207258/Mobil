@@ -47,11 +47,24 @@ export const requireUser = cache(async function requireUser(): Promise<{
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  // 위의 auth.getUser() 는 실패를 감싸 두었는데 이 조회는 그러지 않았다 —
+  // 이 함수는 보호된 페이지 전부와 대기 화면이 공유하므로, Supabase 로 가는
+  // 이 요청 하나가 네트워크 순간 장애로 던지면 그 페이지 전체가 죽었다
+  // (reference 234203017 — 배포 후 "화면을 불러올 수 없습니다" 로 보고됨).
+  // auth.getUser() 와 같은 원칙: 실패하면 "복제 지연으로 아직 안 보임" 과
+  // 똑같이 취급해 대기 화면으로 보낸다. 승인 여부를 모를 땐 통과보다 대기가
+  // 안전하다는 원칙은 아래 폴백과 이미 같다.
+  let profile: Profile | null = null;
+  try {
+    ({ data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single());
+  } catch (error) {
+    if (isNextControlFlowError(error)) throw error;
+    console.error("[requireUser] 프로필 조회 실패:", error);
+  }
 
   return {
     userId: user.id,

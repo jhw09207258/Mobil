@@ -1,12 +1,88 @@
-# Possion (H-1 Prototype, beta v1.6.4)
+# Possion (H-1 Prototype, beta v1.6.5)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 29, v1.6.4 by Haewon Jeong
+Last Update in July 29, v1.6.5 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## 배포 후 장애 — "Sign-in screen could not load" (v1.6.5)
+
+### 무엇이 보고됐나
+
+배포 후 로그인 화면에서 **"Sign-in screen could not load"** 와 함께
+`reference: 234203017` 만 보이는 상태가 보고됐습니다. 이 문구는 우리 코드
+(`app/(auth)/error.tsx`)가 그리는 화면이고, `reference` 는 그 오류의
+`digest` 입니다 — 즉 로그인 화면이 완전히 죽은 게 아니라, **그 세그먼트
+안에서 뭔가 던져 error 경계가 잡았고, 프로덕션 빌드가 실제 메시지를
+가려서** 이 digest 만 남은 상태였습니다. (v1.6.1 에서 다룬 digest
+`3290735100` 과 같은 부류지만 다른 사건입니다 — 매번 새 digest 가 나오는
+것은 우리 계측이 계속 다른 오류들을 잡아내고 있다는 뜻이기도 합니다.)
+
+### 원인
+
+`(auth)` 경로 그룹 안에서 Supabase 를 직접 부르는 곳 세 군데가
+**감싸여 있지 않았습니다.**
+
+| 위치 | 무엇이 벗겨져 있었나 |
+| --- | --- |
+| `app/(auth)/login/actions.ts` | `signInWithPassword` · 프로필 조회 · `signOut` |
+| `app/(auth)/signup/actions.ts` | `signUp` |
+| `lib/auth.ts` `requireUser()` | 프로필 조회(`auth.getUser()` 바로 다음 줄) |
+
+이 저장소는 이미 같은 문제를 여러 번 겪고 고쳐 온 전례가 있습니다 —
+`lib/supabase/middleware.ts` 는 `auth.getUser()` 호출을 try/catch 로
+감싸며 정확히 이렇게 적어 두었습니다: *"Supabase 연결 실패(네트워크 오류,
+잘못된 URL 등)로 미들웨어가 죽어 사이트 전체가 500 이 되는 것을 방지한다."*
+`requireUser()` 자신도 `auth.getUser()` 는 감쌌습니다. 그런데 **바로 다음 줄의
+프로필 조회는 감싸지 않았고**, 로그인·가입 액션은 애초에 아무것도 감싸지
+않았습니다. Server Action 안에서 처리되지 않은 예외는 그 라우트의
+`error.tsx` 로 튀어 오르고, 프로덕션은 실제 메시지를 지우므로 사용자에게는
+정확히 "Sign-in screen could not load · reference: …" 만 남습니다.
+
+**같은 사용자가 겪는 것으로 보이는 상황이 실제로는 세 가지** 였다는 뜻입니다.
+로그인 화면 자체가 못 뜨는 것(v1.6.1 에서 고침, `/login` GET), 로그인/가입을
+**시도했을 때** 실패하는 것(이번 건, Server Action POST), 로그인 이후 보호된
+화면들이 못 뜨는 것(`requireUser` 를 쓰는 모든 페이지) — 세 경로가 각각
+독립적으로 뚫려 있었고 이번에 세 번째까지 막았습니다.
+
+### 고침
+
+세 군데 모두 미들웨어와 같은 패턴으로 감쌌습니다 — try/catch, 실패하면
+"복제 지연으로 아직 안 보임" 과 같은 값으로 안전하게 폴백(`requireUser`)하거나
+화면에 다시 시도할 수 있는 문구를 남깁니다(로그인·가입).
+
+`signup/actions.ts` 는 한 가지 주의가 필요했습니다 — 가입 성공 시
+`redirect("/dashboard")` 를 부르는데, `redirect()` 는 `NEXT_REDIRECT` 라는
+제어 흐름 신호를 예외로 던져 Next 가 처리하게 하는 방식입니다. 이걸
+try/catch **안에** 두면 그 신호까지 여기서 삼켜져 "가입 성공 후 이동" 이
+"가입 실패" 메시지로 둔갑합니다. `redirect()` 호출은 try 블록 **밖으로**
+빼서 이 문제를 피했습니다.
+
+### 검증 — 재현 후 고쳤음을 직접 증명
+
+"고쳤다" 를 주장으로 남기지 않고, **고치기 전 코드가 실제로 이 증상을
+재현하는지** 부터 확인했습니다.
+
+1. `lib/supabase/server.ts` 의 `createClient()` 에 환경변수로 켜지는 강제
+   throw 를 임시로 심었습니다(커밋에는 없습니다).
+2. **고치기 전** `login/actions.ts` 로 프로덕션 빌드를 띄우고, 실제 브라우저로
+   로그인 폼을 제출했습니다 → **error 경계가 잡혔고 "Sign-in screen could
+   not load" 가 그대로 재현**됐습니다.
+3. **고친 뒤** 같은 조건으로 같은 폼을 제출했습니다 → error 경계는 잡히지
+   않고, 화면에는 "Something went wrong on our end. Please try again in a
+   moment." 라는 인라인 메시지가 남았습니다. 가입 폼도 동일하게 확인했습니다.
+4. 미인증 상태로 보호된 페이지(`/dashboard`)에 접근하는 기존 동작(로그인으로
+   리다이렉트)이 그대로인지 회귀 확인했습니다 — 이상 없음.
+5. 강제 throw 코드와 임시 테스트 스크립트는 검증 후 제거했습니다 — 커밋에
+   포함된 diff 는 세 파일(`lib/auth.ts`, `login/actions.ts`,
+   `signup/actions.ts`)의 실제 고침뿐입니다.
+
+이 외에 마이그레이션 0001~0072 재생, 시나리오 77건, 단위 테스트 8개,
+`tsc`·`npm run build` 를 전부 다시 통과시켰습니다(아래 [전체 수치](#전-기능-검증-v163)
+와 같은 절차).
 
 ## v1.6 에서 무엇이 바뀌었나 — 알림, 그리고 남아 있던 한계들
 
@@ -722,6 +798,9 @@ curl https://<배포주소>/api/health
 | `lib/auth.ts` · `lib/supabase/server.ts` (v1.6.4) | `requireUser()` 와 `createClient()` 를 React `cache()` 로 감쌌다 — 화면 한 장이 같은 인증 왕복을 세 번 하던 것을 한 번으로 |
 | `lib/chat-notify.ts` (v1.6.4) | 푸시 뒷정리(prune·touch)를 `for … await` 에서 `Promise.all` 로. 이메일 폴백이 남의 구독 정리 뒤에 줄 서지 않는다 |
 | `app/api/push/dispatch/route.ts` (v1.6.4) | 알림 발송을 상한 8의 동시 처리로. 느린 엔드포인트 하나가 나머지 49건을 막지 않는다 |
+| `lib/auth.ts` (v1.6.5) | `requireUser()` 의 프로필 조회를 try/catch 로 감쌌다 — `auth.getUser()` 는 이미 감싸여 있었는데 바로 다음 줄은 그러지 않았다. 보호된 화면 전체가 공유하는 경로다 |
+| `app/(auth)/login/actions.ts` (v1.6.5) | `signInWithPassword` · 프로필 조회 · `signOut` 을 통째로 try/catch — 어느 하나가 던지면 로그인 화면 전체가 죽던 것을 인라인 오류 메시지로 |
+| `app/(auth)/signup/actions.ts` (v1.6.5) | `signUp` 을 try/catch — `redirect("/dashboard")` 는 그 신호(`NEXT_REDIRECT`)가 삼켜지지 않도록 try 블록 **밖으로** 뺐다 |
 | `vercel.json` | 5분 간격 cron → `/api/push/dispatch` — **v1.6.1 에서 도로 뺐습니다**(Hobby 플랜이 거부해 배포가 통째로 실패). 지금은 수동 설정 항목입니다 |
 | `.env.example` | `VAPID_*`, `NOTIFY_DISPATCH_TOKEN`, `CRON_SECRET` |
 
