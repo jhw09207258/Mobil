@@ -547,6 +547,14 @@ img {
   color: var(--ok);
   border-color: #2f5a38;
 }
+.badge-warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.badge-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
 
 /* 알림 */
 .notice {

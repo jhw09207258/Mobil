@@ -1274,6 +1274,24 @@ export interface Database {
           exceptions: string[];
         }[];
       };
+      record_perf_sample: {
+        Args: { p_feature: string; p_ms: number };
+        Returns: void;
+      };
+      get_perf_percentiles: {
+        Args: { p_window_hours?: number };
+        Returns: {
+          feature: string;
+          n: number;
+          p50: number | null;
+          p90: number | null;
+          p95: number | null;
+          p99: number | null;
+          p999: number | null;
+          max_ms: number | null;
+          outlier_pct: number | null;
+        }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

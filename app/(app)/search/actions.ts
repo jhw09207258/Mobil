@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { embedText, toVectorLiteral } from "@/lib/embeddings";
+import { measure } from "@/lib/observability";
 
 export type SearchResult = {
   kind: string;
@@ -47,7 +48,9 @@ export async function searchOntology(query: string): Promise<SearchResult[]> {
     }));
   }
 
-  const { data, error } = await supabase.rpc("search_ontology", { p_query: q });
+  const { data, error } = await measure(supabase, "search.ontology", async () =>
+    supabase.rpc("search_ontology", { p_query: q })
+  );
   if (error || !data) return [];
   return data;
 }

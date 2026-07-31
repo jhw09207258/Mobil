@@ -1,8 +1,8 @@
-# Possion (H-1 Prototype, beta v1.6.5)
+# Possion (H-1 Prototype, beta v1.6.6)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 29, v1.6.5 by Haewon Jeong
+Last Update in July 29, v1.6.6 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
@@ -84,7 +84,84 @@ try/catch **안에** 두면 그 신호까지 여기서 삼켜져 "가입 성공 
 `tsc`·`npm run build` 를 전부 다시 통과시켰습니다(아래 [전체 수치](#전-기능-검증-v163)
 와 같은 절차).
 
-## v1.6 에서 무엇이 바뀌었나 — 알림, 그리고 남아 있던 한계들
+## 프로덕션 계측과 SLO 목표치 (v1.6.6)
+
+v1.6.4 의 꼬리 지연 감사를 로컬 재현 환경으로 끝내며 이렇게 적어 뒀습니다 —
+*"SLO 목표치 설정. 목표를 정하려면 배포 환경의 실제 분포가 필요합니다.
+그 전까지 이 문서의 숫자는 '구조가 이렇다'는 근거이지 '우리는 이렇다'는
+값이 아닙니다."* 이번이 그 분포를 실제로 쌓는 장치입니다.
+
+### 무엇을 쌓는가
+
+`lib/observability.ts` 의 `measure(supabase, feature, fn)` 가 Server Action
+여섯 곳을 감쌉니다 — v1.6.4 에서 가장 무거웠던 경로들(캘린더 한 달 조회·
+다가오는 일정·통합 검색·첨부 카드·첨부 후보 검색)과, 이번 장애의 진입점이라
+전수로 재는 로그인·가입입니다.
+
+```
+auth.login · auth.signup · calendar.month · calendar.upcoming
+search.ontology · sharing.cards · sharing.attachable
+```
+
+두 가지를 동시에 합니다.
+
+1. **로그**: 호출마다 `[possion:perf] feature=… ms=…` 한 줄을
+   `instrumentation.ts` 의 `[possion:error]` 와 같은 convention 으로 남깁니다.
+   Vercel Logs 에서 그대로 검색되고, 나중에 로그 기반 도구(Log Drain 등)를
+   연결해도 앱 코드를 더 고칠 필요가 없습니다.
+2. **표본**: `perf_samples` 테이블(0073)에 **일부만** 기록합니다 — 기능마다
+   `lib/slo.ts` 의 `sampleRate` 만큼(로그인·가입은 1, 자주 불리는 읽기는
+   0.2~0.3). 계측 자체가 부하가 되면 v1.6.4 에서 줄인 지연을 다시 늘리는
+   꼴이라, 매 호출을 다 쓰지 않습니다. 쓰기는 Next 의 `after()` 로
+   **응답을 보낸 뒤에** 붙습니다(`files/actions.ts` 의 감사 로그 기록과
+   같은 자리) — 계측이 요청 자체를 느리게 만들지 않습니다.
+
+`measure()` 는 `fn()` 이 실패해도(그 실패까지 포함해) 시간을 재고 그대로
+다시 던집니다 — 오류를 삼키지 않습니다.
+
+### 어디서 보는가
+
+**Admin Console → Observability**(`/admin/observability`, 관리자 전용).
+기능별 p50/p90/p99/p999·최댓값·이상치 비율을 1시간/24시간/7일/30일 창으로
+봅니다. 산술평균은 쓰지 않습니다 — v1.6.4 감사와 같은 원칙입니다. 표본이
+30건 미만이면 "low n" 으로 표시합니다(p999 는 꼬리 표본이 n/1000 개뿐이라
+표본이 적으면 신뢰할 수 없습니다). 배포 직후처럼 트래픽이 적을 때는
+"no data"/"low n" 이 뜨는 것이 정상입니다 — 오작동이 아닙니다.
+
+### SLO 목표치 — 잠정치입니다
+
+`lib/slo.ts` 에 기능마다 p99/p999 목표를 적어 뒀습니다. v1.6.4 에서 로컬로
+잰 서버(DB)측 백분위에, 배포 환경의 네트워크+PostgREST 왕복을 감안한 여유를
+얹어 정했습니다 — 지금 새로 재는 `measure()` 는 그 왕복을 **전부 포함**해서
+재므로(v1.6.4 의 `bench.sql` 은 PL/pgSQL 안에서만 쟀지만, 이번 계측은 Server
+Action 이 `supabase.rpc(...)` 를 왕복하는 전체 시간입니다), 목표치를 DB
+전용 값보다 훨씬 넉넉하게 잡았습니다.
+
+| 기능 | 목표 p99 | 목표 p999 | 근거 |
+| --- | --- | --- | --- |
+| 로그인 | 800ms | 2000ms | GoTrue 왕복(비밀번호 해시 확인)이 섞여 순수 조회보다 느린 게 정상. 전수 기록 |
+| 회원가입 | 1000ms | 2500ms | signUp 은 로그인보다 무겁다(계정 생성 + 트리거) |
+| 캘린더 한 달 조회 | 60ms | 150ms | 로컬 DB p99 7.7ms·p999 10.1ms(0071 최적화 후) |
+| 다가오는 일정 | 40ms | 100ms | 로컬 DB p99 4.6ms·p999 5.3ms |
+| 통합 검색 | 80ms | 200ms | 로컬 DB p99 5.9ms·p999 8.1ms(0072 최적화 후). 실제 검색어 분포는 시드보다 다양할 수 있어 여유를 더 뒀다 |
+| 첨부 카드 조회 | 40ms | 100ms | 채팅·캘린더 곳곳에서 자주 불림 |
+| 첨부 후보 검색 | 80ms | 200ms | v1.6.4 감사 시점 최적화 후 가장 느린 기능(로컬 p999 13.4ms) |
+
+**목표가 아니라 첫 추정치로 대해야 합니다.** `/admin/observability` 에
+표본이 30건 이상 쌓이는 대로 실측값과 비교해 다시 조정하는 것이 이
+작업의 다음 단계입니다.
+
+### 새로 생긴 것
+
+| 항목 | 내용 |
+| --- | --- |
+| `supabase/migrations/0073_perf_observability.sql` | `perf_samples` 테이블(RLS `using(false)` — `app_secrets` 와 같은 패턴). `record_perf_sample(feature, ms)`(authenticated+anon, 입력 검증 후 조용히 버림), `get_perf_percentiles(hours)`(관리자 전용, 산술평균 없음), `purge_old_perf_samples()`(30일 보관, trash 자동 비우기와 같은 pg_cron 패턴) |
+| `lib/slo.ts` | 기능별 SLO 목표(p99/p999)와 표본 비율. 서버·클라이언트 양쪽에서 import 가능(부작용 없음) |
+| `lib/observability.ts` | `measure()` — 시간 측정 + 로그 + 샘플링된 `after()` 기록 |
+| `app/(app)/admin/observability/page.tsx` | 관리자 전용 백분위 대시보드 |
+| `app/globals.css` | `.badge-warn`·`.badge-danger` 추가(SLO 상태 표시용) |
+
+## 배포 후 장애 — "Sign-in screen could not load" (v1.6.5)
 
 v1.5 를 내면서 스스로 적어 둔 한계 목록을 다시 열어 대부분을 없앴습니다.
 가장 큰 것은 **알림**입니다.
@@ -767,6 +844,7 @@ curl https://<배포주소>/api/health
 | `0070_push_claim_is_idempotent.sql` (v1.6.3) | `chat_members.last_push_message` 추가. `claim_chat_push_recipients` 가 **같은 메시지를 두 번 청구해도 한 번만** 대상을 돌려주도록 재정의 — 아래 [전 기능 검증](#전-기능-검증-v163) 참고 |
 | `0071_calendar_read_path_latency.sql` (v1.6.4) | `list_calendar_events` · `list_upcoming_events` 재작성 — 권한을 행마다 함수로 묻지 않고 한 번에 집합으로 구한 뒤 인덱스를 타게 하고, 참석자 통계 네 개를 LATERAL 한 번으로 합쳤다. `calendar_events_starts_idx` 추가. p999 218.7 → 10.1 ms · 145.2 → 5.3 ms, 결과는 전 컬럼 동일 |
 | `0072_search_latency.sql` (v1.6.4) | `search_ontology` 재작성 — 행마다 부르던 `can_view_object` 를 각 브랜치 안의 집합 조건으로 내리고, 브랜치마다 `limit 30`(전체 상위 30에 한 브랜치가 30개 넘게 기여할 수 없으므로 결과 동일), 스니펫은 살아남은 30행에만 계산. p999 371.6 → 8.1 ms |
+| `0073_perf_observability.sql` (v1.6.6) | `perf_samples` + `record_perf_sample`(authenticated+anon, 입력 검증) + `get_perf_percentiles`(관리자 전용, 산술평균 없음) + `purge_old_perf_samples`(30일 보관, pg_cron) |
 
 ### 새 파일
 
@@ -801,6 +879,12 @@ curl https://<배포주소>/api/health
 | `lib/auth.ts` (v1.6.5) | `requireUser()` 의 프로필 조회를 try/catch 로 감쌌다 — `auth.getUser()` 는 이미 감싸여 있었는데 바로 다음 줄은 그러지 않았다. 보호된 화면 전체가 공유하는 경로다 |
 | `app/(auth)/login/actions.ts` (v1.6.5) | `signInWithPassword` · 프로필 조회 · `signOut` 을 통째로 try/catch — 어느 하나가 던지면 로그인 화면 전체가 죽던 것을 인라인 오류 메시지로 |
 | `app/(auth)/signup/actions.ts` (v1.6.5) | `signUp` 을 try/catch — `redirect("/dashboard")` 는 그 신호(`NEXT_REDIRECT`)가 삼켜지지 않도록 try 블록 **밖으로** 뺐다 |
+| `lib/slo.ts` (v1.6.6, 신규) | 기능별 SLO 목표(p99/p999)와 표본 비율. v1.6.4 로컬 백분위 + 배포 여유로 정한 잠정치 |
+| `lib/observability.ts` (v1.6.6, 신규) | `measure()` — 시간 측정 + `[possion:perf]` 로그 + 샘플링된 `after()` 기록 |
+| `app/(app)/admin/observability/page.tsx` (v1.6.6, 신규) | 관리자 전용 백분위 대시보드. 1H/24H/7D/30D 창, SLO 상태 배지 |
+| `app/(auth)/login/actions.ts` · `app/(auth)/signup/actions.ts` (v1.6.6) | `auth.login`/`auth.signup` 계측 추가(전수 기록) |
+| `app/(app)/calendar/actions.ts` · `app/(app)/dashboard/page.tsx` · `app/(app)/search/actions.ts` · `app/(app)/sharing/actions.ts` (v1.6.6) | `calendar.month`/`calendar.upcoming`/`search.ontology`/`sharing.cards`/`sharing.attachable` 계측 추가 |
+| `app/globals.css` (v1.6.6) | `.badge-warn`·`.badge-danger` 추가 |
 | `vercel.json` | 5분 간격 cron → `/api/push/dispatch` — **v1.6.1 에서 도로 뺐습니다**(Hobby 플랜이 거부해 배포가 통째로 실패). 지금은 수동 설정 항목입니다 |
 | `.env.example` | `VAPID_*`, `NOTIFY_DISPATCH_TOKEN`, `CRON_SECRET` |
 

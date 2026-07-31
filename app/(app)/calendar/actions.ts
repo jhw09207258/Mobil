@@ -6,6 +6,7 @@ import { requireApprovedUser as requireUser } from "@/lib/auth";
 import { parseIcs } from "@/lib/ics";
 import { nextReminderAt } from "@/lib/recurrence";
 import { pushConfigured, sendPush, type PushTarget } from "@/lib/push";
+import { measure } from "@/lib/observability";
 
 /**
  * 캘린더 서버 액션.
@@ -106,10 +107,9 @@ export async function listCalendars(): Promise<CalendarSummary[]> {
 export async function listEvents(from: string, to: string): Promise<CalendarEventRow[]> {
   await requireUser();
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("list_calendar_events", {
-    p_from: from,
-    p_to: to,
-  });
+  const { data, error } = await measure(supabase, "calendar.month", async () =>
+    supabase.rpc("list_calendar_events", { p_from: from, p_to: to })
+  );
   if (error) return [];
   return (data ?? []) as CalendarEventRow[];
 }

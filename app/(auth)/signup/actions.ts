@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { measure } from "@/lib/observability";
 
 export type SignupState =
   | { error: string }
@@ -35,22 +36,32 @@ export async function signup(
   let session: { needsConfirmation: boolean } | null = null;
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { display_name: displayName || null },
-      },
+    const outcome = await measure(supabase, "auth.signup", async () => {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { display_name: displayName || null },
+        },
+      });
+
+      if (error) {
+        if (error.message.toLowerCase().includes("already")) {
+          return { kind: "error" as const, error: "This email is already registered." };
+        }
+        return { kind: "error" as const, error: "Sign-up failed. Please try again shortly." };
+      }
+
+      return {
+        kind: "ok" as const,
+        session: data.session ? { needsConfirmation: false } : { needsConfirmation: true },
+      };
     });
 
-    if (error) {
-      if (error.message.toLowerCase().includes("already")) {
-        return { error: "This email is already registered." };
-      }
-      return { error: "Sign-up failed. Please try again shortly." };
+    if (outcome.kind === "error") {
+      return { error: outcome.error };
     }
-
-    session = data.session ? { needsConfirmation: false } : { needsConfirmation: true };
+    session = outcome.session;
   } catch (e) {
     console.error("[auth:signup] unexpected failure:", e instanceof Error ? e.message : e);
     return { error: "Something went wrong on our end. Please try again in a moment." };

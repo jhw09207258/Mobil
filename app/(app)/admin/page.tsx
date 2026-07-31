@@ -43,6 +43,9 @@ export default async function AdminConsolePage() {
           <div>
             <h1 className="page-h">Admin Console</h1>
           </div>
+          <Link href="/admin/observability" className="btn btn-ghost btn-sm">
+            Observability →
+          </Link>
         </div>
 
         <div className="panel" style={{ marginBottom: 24 }}>
