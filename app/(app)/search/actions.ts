@@ -29,6 +29,14 @@ export type Backlink = {
   link_source: string;
 };
 
+export type LinkedEvent = {
+  id: string;
+  title: string;
+  starts_at: string;
+  all_day: boolean;
+  calendar_id: string;
+};
+
 export type SemanticResult = {
   kind: string;
   id: string;
@@ -102,4 +110,14 @@ export async function getBacklinks(kind: string, id: string): Promise<Backlink[]
   const { data, error } = await supabase.rpc("get_backlinks", { p_kind: kind, p_id: id });
   if (error || !data) return [];
   return data.map((r) => ({ ...r, title: r.title ?? "Untitled" }));
+}
+
+/** 이 항목을 참조하는 캘린더 일정(get_object_events, 0078) — calendar_event_links
+ * 는 지금까지 일정 → 자료 방향으로만 조회됐다. 문서 에디터에 "관련 일정"을
+ * 보여주려면 반대 방향이 필요하다. */
+export async function getObjectEvents(kind: string, id: string): Promise<LinkedEvent[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_object_events", { p_kind: kind, p_id: id });
+  if (error || !data) return [];
+  return data;
 }

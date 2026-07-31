@@ -586,15 +586,18 @@ export interface Database {
           id: string;
           owner_id: string;
           name: string;
+          parent_id: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           owner_id: string;
           name: string;
+          parent_id?: string | null;
         };
         Update: {
           name?: string;
+          parent_id?: string | null;
         };
         Relationships: [];
       };
@@ -1073,6 +1076,20 @@ export interface Database {
       list_repository_contents: {
         Args: { p_repository?: string | null };
         Returns: { kind: string; id: string; label: string }[];
+      };
+      get_repository_graph: {
+        Args: { p_repository: string };
+        Returns: Json;
+      };
+      get_object_events: {
+        Args: { p_kind: string; p_id: string };
+        Returns: {
+          id: string;
+          title: string;
+          starts_at: string;
+          all_day: boolean;
+          calendar_id: string;
+        }[];
       };
 
       // ---- 0066/0067: 캘린더 ----

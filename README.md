@@ -1,12 +1,142 @@
-# Possion (H-1 Prototype, beta v1.6.14)
+# Possion (H-1 Prototype, beta v1.6.15)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 31, v1.6.14 by Haewon Jeong
+Last Update in July 31, v1.6.15 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## Repository 폴더 계층 + Obsidian 식 그래프 뷰 (v1.6.15)
+
+**요청**: Repository 안에 폴더를 만들어 문서/코드/시트/맵/파일을 상하 구조로
+묶고, Docs/Code/Table/파일로 나뉘어 있던 목록을 통합해서 보여주고, 특정
+Repository 를 열면 List 보기와 Graph(그래프형 데이터 모델) 보기를 토글할 수
+있게 하고, 그래프의 노드를 클릭하면 해당 파일/폴더로 바로 이동하고, 캘린더
+일정이 문서 에디터·그래프 양쪽에도 나타나게 해 달라는 요청.
+
+### DB — `supabase/migrations/0078_repository_folders_and_graph.sql`
+
+- **폴더 계층**: `repositories` 에 `parent_id`(자기참조) 하나를 추가했다.
+  Obsidian 이 vault 와 폴더를 구분하지 않는 것과 같은 모양이다 — 최상위
+  저장소는 `parent_id is null`, 그 밑의 "폴더"는 그냥 같은 테이블의 또 다른
+  행이다. 트리거(`prevent_repository_cycle`) 하나가 세 가지를 한 번에
+  막는다: 자기 자신을 부모로 삼는 것, 상위로 거슬러 올라가다 순환이 생기는
+  것, 8단을 넘는 중첩. 소유자가 다른 저장소 밑으로는 애초에 못 들어가게도
+  막는다(저장소는 공유 개념이 없다, 0044). 상위 폴더를 지워도 그 밑의
+  폴더는 사라지지 않고 최상위로 승격된다(`on delete set null`) — "저장소를
+  지워도 안의 항목은 Null Repository 로 돌아갈 뿐 지워지지 않는다"는 기존
+  원칙을 폴더에도 그대로 적용한 것이다.
+- **통합 목록**: `list_repository_contents`(0075 에서 이미 만든 함수)에
+  폴더(`kind='folder'`)와 파일(`kind='file'`)을 더했다 — 지금까지 "파일은
+  /files 표가 따로 보여준다"고 미뤄 뒀던 것을 마저 합쳤다. 여전히 바로 아래
+  자식만 돌려준다(드릴다운 목록용, 재귀 아님).
+- **그래프**: `get_repository_graph(p_repository)` — 저장소 서브트리 전체를
+  재귀로 모아 노드(폴더·문서·코드·시트·맵·파일·캘린더 일정)와 간선(포함관계
+  + `object_links` 참조 + `calendar_event_links`)을 `jsonb` 하나로 묶어
+  돌려준다(list/edges 두 번 왕복하지 않는다 — storage locality 원칙,
+  v1.6.11 참고). 저장소는 공유가 없으므로 소유자 본인/관리자만 부를 수
+  있고, 그 안에서도 각 항목은 `can_view_object`/`can_view_event` 로 한 번 더
+  거른다 — 저장소 소유자가 아닌 사람이 자기 문서를 남의 저장소에 잘못
+  얹어 둔 경우에도 저장소 주인에게 실제로 안 보이는 문서까지 그래프에
+  새지 않는다.
+- **캘린더 ↔ 문서 역방향**: `get_object_events(kind, id)` — `calendar_event_links`
+  는 지금까지 일정 → 자료 방향으로만 조회됐다(그 일정에 뭐가 걸려 있는지).
+  문서를 열었을 때 "이 문서를 참조하는 일정"을 보여주려면 반대 방향이
+  필요했다 — 이번에 추가했다.
+
+**함정 하나 겪고 고침**: `item_nodes` CTE 를 여러 `union all` 가지로
+만들면서 첫 번째 가지에만 `as` 별칭을 달았다 — Postgres 는 `UNION` 계열
+에서 **첫 번째 가지의 컬럼 이름만** 쓰고 나머지 가지의 별칭은 무시한다.
+그 결과 `item_nodes.kind`/`label`/`container_id` 가 실제로는 이름 없는
+컬럼이 되어 있었고, 이를 참조하는 `all_nodes` 가 "column kind does not
+exist" 로 죽었다. `item_nodes (id, kind, label, container_id) as (...)`
+처럼 CTE 자체에 컬럼 이름을 못박아 고쳤다 — 로컬 Postgres 로 재생하며
+바로 잡은 경우라 실제 배포 전에 걸러졌다.
+
+### 앱 레이어
+
+- **`app/(app)/repositories/actions.ts`**: `Repository` 에 `parentId` 추가,
+  `createRepository(name, parentId?)`/`moveRepository(id, parentId)` 추가,
+  `listRepositoryContents` 가 이제 폴더+문서+코드+시트+맵+파일이 섞인 평평한
+  배열(`RepositoryEntry[]`)을 돌려준다(기존의 종류별로 나뉜 객체 모양을
+  버렸다 — 통합 표시가 이번 요청의 핵심이라 자연스럽게 맞춘 것),
+  `getRepositoryGraph(id)` 추가.
+- **`app/(app)/repositories/repository-graph.tsx`**(신규): 힘-기반(force-
+  directed) 그래프. `d3-force`(신규 의존성, ~30KB, 물리 시뮬레이션만
+  맡기고 렌더링은 직접 SVG 로 — 노드가 수백 개를 넘길 자료가 아니라 Canvas
+  최적화까지는 필요 없고, 클릭·드래그를 노드 단위 이벤트로 다루기엔 SVG
+  가 더 단순하다)로 좌표를 계산한다. 포함관계 간선은 짧고 강하게, 참조
+  간선은 길고 약하게 당겨 폴더 안 내용물이 자연스럽게 뭉치게 했다. 노드
+  드래그로 수동 배치 가능. 클릭(드래그 아님)하면 종류에 따라 폴더는
+  드릴다운, 문서/코드/시트/맵은 탭으로 열기, 파일은 미리보기, 캘린더
+  일정은 `/calendar?event=id` 로 이동 — 전부 이미 있는 탐색 경로를
+  재사용한다(새 상세 화면을 만들지 않았다).
+- **`app/(app)/files/files-client.tsx`**: 큰 개편.
+  - 이전: 랜딩(저장소 카드) → 상세에서 "ALL ITEMS"(문서/코드/시트/맵) 표와
+    "FILES"(카테고리 탭 있는 파일 전용) 표 **두 개**가 따로 있었다.
+  - 이후: 하나의 통합 표(폴더 포함 6종류가 다 섞여서 한 줄씩) + 브레드크럼
+    (Repositories › … › 현재 폴더, 부모 체인을 이미 받아 온 전체 저장소
+    목록에서 클라이언트에서 계산한다 — 레벨 이동마다 서버를 왕복하지
+    않는다) + 행마다 "Move to…" 드롭다운(어떤 폴더로든 바로 옮긴다, 이전엔
+    파일에만 있던 걸 전체 종류로 넓혔다) + List/Graph 토글.
+  - 파일 행은 통합 표에서도 미리보기/다운로드/공유/이름변경/삭제 같은
+    기존의 풍부한 동작을 그대로 쓴다 — `list_repository_contents` 가
+    돌려주는 요약(kind/id/label)만으로는 부족한 mime_type 같은 정보는,
+    페이지가 이미 로드 때 받아 온 `initialFiles`(전체 파일 메타데이터)에서
+    id 로 찾아 채운다. 왕복을 하나 더 만들지 않았다.
+  - 카테고리 탭(이미지/영상/PDF…)과 "Starred" 필터는 뺐다 — 카테고리 탭은
+    파일 전용 개념이라 통합 표와 맞지 않고, Starred 필터는 지금까지 파일
+    종류의 즐겨찾기만 서버에서 받아 왔던 터라(`listStarredIds("file")`)
+    문서/코드/시트/맵까지 포함한 통합 필터로 정확히 동작시키려면 새로운
+    조회가 필요했다 — 이번 범위를 넘어 남겨 둔다(각 행의 개별 즐겨찾기
+    별표는 파일에 한해 그대로 있다).
+- **`app/(app)/documents/[id]/backlinks-panel.tsx`**: 새 패널을 또 만드는
+  대신, 이미 있는 백링크 패널에 "이 문서를 참조하는 캘린더 일정"
+  섹션을 더했다 — "무언가 나를 가리킨다"는 점에서 같은 개념이라 자리를
+  합쳤다. 클릭하면 캘린더로 이동해 그 일정을 바로 연다.
+
+### 검증
+
+로컬 Postgres 에 0001~0078 을 전부 재생(에러 0건) 하고 시나리오로 직접
+확인했다: (1) 폴더 안에 폴더, 그 목록 조회 (2) 자기 자신/조상을 부모로
+지정하는 순환 시도 — 거부됨 (3) 다른 사람 저장소 밑에 중첩 시도 — 거부됨
+(4) 상위 폴더 삭제 → 하위 폴더가 최상위로 승격되는지 (5) 문서 A 가 문서
+B 를 참조할 때 `get_repository_graph` 의 노드/간선이 정확한지 (6) 캘린더
+일정을 문서에 연결한 뒤 `get_object_events` 와 `get_repository_graph` 양쪽
+에서 잡히는지 — 전부 기대한 대로였다. `npx tsc --noEmit`, `npm run build`
+모두 정상.
+
+### 기능적 검토 — 이번 기능의 한계와 남겨 둔 것
+
+- **RepositoryPicker**(각 에디터 툴바의 저장소 선택 드롭다운)는 여전히
+  전체 저장소를 평평하게만 보여준다 — 중첩 깊이를 들여쓰기로 보여주지
+  않는다. 파일 탐색기 자체(`/files`)는 드릴다운으로 계층을 보여주므로
+  핵심 경로는 아니지만, 에디터 안에서 깊이 중첩된 폴더로 바로 배정하려면
+  일단 파일 탐색기에서 옮겨야 한다.
+- **"Move to…" 드롭다운**은 대상 목록에서 자기 자신만 뺄 뿐, 폴더를 옮길
+  때 자기 자신의 하위 폴더로는 못 옮기게 미리 걸러 주지 않는다 — 실제로
+  그렇게 시도하면 DB 트리거가 막고 그 오류 메시지가 화면에 뜬다(고쳐지지
+  않는 게 아니라, UI 가 미리 알려주지 않고 서버가 대신 알려주는 차이다).
+- **드래그 앤 드롭으로 폴더 이동은 없다** — 드롭다운으로만 옮긴다. 파일
+  업로드 드래그 앤 드롭(기존 기능)은 그대로 있다.
+- **그래프의 "참조" 간선**은 `object_links`(문서 간 위키링크 등)와
+  `calendar_event_links`(일정↔자료)만 그린다 — 채팅 공유, 태그로 묶인
+  것 등은 간선으로 나타나지 않는다(애초에 "링크"가 아니라 별도 개념이다).
+- **그래프는 힘-기반 레이아웃이라 매번 다시 열 때마다 배치가 달라질 수
+  있다** — 위치를 저장해 다음에 열 때 복원하지는 않는다(Obsidian 도 기본
+  동작은 이와 비슷하다).
+- **Starred 필터를 통합 표에서 뺀 것**(위에서 이미 설명) — 문서/코드/
+  시트/맵까지 포함한 통합 즐겨찾기 필터가 필요해지면 `listStarredIds` 를
+  종류 무관하게 확장하는 다음 작업이 될 것이다.
+- **code_files 가 두 가지 "저장소" 개념을 동시에 가진다** — 이번에 다룬
+  일반 `repositories`(폴더 계층 포함)와, 기존의 `code_repositories`
+  (Code Space, git 가져오기 전용, 자체 경로 기반 파일 트리)가 서로
+  독립적으로 존재한다. 이번 그래프/폴더 작업은 전자만 다뤘다 — Code
+  Space 를 이 그래프에 합치는 것은 이번 요청 범위 밖으로 판단해 손대지
+  않았다(요청이 "일반 다른 형식의 파일들"과 "Docs, code, sheet" 를
+  가리켰고, git 저장소 트리는 이미 자기만의 파일탐색기가 있다).
 
 ## 아키텍처 리뷰 — 온톨로지·임피던스 불일치·SQL/NoSQL·선언형/명령형·MapReduce (v1.6.14)
 
