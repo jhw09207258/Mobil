@@ -1,8 +1,8 @@
-# Possion (H-1 Prototype, beta v1.6.6)
+# Possion (H-1 Prototype, beta v1.6.7)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 29, v1.6.6 by Haewon Jeong
+Last Update in July 29, v1.6.7 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
@@ -83,6 +83,70 @@ try/catch **안에** 두면 그 신호까지 여기서 삼켜져 "가입 성공 
 이 외에 마이그레이션 0001~0072 재생, 시나리오 77건, 단위 테스트 8개,
 `tsc`·`npm run build` 를 전부 다시 통과시켰습니다(아래 [전체 수치](#전-기능-검증-v163)
 와 같은 절차).
+
+## 배포 후 장애 — v1.6.6 이 로그인을 100% 깨뜨렸다 (v1.6.7)
+
+### 무엇이 보고됐나
+
+v1.6.6(프로덕션 계측 추가)을 배포한 직후, 로그인 시도가 전부 **"Something
+went wrong on our end. Please try again in a moment."** 로 실패한다는 보고를
+받았습니다. 이건 v1.6.5 에서 새로 넣은 `login/actions.ts` 의 일반 오류
+메시지입니다 — 즉 v1.6.5 가 막으려던 "화면이 통째로 죽는 사고" 는 막았지만,
+바로 다음 배포(v1.6.6)가 로그인을 **항상 실패하는** 상태로 만들었다는
+뜻입니다. 아이디/비밀번호가 맞아도 마찬가지였습니다.
+
+### 원인 — JavaScript `finally` 시맨틱스
+
+v1.6.6 에서 넣은 `lib/observability.ts` 의 `measure()` 는 이런 모양이었습니다.
+
+```ts
+try {
+  return await fn();       // 로그인 로직 — 성공하면 { ok: true, redirectTo }
+} finally {
+  // 로그 남기기, after() 로 표본 기록 예약 …
+}
+```
+
+**JavaScript 의 `finally` 는, 그 안에서 무언가 던지면 `try` 의 결과(성공
+반환값이든 이미 던져진 오류든 상관없이)를 통째로 덮어씁니다.** `measure()`
+의 `finally` 안에서 `after()` 호출이나 그 주변 코드가 배포 환경에서 던지는
+순간, **로그인이 실제로는 성공했어도 그 반환값은 사라지고** `finally` 의
+오류만 `login()` 의 바깥 `catch` 로 올라가 "Something went wrong on our
+end" 를 돌려줬습니다. `lib/observability.ts` 자체에 "계측 실패가 기능
+실패가 되면 안 된다" 라고 주석까지 적어 뒀지만, `finally` 배치 때문에 실제로는
+그 반대로 동작하고 있었습니다.
+
+로컬 `next start` 재현 환경에서는 `after()` 가 조용히 성공해 이 문제가 전혀
+드러나지 않았습니다 — 배포 환경(Vercel)의 서버리스 함수 조건에서만
+나타났고, **로그인은 모든 세션이 반드시 거치는 경로라 다른 `after()` 사용
+지점(파일 다운로드 감사 로그 등)보다 훨씬 빨리, 훨씬 자주 이 문제에
+부딪혔습니다.**
+
+### 고침
+
+`measure()` 의 `finally` 블록 **안**에 다시 try/catch 를 하나 더 둡니다.
+계측 코드(로그·`after()` 예약)에서 무엇이 던지든 그 안에서 잡아 삼키고,
+바깥의 `try` 결과(성공 반환값이든 `fn()` 자체가 던진 실제 오류든)는 절대
+건드리지 않습니다.
+
+### 검증 — 정확히 이 시맨틱스를 고정했다
+
+1. `lib/observability.test.mjs` — Next 런타임 없이 순수 JS 로 `finally`
+   시맨틱스 자체를 검증하는 단위 테스트 4개를 추가했습니다: 고치기 전
+   모양은 계측 오류가 성공 반환값을 삼킨다는 것을(버그 재현), 고친 모양은
+   계측이 던져도 성공 반환값이 살아남는다는 것과, 실제 오류(`fn()` 이 던진
+   것)는 여전히 정확히 전달된다는 것을(성공 케이스와 실패 케이스 둘 다) 확인합니다.
+2. 실제 `lib/observability.ts` 파일로도 확인했습니다. 환경변수로 켜지는
+   강제 throw 를 `finally` 안에 임시로 심고, **고치기 전** 코드로 프로덕션
+   빌드를 띄워 실제 브라우저로 로그인을 제출했더니 정확히 보고된 증상
+   ("Something went wrong on our end")이 재현됐습니다. **고친 뒤** 같은
+   강제 throw 조건에서 같은 폼을 제출하면 올바른 결과("Invalid email or
+   password.")가 그대로 나왔습니다.
+3. 강제 throw 코드와 임시 테스트 스크립트는 검증 후 제거했습니다 — 커밋에
+   포함된 diff 는 `lib/observability.ts` 의 실제 고침과 새 단위 테스트뿐입니다.
+
+마이그레이션 0001~0073 재생, 시나리오 85건, 단위 테스트 9개(신규 1개 포함),
+`tsc`·`npm run build` 를 다시 통과시켰습니다.
 
 ## 프로덕션 계측과 SLO 목표치 (v1.6.6)
 
@@ -885,6 +949,8 @@ curl https://<배포주소>/api/health
 | `app/(auth)/login/actions.ts` · `app/(auth)/signup/actions.ts` (v1.6.6) | `auth.login`/`auth.signup` 계측 추가(전수 기록) |
 | `app/(app)/calendar/actions.ts` · `app/(app)/dashboard/page.tsx` · `app/(app)/search/actions.ts` · `app/(app)/sharing/actions.ts` (v1.6.6) | `calendar.month`/`calendar.upcoming`/`search.ontology`/`sharing.cards`/`sharing.attachable` 계측 추가 |
 | `app/globals.css` (v1.6.6) | `.badge-warn`·`.badge-danger` 추가 |
+| `lib/observability.ts` (v1.6.7) | `measure()` 의 `finally` 안을 다시 try/catch 로 감쌌다 — JS 의 `finally` 는 던지면 `try` 의 성공 반환값을 덮어쓴다는 시맨틱스 때문에, 계측 코드의 예외가 v1.6.6 배포 직후 로그인을 100% 실패시켰다 |
+| `lib/observability.test.mjs` (v1.6.7, 신규) | 위 `finally` 시맨틱스를 고정하는 단위 테스트 4개 |
 | `vercel.json` | 5분 간격 cron → `/api/push/dispatch` — **v1.6.1 에서 도로 뺐습니다**(Hobby 플랜이 거부해 배포가 통째로 실패). 지금은 수동 설정 항목입니다 |
 | `.env.example` | `VAPID_*`, `NOTIFY_DISPATCH_TOKEN`, `CRON_SECRET` |
 

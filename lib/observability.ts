@@ -29,21 +29,36 @@ export async function measure<T>(
   try {
     return await fn();
   } finally {
-    const ms = performance.now() - t0;
-    console.log(`[possion:perf] feature=${feature} ms=${ms.toFixed(1)}`);
+    // 이 블록 안의 무엇이든 던지면 안 된다 — JS 의 finally 는 **던지면 try 의
+    // 결과(성공 반환값이든 던진 오류든)를 통째로 덮어써 버린다.** 로그인이
+    // 실제로 성공했어도, 여기서 뭔가(after() 호출 자체, SLO 조회 등) 던지는
+    // 순간 그 성공은 사라지고 이 finally 의 오류만 호출부로 올라간다 —
+    // 계측이 "기능 실패" 를 직접 만들어낸 것과 같다. 정확히 이 문제로
+    // v1.6.6 배포 직후 로그인이 100% 실패했다(catch 의 일반 오류 메시지로
+    // 가려져 원인이 안 보였다). 그래서 이 블록 전체를 다시 한번 try/catch 로
+    // 감싼다 — 안에서 뭐가 터지든 바깥의 try 결과에는 손대지 못하게.
+    try {
+      const ms = performance.now() - t0;
+      console.log(`[possion:perf] feature=${feature} ms=${ms.toFixed(1)}`);
 
-    if (Math.random() < SLO[feature].sampleRate) {
-      // after() 는 진짜 Promise<void> 를 요구하는데 supabase.rpc(...) 는
-      // thenable(PostgrestFilterBuilder) 이라 타입이 맞지 않는다. async 화살표로
-      // 감싸 진짜 Promise 로 만든다.
-      after(async () => {
-        await supabase
-          .rpc("record_perf_sample", { p_feature: feature, p_ms: ms })
-          .then(
-            () => {},
-            () => {}
-          );
-      });
+      if (Math.random() < SLO[feature].sampleRate) {
+        // after() 는 진짜 Promise<void> 를 요구하는데 supabase.rpc(...) 는
+        // thenable(PostgrestFilterBuilder) 이라 타입이 맞지 않는다. async 화살표로
+        // 감싸 진짜 Promise 로 만든다.
+        after(async () => {
+          await supabase
+            .rpc("record_perf_sample", { p_feature: feature, p_ms: ms })
+            .then(
+              () => {},
+              () => {}
+            );
+        });
+      }
+    } catch (e) {
+      console.error(
+        `[possion:perf] instrumentation failed for ${feature}:`,
+        e instanceof Error ? e.message : e
+      );
     }
   }
 }
