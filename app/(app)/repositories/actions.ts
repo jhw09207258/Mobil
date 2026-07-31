@@ -102,28 +102,27 @@ export type RepositoryContents = {
 };
 
 /** 특정 저장소(null = Null Repository)에 속한 내 콘텐츠 — 파일 제외
- * (파일은 /files 표 자체가 필터링해 보여준다). */
+ * (파일은 /files 표 자체가 필터링해 보여준다).
+ *
+ * 예전에는 documents/code_files/sheets/mind_maps 네 테이블을 Promise.all 로
+ * 병렬 조회했다 — 지연은 겹쳐서 없앴지만 왕복 자체는 여전히 네 번이었다.
+ * list_repository_contents(0075)가 UNION ALL 로 한 번에 묶어 왕복을 하나로
+ * 줄인다(list_attachable_objects, 0065 와 같은 방식). */
 export async function listRepositoryContents(
   repositoryId: string | null
 ): Promise<RepositoryContents> {
   await requireUser();
   const supabase = await createClient();
 
-  const q = (table: "documents" | "code_files" | "sheets" | "mind_maps", cols: string) => {
-    const base = supabase.from(table).select(cols).order("updated_at", { ascending: false }).limit(100);
-    return repositoryId === null ? base.is("repository_id", null) : base.eq("repository_id", repositoryId);
-  };
+  const { data } = await supabase.rpc("list_repository_contents", {
+    p_repository: repositoryId,
+  });
+  const rows = data ?? [];
 
-  const [docs, code, sheets, maps] = await Promise.all([
-    q("documents", "id, title") as unknown as Promise<{ data: { id: string; title: string }[] | null }>,
-    q("code_files", "id, name") as unknown as Promise<{ data: { id: string; name: string }[] | null }>,
-    q("sheets", "id, title") as unknown as Promise<{ data: { id: string; title: string }[] | null }>,
-    q("mind_maps", "id, title") as unknown as Promise<{ data: { id: string; title: string }[] | null }>,
-  ]);
   return {
-    documents: (docs.data ?? []).map((d) => ({ id: d.id, title: d.title || "Untitled" })),
-    code: (code.data ?? []).map((c) => ({ id: c.id, name: c.name })),
-    sheets: (sheets.data ?? []).map((s) => ({ id: s.id, title: s.title || "Untitled" })),
-    mindmaps: (maps.data ?? []).map((m) => ({ id: m.id, title: m.title || "Untitled" })),
+    documents: rows.filter((r) => r.kind === "document").map((r) => ({ id: r.id, title: r.label })),
+    code: rows.filter((r) => r.kind === "code").map((r) => ({ id: r.id, name: r.label })),
+    sheets: rows.filter((r) => r.kind === "sheet").map((r) => ({ id: r.id, title: r.label })),
+    mindmaps: rows.filter((r) => r.kind === "mindmap").map((r) => ({ id: r.id, title: r.label })),
   };
 }

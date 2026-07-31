@@ -1,21 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listContributors, type ContributorRow } from "./actions";
 
 export function ContributorBadges({
   kind,
   id,
   refreshToken,
+  initial,
 }: {
   kind: "document" | "code" | "sheet" | "mindmap";
   id: string;
   refreshToken?: unknown;
+  /** 서버 컴포넌트가 문서와 같은 왕복에서 이미 받아 온 초기값이 있으면 그걸
+   * 쓰고 마운트 시점의 재조회를 건너뛴다 — 넘겨주지 않은 호출부(code/sheet/
+   * mindmap)는 지금까지처럼 자립형으로 스스로 불러온다. */
+  initial?: ContributorRow[];
 }) {
-  const [contributors, setContributors] = useState<ContributorRow[]>([]);
+  const [contributors, setContributors] = useState<ContributorRow[]>(initial ?? []);
+  const skipNextFetch = useRef(initial !== undefined);
 
   useEffect(() => {
     let cancelled = false;
+    if (skipNextFetch.current) {
+      skipNextFetch.current = false;
+      return;
+    }
     listContributors(kind, id).then((rows) => {
       if (!cancelled) setContributors(rows);
     });

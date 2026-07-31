@@ -1052,6 +1052,25 @@ export interface Database {
         }[];
       };
 
+      // ---- 0075: storage locality ----
+      list_code_repositories: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          name: string;
+          github_owner: string | null;
+          github_repo: string | null;
+          github_ref: string | null;
+          imported_at: string | null;
+          created_at: string;
+          file_count: number;
+        }[];
+      };
+      list_repository_contents: {
+        Args: { p_repository?: string | null };
+        Returns: { kind: string; id: string; label: string }[];
+      };
+
       // ---- 0066/0067: 캘린더 ----
       ensure_default_calendar: {
         Args: Record<string, never>;

@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { DocumentEditorLoader } from "./editor-loader";
+import { listContributors } from "../../contributors/actions";
+import { listRepositories, getItemRepository } from "../../repositories/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,16 +30,27 @@ export default async function DocumentPage({
   let canEdit = doc.owner_id === userId;
   if (!canEdit && doc.visibility !== "owner") {
     canEdit = doc.visibility === "public" || profile.role === "admin";
-    if (!canEdit) {
-      const { data: perm } = await supabase
-        .from("document_permissions")
-        .select("permission")
-        .eq("document_id", id)
-        .eq("user_id", userId)
-        .maybeSingle();
-      canEdit = perm?.permission === "edit";
-    }
   }
+  const needsPermCheck = !canEdit && doc.visibility !== "owner";
+
+  // 에디터 상단바가 자기 마운트 시점에 따로 불러오던 기여자 목록/저장소
+  // 배정을 여기서 같이 가져온다 — /documents/[id] 로 직접 들어온 경우(탭
+  // 시스템을 거치지 않는 경로)도 getDocumentForTab 과 같은 이득을 보게
+  // 맞춘다.
+  const [perm, contributors, repos, itemRepo] = await Promise.all([
+    needsPermCheck
+      ? supabase
+          .from("document_permissions")
+          .select("permission")
+          .eq("document_id", id)
+          .eq("user_id", userId)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { permission: string } | null }),
+    listContributors("document", id),
+    listRepositories(),
+    getItemRepository("document", id),
+  ]);
+  if (needsPermCheck) canEdit = perm.data?.permission === "edit";
 
   const isOwner = doc.owner_id === userId;
 
@@ -54,6 +67,9 @@ export default async function DocumentPage({
         myShareId={userId}
         myName={profile.display_name || profile.email}
         myAvatarUrl={profile.avatar_url}
+        initialContributors={contributors}
+        initialRepos={repos}
+        initialRepositoryId={itemRepo?.repositoryId ?? null}
       />
     </>
   );

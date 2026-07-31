@@ -43,7 +43,9 @@ import { WorkspaceLink } from "./workspace-link";
 import { WorkspaceMention } from "./mention-command";
 import { FontSize, FONT_SIZES } from "./font-size";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import type { ContributorRow } from "../../contributors/actions";
 import { RepositoryPicker } from "../../repositories/repository-picker";
+import type { Repository } from "../../repositories/actions";
 import { ActivityPanel } from "./activity-panel";
 import { createMindmapFromDocument } from "../../convert-actions";
 import { usePresence } from "@/lib/use-presence";
@@ -96,6 +98,9 @@ export function DocumentEditor({
   myShareId,
   myName,
   myAvatarUrl,
+  initialContributors,
+  initialRepos,
+  initialRepositoryId,
 }: {
   docId: string;
   initialTitle: string;
@@ -107,6 +112,9 @@ export function DocumentEditor({
   myShareId: string;
   myName: string;
   myAvatarUrl: string | null;
+  initialContributors?: ContributorRow[];
+  initialRepos?: Repository[];
+  initialRepositoryId?: string | null;
 }) {
   const router = useRouter();
   const { renameTab, openTab, closeTab } = useWorkspace();
@@ -368,8 +376,19 @@ export function DocumentEditor({
         />
         <div className="row hscroll" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
-          <RepositoryPicker kind="document" itemId={docId} canEdit={canEdit} />
-          <ContributorBadges kind="document" id={docId} refreshToken={saveState} />
+          <RepositoryPicker
+            kind="document"
+            itemId={docId}
+            canEdit={canEdit}
+            initialRepos={initialRepos}
+            initialRepositoryId={initialRepositoryId}
+          />
+          <ContributorBadges
+            kind="document"
+            id={docId}
+            refreshToken={saveState}
+            initial={initialContributors}
+          />
           <span
             className={`save-state ${
               saveState === "dirty" ? "dirty" : saveState === "saved" ? "saved" : ""

@@ -1,12 +1,63 @@
-# Possion (H-1 Prototype, beta v1.6.10)
+# Possion (H-1 Prototype, beta v1.6.11)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 31, v1.6.10 by Haewon Jeong
+Last Update in July 31, v1.6.11 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## Storage Locality — Repository/Docs 의 불필요한 I/O 제거 (v1.6.11)
+
+**정책**: 한 화면을 그리는 데 필요한 데이터가 여러 테이블/여러 쿼리에
+흩어져 있으면, (a) DB 안에서 끝낼 수 있는 집계를 앱으로 끌고 나와 원본
+행을 통째로 옮기거나, (b) 같은 요청 안에서 한 번에 모아 올 수 있는 것을
+여러 번의 별도 왕복으로 나눠 가져오게 된다. 디스크 지역성(연속된 블록을
+한 번에 읽는 것이 흩어진 블록을 여러 번 읽는 것보다 싸다)과 같은 원리를
+네트워크 왕복에 적용했다 — 이번 점검에서 실제로 이 두 가지 패턴을 찾아
+고쳤다.
+
+**Repository — `supabase/migrations/0075_storage_locality.sql`**
+- `list_code_repositories()`: 지금까지 `app/(app)/code/repo-actions.ts`
+  는 저장소별 파일 수를 세려고 `code_files.code_repository_id` 컬럼을
+  **전체 행** 긁어와 자바스크립트에서 셌다. 파일이 수천 개면 숫자 하나
+  보려고 수천 행을 네트워크로 옮기는 셈이었다. 새 SQL 함수가 `count(*)
+  group by` 로 DB 안에서 집계하고, 저장소 수만큼의 행만 돌려준다.
+  `SECURITY DEFINER` 가 아니다 — 호출자 권한 그대로 기존 RLS
+  (`code_repositories_select`/`code_files_select`)가 걸린다.
+- `list_repository_contents()`: `repositories`(문서·코드·시트·맵 범용
+  저장소, 0044) 하나의 내용물을 보려고 `documents`/`code_files`/`sheets`/
+  `mind_maps` 네 테이블을 따로 쿼리했다(`Promise.all` 로 병렬화는 되어
+  있었지만 왕복 자체는 네 번). `UNION ALL` 로 한 번에 묶었다 —
+  `list_attachable_objects`(0065)가 이미 쓰는 것과 같은 방식.
+
+**Docs — 문서를 열 때 뒤따르던 왕복 두 번 제거**
+`ContributorBadges`/`RepositoryPicker` 는 지금까지 문서 에디터가 열릴
+때마다 **자기 마운트 시점에 따로** 기여자 목록과 저장소 배정을 불러왔다
+— 문서 본문을 담은 서버 왕복 뒤에 클라이언트발 왕복이 두 번 더 따라
+붙는 구조였다(문서를 열 때마다 매번). `getDocumentForTab()`
+(`app/(app)/documents/actions.ts`)과 `/documents/[id]` 직접 진입 경로
+(`app/(app)/documents/[id]/page.tsx`) 양쪽에서 이제 문서 본문 조회와
+함께 `Promise.all` 로 병렬로 가져와 `initialContributors`/`initialRepos`/
+`initialRepositoryId` 로 내려보낸다. 두 컴포넌트는 이 값이 주어지면
+마운트 시점의 재조회를 건너뛰고, 주어지지 않으면(code/sheet/mindmap 은
+아직 이 값을 넘기지 않는다) 지금까지처럼 스스로 불러온다 — 순수 추가라
+그 세 콘텐츠 종류의 동작은 전혀 바뀌지 않는다.
+
+**범위**: `code_files`/`sheets`/`mind_maps`/`files` 에도 같은
+Repository 이득(집계 RPC)을 적용할 수 있지만 이번엔 손대지 않았다.
+`app/(app)/code/repo-actions.ts` 의 `renameSpaceFolder()`(폴더 이름을
+바꾸면 그 안의 파일마다 UPDATE 를 한 번씩 따로 보낸다, 쓰기 쪽 N+1)도
+같은 종류의 문제로 확인했지만 이번 점검에서는 고치지 않았다 — 폴더
+이름 변경은 읽기 경로에 비해 훨씬 드물게 일어나고, 배치 UPDATE + 충돌
+검사를 SQL 하나로 정확히 옮기는 작업은 별도로 검증할 시간이 필요해
+범위를 초과했다. 다음 손볼 항목으로 남겨 둔다.
+
+**검증**: 로컬 Postgres 에 마이그레이션 0001~0075 를 전부 재생해
+`list_code_repositories()`/`list_repository_contents()` 를 직접 호출해
+집계·UNION 결과가 맞는지 확인했다. `npx tsc --noEmit`, `npm run build`
+모두 정상.
 
 ## 문서 프라이버시에 "Owner 전용" 단계 추가 — 관리자도 못 본다 (v1.6.10)
 

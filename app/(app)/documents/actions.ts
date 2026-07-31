@@ -7,6 +7,8 @@ import type { Json, DocVisibility } from "@/lib/database.types";
 import { extractDocLinks } from "@/lib/ontology-links";
 import { extractTagsFromText, extractTiptapPlainText } from "@/lib/tags";
 import { syncObjectEmbedding } from "@/lib/embeddings";
+import { listContributors } from "../contributors/actions";
+import { listRepositories, getItemRepository } from "../repositories/actions";
 import {
   importFileToTiptapDoc,
   tiptapToPlainText,
@@ -177,7 +179,16 @@ export async function createDocumentTab(): Promise<{
   };
 }
 
-/** 탭 시스템용: 문서 데이터 + 편집 가능 여부를 한 번에 조회. */
+/**
+ * 탭 시스템용: 문서 데이터 + 편집 가능 여부를 한 번에 조회.
+ *
+ * 에디터 상단바의 ContributorBadges/RepositoryPicker 는 원래 각자 마운트
+ * 시점에 스스로 불러왔다 — 문서 하나를 열 때마다 이 서버 왕복(문서 본문)
+ * 뒤에 클라이언트발 왕복이 두 번 더 따라붙는 셈이었다(기여자 목록, 저장소
+ * 목록+현재 배정). "문서를 열 때 필요한 것 대부분을 한 번에" 원칙에 따라
+ * 여기서 같이 가져와 그 두 번을 없앤다 — Promise.all 로 병렬화하므로 지연은
+ * 겹치고, 별도 요청 두 번이 사라지는 이득만 남는다.
+ */
 export async function getDocumentForTab(id: string) {
   const { userId, profile } = await requireUser();
   const supabase = await createClient();
@@ -196,16 +207,23 @@ export async function getDocumentForTab(id: string) {
   let canEdit = doc.owner_id === userId;
   if (!canEdit && doc.visibility !== "owner") {
     canEdit = doc.visibility === "public" || profile.role === "admin";
-    if (!canEdit) {
-      const { data: perm } = await supabase
-        .from("document_permissions")
-        .select("permission")
-        .eq("document_id", id)
-        .eq("user_id", userId)
-        .maybeSingle();
-      canEdit = perm?.permission === "edit";
-    }
   }
+  const needsPermCheck = !canEdit && doc.visibility !== "owner";
+
+  const [perm, contributors, repos, itemRepo] = await Promise.all([
+    needsPermCheck
+      ? supabase
+          .from("document_permissions")
+          .select("permission")
+          .eq("document_id", id)
+          .eq("user_id", userId)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { permission: string } | null }),
+    listContributors("document", id),
+    listRepositories(),
+    getItemRepository("document", id),
+  ]);
+  if (needsPermCheck) canEdit = perm.data?.permission === "edit";
 
   return {
     id: doc.id,
@@ -215,6 +233,9 @@ export async function getDocumentForTab(id: string) {
     visibility: doc.visibility,
     canEdit,
     isOwner: doc.owner_id === userId,
+    contributors,
+    repos,
+    currentRepositoryId: itemRepo?.repositoryId ?? null,
     myShareId: userId,
     myName: profile.display_name || profile.email,
     myAvatarUrl: profile.avatar_url,

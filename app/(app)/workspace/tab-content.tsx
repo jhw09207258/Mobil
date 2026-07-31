@@ -98,6 +98,9 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
         myShareId={d.myShareId}
         myName={d.myName}
         myAvatarUrl={d.myAvatarUrl}
+        initialContributors={d.contributors}
+        initialRepos={d.repos}
+        initialRepositoryId={d.currentRepositoryId}
       />
     );
   }
