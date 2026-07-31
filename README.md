@@ -1,12 +1,71 @@
-# Possion (H-1 Prototype, beta v1.6.9)
+# Possion (H-1 Prototype, beta v1.6.10)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 31, v1.6.9 by Haewon Jeong
+Last Update in July 31, v1.6.10 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## 문서 프라이버시에 "Owner 전용" 단계 추가 — 관리자도 못 본다 (v1.6.10)
+
+**문제**: `documents` 는 `is_public` 하나뿐이었다. `false`("비공개")라도 실제로는
+소유자 / `document_permissions` 로 명시 공유받은 사람 / 그리고 예외 없이
+`is_admin()` 이 전부 볼 수 있었다(`documents_select`, 0050). Admin Code 를
+`redeem_admin_code` 로 입력해 `profiles.role='admin'` 이 되는 순간부터 "비공개"
+문서 전부가 그 사람에게 열린다 — 관리자 계정 하나가 뚫리면 조직의 모든 개인
+문서(일기·인사 기록 등)가 함께 뚫리는 구조였고, 개인적인 문서를 둘 자리가
+없었다.
+
+**조치**: `documents.is_public` 을 지우고 `visibility` 세 단계로 바꿨다
+(`supabase/migrations/0074_document_owner_privacy.sql`).
+- `owner` — 소유자 본인만. `document_permissions` 명시 공유도, `is_admin()`
+  도 통하지 않는다. 이번에 새로 추가한 단계.
+- `private` — 지금까지의 "비공개" 그대로: 소유자 + 명시 공유 + 관리자.
+- `public` — 지금까지의 `is_public = true` 그대로: 로그인한 모두가 보고 고침.
+
+`visibility` 를 참조하는 곳은 RLS 정책만이 아니었다 — 성능/재사용을 위해 같은
+조건을 각자 인라인해 둔 SECURITY DEFINER 함수 다섯 개
+(`can_view_object`, `can_edit_object`, `search_ontology`,
+`list_conversation_plugins`, `grant_object_access`)를 전부 함께 고쳤다. 이 중
+하나라도 빠뜨리면 "목록/에디터에서는 안 보이는데 검색 결과나 AI 대화 첨부,
+실시간 협업 채널 구독으로는 여전히 새는" 구멍이 남는다 — 특히
+`grant_object_access()` 는 `can_view_object` 를 거치지 않고 소유자/관리자
+여부만 직접 검사했으므로, 고치지 않았다면 관리자가 자기 자신에게 owner 단계
+문서의 열람 권한을 몰래 부여할 수 있는 유일한 남은 구멍이었다.
+
+`document_permissions` 의 정책에 `visibility` 조건을 raw
+`exists(select … from documents …)` 로 바로 넣으면 `documents_select` 정책이
+다시 `document_permissions` 를 쿼리하고, 그 정책이 다시 `documents` 를
+쿼리하는 순환이 생겨 "infinite recursion detected in policy" 로 죽는다 —
+0017/0018 이 이미 한 번 고쳤던 것과 같은 함정이다. 기존 `is_document_owner()`
+와 같은 원칙으로 새 SECURITY DEFINER 헬퍼 `is_owner_only_document()` 를 만들어
+피했다.
+
+앱 레이어(`app/(app)/documents/`): 문서 에디터 툴바의 Public/Private 2단
+토글을 Owner only/Private/Public 3단 셀렉트로 바꿨고, 목록의 Visibility
+배지에 `owner`(경고색, "Only the owner can see this — not even admins.")
+를 추가했다. `shareDocument()` 는 DB 가 어차피 막기 전에 owner 단계 문서에
+대한 공유 시도를 앱 레벨에서 먼저 걸러 명확한 이유를 보여준다 — 그러지
+않으면 "공유했는데 상대가 못 본다"는 혼란만 남는다.
+
+**범위**: 이번 변경은 `documents` 테이블에만 적용했다(요청이 "문서"였다).
+`code_files`/`sheets`/`mind_maps`/`files` 는 아직 `is_public` 2단 그대로다 —
+같은 패턴(정책 + `can_view_object` 등 다섯 함수)을 그대로 반복하면 확장할 수
+있다.
+
+**검증**: 로컬 Postgres 16 에 Supabase 스키마 스텁(`auth`/`storage`/`realtime`
+등)을 얹고 마이그레이션 0001~0074 를 전부 재생한 뒤, `owner`/`private`/
+`public` 세 문서와 소유자·관리자·무관한 사용자·공유받은 사용자 네 명으로
+시나리오를 짜서 검증했다: 관리자의 RLS `SELECT`, `can_view_object`,
+`can_edit_object`, blind `UPDATE`(제목 변경 시도, `visibility` 를 몰래
+`private` 로 내리는 시도 포함), blind `DELETE`, `grant_object_access` 로
+자기 자신에게 권한을 부여하는 시도, `share_object_with_conversation`,
+그리고 `document_permissions` 목록 열람까지 — 관리자와 무관한 사용자 모두
+owner 단계 문서에 대해 어떤 경로로도 읽기·쓰기·삭제·공유목록열람·권한부여가
+전부 막혔고, `private`/`public` 문서의 기존 동작은 회귀 없이 그대로였다.
+`npx tsc --noEmit`, `npm run build` 모두 정상.
 
 ## "달력 추가조차 안 된다" — 캘린더 액션이 실패를 삼켜 무한 로딩 (v1.6.9)
 

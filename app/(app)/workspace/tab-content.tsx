@@ -94,7 +94,7 @@ export function TabContent({ kind, itemId }: { kind: TabKind; itemId: string }) 
         initialYjsState={d.initialYjsState}
         canEdit={d.canEdit}
         isOwner={d.isOwner}
-        isPublic={d.isPublic}
+        visibility={d.visibility}
         myShareId={d.myShareId}
         myName={d.myName}
         myAvatarUrl={d.myAvatarUrl}

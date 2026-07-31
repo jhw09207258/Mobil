@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedUser as requireUser } from "@/lib/auth";
-import type { Json } from "@/lib/database.types";
+import type { Json, DocVisibility } from "@/lib/database.types";
 import { extractDocLinks } from "@/lib/ontology-links";
 import { extractTagsFromText, extractTiptapPlainText } from "@/lib/tags";
 import { syncObjectEmbedding } from "@/lib/embeddings";
@@ -75,7 +75,7 @@ export async function importDocument(
       title: data.title,
       content: data.content,
       initialYjsState: null,
-      isPublic: false,
+      visibility: "private" as DocVisibility,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
@@ -167,7 +167,7 @@ export async function createDocumentTab(): Promise<{
       title: data.title,
       content: data.content,
       initialYjsState: null,
-      isPublic: false,
+      visibility: "private" as DocVisibility,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
@@ -184,21 +184,27 @@ export async function getDocumentForTab(id: string) {
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, owner_id, title, content, is_public, updated_at, yjs_state")
+    .select("id, owner_id, title, content, visibility, updated_at, yjs_state")
     .eq("id", id)
     .single();
 
   if (!doc) return null;
 
-  let canEdit = doc.owner_id === userId || profile.role === "admin" || doc.is_public;
-  if (!canEdit) {
-    const { data: perm } = await supabase
-      .from("document_permissions")
-      .select("permission")
-      .eq("document_id", id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    canEdit = perm?.permission === "edit";
+  // documents_update RLS(0074)와 같은 모양으로 판정한다: 소유자는 언제나,
+  // 'owner' 단계가 아니면 공개거나 관리자거나 명시적 edit 공유를 받은 경우.
+  // 'owner' 단계는 소유자 본인 외에는 관리자를 포함해 누구도 편집할 수 없다.
+  let canEdit = doc.owner_id === userId;
+  if (!canEdit && doc.visibility !== "owner") {
+    canEdit = doc.visibility === "public" || profile.role === "admin";
+    if (!canEdit) {
+      const { data: perm } = await supabase
+        .from("document_permissions")
+        .select("permission")
+        .eq("document_id", id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      canEdit = perm?.permission === "edit";
+    }
   }
 
   return {
@@ -206,7 +212,7 @@ export async function getDocumentForTab(id: string) {
     title: doc.title,
     content: doc.content,
     initialYjsState: doc.yjs_state,
-    isPublic: doc.is_public,
+    visibility: doc.visibility,
     canEdit,
     isOwner: doc.owner_id === userId,
     myShareId: userId,
@@ -338,16 +344,13 @@ export async function deleteDocument(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** 공개 여부 토글. */
-export async function setDocumentPublic(
+/** 프라이버시 레벨 변경 — owner(소유자만, 관리자도 못 봄) / private / public. */
+export async function setDocumentVisibility(
   id: string,
-  isPublic: boolean
+  visibility: DocVisibility
 ): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("documents")
-    .update({ is_public: isPublic })
-    .eq("id", id);
+  const { error } = await supabase.from("documents").update({ visibility }).eq("id", id);
   if (error) return { ok: false, error: "Update failed." };
   return { ok: true };
 }
@@ -371,6 +374,22 @@ export async function shareDocument(
   }
   if (id === user.id) {
     return { ok: false, error: "You can't share with yourself." };
+  }
+
+  // document_permissions_insert RLS(0074)는 소유자 본인이면 owner 단계 문서에도
+  // 행을 넣는 것 자체는 막지 않는다(무해하다 — documents_select 가 어차피 그
+  // 공유를 무시한다). 하지만 그러면 "공유했는데 상대가 못 본다"는 혼란스러운
+  // 결과만 남으므로, 여기서 미리 막아 이유를 알려준다.
+  const { data: target } = await supabase
+    .from("documents")
+    .select("visibility")
+    .eq("id", documentId)
+    .maybeSingle();
+  if (target?.visibility === "owner") {
+    return {
+      ok: false,
+      error: "Owner-only documents can't be shared — switch visibility first.",
+    };
   }
 
   const { error } = await supabase.from("document_permissions").upsert(

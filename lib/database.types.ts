@@ -16,6 +16,8 @@ export type Json =
 export type Role = "user" | "admin";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type Permission = "view" | "edit";
+/** documents 전용 — owner 는 소유자 본인만(관리자도 못 봄), 나머지는 기존 그대로. */
+export type DocVisibility = "owner" | "private" | "public";
 export type TargetType = "document" | "file" | "code";
 export type AuditAction =
   | "view"
@@ -80,7 +82,7 @@ export interface Database {
           owner_id: string;
           title: string;
           content: Json;
-          is_public: boolean;
+          visibility: DocVisibility;
           created_at: string;
           updated_at: string;
           yjs_state: string | null;
@@ -91,13 +93,13 @@ export interface Database {
           owner_id: string;
           title?: string;
           content?: Json;
-          is_public?: boolean;
+          visibility?: DocVisibility;
           yjs_state?: string | null;
         };
         Update: {
           title?: string;
           content?: Json;
-          is_public?: boolean;
+          visibility?: DocVisibility;
           yjs_state?: string | null;
           repository_id?: string | null;
         };

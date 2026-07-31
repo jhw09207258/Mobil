@@ -10,7 +10,7 @@ import {
   sheetRowsToMindmapData,
   type SheetCell,
 } from "@/lib/outline-convert";
-import type { Json } from "@/lib/database.types";
+import type { Json, DocVisibility } from "@/lib/database.types";
 import { parseInitialData } from "@/lib/mindmap-legacy";
 
 type TabResult = { id: string; title: string; seed: unknown } | { error: string };
@@ -68,7 +68,7 @@ export async function createDocumentFromMindmap(mapId: string): Promise<TabResul
       title: data.title,
       content: data.content,
       initialYjsState: null,
-      isPublic: false,
+      visibility: "private" as DocVisibility,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,

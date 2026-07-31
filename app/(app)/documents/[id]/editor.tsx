@@ -24,13 +24,13 @@ import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import { ResizableImage } from "./resizable-image";
 import { SlashCommand } from "./slash-command";
-import type { Json } from "@/lib/database.types";
+import type { Json, DocVisibility } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/client";
 import { ShareDialog } from "@/components/share-dialog";
 import {
   saveDocument,
   deleteDocument,
-  setDocumentPublic,
+  setDocumentVisibility,
   shareDocument,
   revokeDocumentShare,
   listDocumentShares,
@@ -92,7 +92,7 @@ export function DocumentEditor({
   initialYjsState,
   canEdit,
   isOwner,
-  isPublic,
+  visibility,
   myShareId,
   myName,
   myAvatarUrl,
@@ -103,7 +103,7 @@ export function DocumentEditor({
   initialYjsState: string | null;
   canEdit: boolean;
   isOwner: boolean;
-  isPublic: boolean;
+  visibility: DocVisibility;
   myShareId: string;
   myName: string;
   myAvatarUrl: string | null;
@@ -119,7 +119,7 @@ export function DocumentEditor({
     color: colorForUserId(myShareId),
   });
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [pub, setPub] = useState(isPublic);
+  const [vis, setVis] = useState<DocVisibility>(visibility);
   const [showShare, setShowShare] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -300,12 +300,12 @@ export function DocumentEditor({
     if (canEdit) markDirty();
   };
 
-  const togglePublic = async () => {
-    const next = !pub;
-    setPub(next);
-    const res = await setDocumentPublic(docId, next);
+  const changeVisibility = async (next: DocVisibility) => {
+    const prev = vis;
+    setVis(next);
+    const res = await setDocumentVisibility(docId, next);
     if (!res.ok) {
-      setPub(!next);
+      setVis(prev);
       setError(res.error);
     }
   };
@@ -379,10 +379,30 @@ export function DocumentEditor({
           </span>
           {isOwner && (
             <>
-              <button className="btn btn-sm" onClick={togglePublic}>
-                {pub ? "Public" : "Private"}
-              </button>
-              <button className="btn btn-sm" onClick={() => setShowShare(true)}>
+              <select
+                className="select"
+                style={{ width: 118, height: 30 }}
+                value={vis}
+                onChange={(e) => changeVisibility(e.target.value as DocVisibility)}
+                aria-label="Document visibility"
+                title={
+                  vis === "owner"
+                    ? "Only you can see this — not even admins."
+                    : vis === "public"
+                      ? "Anyone signed in can see and edit this."
+                      : "Owner, admins, and anyone you share it with can see this."
+                }
+              >
+                <option value="owner">Owner only</option>
+                <option value="private">Private</option>
+                <option value="public">Public</option>
+              </select>
+              <button
+                className="btn btn-sm"
+                onClick={() => setShowShare(true)}
+                disabled={vis === "owner"}
+                title={vis === "owner" ? "Owner-only documents can't be shared." : undefined}
+              >
                 Share
               </button>
               <button className="btn btn-sm btn-danger" onClick={() => setShowDelete(true)}>

@@ -15,7 +15,7 @@ export default async function DocumentsPage() {
   const [{ data: docs }, starredIds] = await Promise.all([
     supabase
       .from("documents")
-      .select("id, owner_id, title, is_public, updated_at")
+      .select("id, owner_id, title, visibility, updated_at")
       .order("updated_at", { ascending: false }),
     listStarredIds("document"),
   ]);

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { extractTagsFromText } from "@/lib/tags";
 import { detectLanguage } from "@/lib/languages";
 import { ensureCodeSpace, uniquePath } from "@/lib/code-space";
-import type { Json } from "@/lib/database.types";
+import type { Json, DocVisibility } from "@/lib/database.types";
 
 // ============================================================================
 // Big Brother — 통합 검색. 호스팅 없이 바로 붙일 수 있는 공개 API 만 이번
@@ -272,7 +272,7 @@ export async function addPaperToDocument(
       title: data.title,
       content: data.content,
       initialYjsState: null,
-      isPublic: false,
+      visibility: "private" as DocVisibility,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,

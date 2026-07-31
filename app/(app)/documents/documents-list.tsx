@@ -7,12 +7,13 @@ import { StarButton } from "../star-button";
 import { SendToChatButton } from "../send-to-chat-button";
 import { ShareDialog } from "@/components/share-dialog";
 import { shareDocument, revokeDocumentShare, listDocumentShares } from "./actions";
+import type { DocVisibility } from "@/lib/database.types";
 
 type DocRow = {
   id: string;
   owner_id: string;
   title: string;
-  is_public: boolean;
+  visibility: DocVisibility;
   updated_at: string;
 };
 
@@ -108,8 +109,12 @@ export function DocumentsList({
                   </OpenItemButton>
                 </td>
                 <td>
-                  {d.is_public ? (
+                  {d.visibility === "public" ? (
                     <span className="badge badge-ok">public</span>
+                  ) : d.visibility === "owner" ? (
+                    <span className="badge badge-warn" title="Only the owner can see this — not even admins.">
+                      owner
+                    </span>
                   ) : (
                     <span className="badge">private</span>
                   )}
@@ -129,6 +134,8 @@ export function DocumentsList({
                         type="button"
                         className="btn btn-ghost btn-sm"
                         onClick={() => setShareTarget(d)}
+                        disabled={d.visibility === "owner"}
+                        title={d.visibility === "owner" ? "Owner-only documents can't be shared." : undefined}
                       >
                         Share
                       </button>
@@ -137,7 +144,7 @@ export function DocumentsList({
                       kind="document"
                       id={d.id}
                       title={d.title || "Untitled"}
-                      canGrant={d.owner_id === userId}
+                      canGrant={d.owner_id === userId && d.visibility !== "owner"}
                       label="Chat"
                     />
                     <OpenItemButton kind="document" id={d.id} title={d.title || "Untitled"} className="btn btn-ghost btn-sm">
