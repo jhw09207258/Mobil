@@ -1,8 +1,8 @@
-# Possion (H-1 Prototype, beta v1.6.7)
+# Possion (H-1 Prototype, beta v1.6.8)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 29, v1.6.7 by Haewon Jeong
+Last Update in July 29, v1.6.8 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
@@ -83,6 +83,90 @@ try/catch **안에** 두면 그 신호까지 여기서 삼켜져 "가입 성공 
 이 외에 마이그레이션 0001~0072 재생, 시나리오 77건, 단위 테스트 8개,
 `tsc`·`npm run build` 를 전부 다시 통과시켰습니다(아래 [전체 수치](#전-기능-검증-v163)
 와 같은 절차).
+
+## 로그인이 계속 안 됨 — createClient() 가 환경변수 없음을 방어하지 않았다 (v1.6.8)
+
+### 무엇이 보고됐나
+
+v1.6.7 을 배포한 뒤에도 로그인이 여전히 **"Something went wrong on our
+end. Please try again in a moment."** 로 실패한다는 보고를 받았습니다.
+v1.6.7 은 `measure()` 의 `finally` 시맨틱스 버그를 고쳤지만, 그건 계측
+코드가 스스로 만들어내던 실패였을 뿐입니다 — 로그인 로직 자체가 던지는
+다른 원인이 있다면 그 고침과 무관하게 여전히 실패합니다. 실제로 그랬습니다.
+
+### 원인 재현
+
+`lib/supabase/server.ts` 의 `createClient()` 는 이렇게 되어 있었습니다.
+
+```ts
+return createServerClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  { ... }
+);
+```
+
+`!` 는 타입에게만 "undefined 아니다" 라고 말할 뿐, 런타임에 실제로
+undefined 면 아무 의미가 없습니다. `NEXT_PUBLIC_SUPABASE_URL`/
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` 가 배포 환경에 없으면 `createServerClient`
+는 `@supabase/ssr` 안쪽에서 곧바로 이렇게 던집니다.
+
+```
+Your project's URL and Key are required to create a Supabase client!
+```
+
+`lib/supabase/middleware.ts` 는 **정확히 이 상황을 이미 방어하고
+있었습니다** — `if (!supabaseUrl || !supabaseAnonKey)` 를 검사해 사이트
+전체가 500 이 되는 것을 막습니다. 그런데 그 방어는 미들웨어에만 있었고,
+`createClient()` 자신에는 없었습니다. 미들웨어를 통과한 뒤 Server Action
+안에서 다시 `createClient()` 가 불리면(로그인·가입 포함) 이 검사 없이
+그대로 SDK 오류가 터졌고, v1.6.5 에서 로그인 액션에 둘러 둔 try/catch가
+그 오류를 잡아 매번 "Something went wrong on our end" 를 돌려줬습니다 —
+**v1.6.5/v1.6.6/v1.6.7 모두 이 오류를 더 안전하게 잡는 방법을 고쳤을
+뿐, 애초에 이 오류가 왜 나는지는 건드리지 않았습니다.**
+
+로컬에서 `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` 를
+**완전히 비운 채** 프로덕션 빌드를 띄우고 실제 브라우저로 로그인을
+제출했더니, 보고된 메시지와 **글자 하나까지 동일하게** 재현됐고 서버
+로그에는 정확히 이 SDK 오류가 찍혔습니다.
+
+### 고침
+
+`createClient()` 에도 미들웨어와 같은 검사를 추가했습니다. 값이 없으면
+SDK 의 알 수 없는 오류 대신, 어디가 왜 비어 있는지 분명히 말하는 오류를
+던집니다 — 사용자에게 보이는 메시지는 그대로 두되(보안상 일부러 일반적인
+문구를 유지합니다), 서버 로그에는 원인이 정확히 남습니다. 이 검사는
+`createClient()` 를 부르는 **모든** 곳(앱 전체 100곳 이상)에 한 번에
+적용됩니다.
+
+### 지금 확인해야 할 것
+
+**이 문제는 코드로 고칠 수 있는 버그가 아니라 배포 환경 설정 문제일 가능성이
+높습니다.** 재현 조건이 "환경변수가 실제로 없음" 이었기 때문입니다.
+로그인이 안 되는 그 배포 주소에서 `/api/health` 를 열어 보세요(로그인
+없이 열립니다) — `env.NEXT_PUBLIC_SUPABASE_URL` 과
+`env.NEXT_PUBLIC_SUPABASE_ANON_KEY` 가 `false` 로 나오면 바로 이 문제이고,
+Vercel 프로젝트 설정 → Environment Variables 에서 **지금 테스트 중인
+배포 환경(Development/Preview/Production 중 어느 것인지)** 에 이 두 값이
+실제로 등록돼 있는지 확인해야 합니다. 값 자체는 이 문서에도, `/api/health`
+에도 절대 나타나지 않습니다 — 존재 여부만 보여줍니다. (이 세션은 배포된
+주소에 직접 접근할 권한이 없어 — Vercel Deployment Protection 이 걸려
+있어 자동 확인은 시도했지만 403 을 받았습니다 — 이 마지막 확인은 직접
+해 주셔야 합니다.)
+
+`db.reachable` 이 `false` 인데 `env` 두 값은 `true` 라면 원인이 다릅니다 —
+그때는 Supabase 프로젝트 자체가 일시정지됐거나 URL 이 잘못된 경우이니
+알려 주시면 그 경로를 다시 봅니다.
+
+### 검증
+
+로컬에서 env 값을 완전히 비운 프로덕션 빌드로 재현 → 고침 적용 → 서버
+로그에 새 진단 메시지가 남는지 확인했습니다. `/api/health` 가 같은 조건에서
+`env.NEXT_PUBLIC_SUPABASE_URL: false`·`db.error: "missing-env"` 를 정확히
+보고하는 것도 함께 확인했습니다. env 값이 정상인 경우 `/login`·`/signup`·
+`/dashboard`·`/api/health`·`/sw.js`·`/manifest.json` 전부 회귀 없이 그대로
+동작합니다. 마이그레이션 0001~0073 재생, 시나리오 85건, 단위 테스트 9개,
+`tsc`·`npm run build` 를 다시 통과시켰습니다.
 
 ## 배포 후 장애 — v1.6.6 이 로그인을 100% 깨뜨렸다 (v1.6.7)
 
@@ -951,6 +1035,7 @@ curl https://<배포주소>/api/health
 | `app/globals.css` (v1.6.6) | `.badge-warn`·`.badge-danger` 추가 |
 | `lib/observability.ts` (v1.6.7) | `measure()` 의 `finally` 안을 다시 try/catch 로 감쌌다 — JS 의 `finally` 는 던지면 `try` 의 성공 반환값을 덮어쓴다는 시맨틱스 때문에, 계측 코드의 예외가 v1.6.6 배포 직후 로그인을 100% 실패시켰다 |
 | `lib/observability.test.mjs` (v1.6.7, 신규) | 위 `finally` 시맨틱스를 고정하는 단위 테스트 4개 |
+| `lib/supabase/server.ts` (v1.6.8) | `createClient()` 에 `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` 누락 검사 추가 — `lib/supabase/middleware.ts` 에는 있었지만 이 파일에는 없어, 배포 환경에 두 값이 없으면 SDK 의 알 수 없는 오류로 로그인이 매번 실패하고 있었다. `createClient()` 를 부르는 모든 곳에 한 번에 적용된다 |
 | `vercel.json` | 5분 간격 cron → `/api/push/dispatch` — **v1.6.1 에서 도로 뺐습니다**(Hobby 플랜이 거부해 배포가 통째로 실패). 지금은 수동 설정 항목입니다 |
 | `.env.example` | `VAPID_*`, `NOTIFY_DISPATCH_TOKEN`, `CRON_SECRET` |
 
