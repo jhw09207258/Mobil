@@ -1,12 +1,65 @@
-# Possion (H-1 Prototype, beta v1.6.11)
+# Possion (H-1 Prototype, beta v1.6.12)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 31, v1.6.11 by Haewon Jeong
+Last Update in July 31, v1.6.12 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## Obsidian 에서 가져온 것 1 — 위키링크 자동 갱신 + `[[` 트리거, 중첩 태그 (v1.6.12)
+
+Obsidian 의 기술 목록을 검토해 "우리 에디터에 이미 있는 것과 겹치는 것 / 겹치지
+않고 실제로 보탬이 되는 것" 을 나눴다. 실시간 미리보기(Live preview), GFM,
+멘션/슬래시 커맨드, 강조 구문, 코멘트 구문은 이미 Tiptap WYSIWYG 로 동등하거나
+더 나은 형태로 있다(소스 마크다운이 아니라 위지윅이라 애초에 "미리보기 전환"
+개념이 없다). 이번엔 겹치지 않고 실제로 비어 있던 두 가지만 가져왔다.
+
+**위키링크 자동 갱신** — Obsidian 은 `[[문서명]]` 을 파일명으로 다시 찾아
+렌더링하므로, 대상 파일 이름이 바뀌면 링크 텍스트가 저절로 따라 바뀐다. 이
+에디터는 워크스페이스 링크를 텍스트가 아니라 노드로, 식별자는 제목이 아니라
+안정적인 UUID(`refId`)로 저장한다(`workspace-link.ts`) — 제목이 겹치거나
+바뀌어도 링크 자체는 절대 깨지지 않는다는 점에서 더 안전한 설계다. 다만 칩에
+박아 둔 표시 텍스트(`label`)는 삽입 시점의 스냅샷이라 그 뒤로는 저절로
+갱신되지 않았다. `editor.tsx` 에 문서를 열 때 한 번, 그 문서 안의 모든
+워크스페이스 링크 칩을 모아 `get_object_cards`(0065, 이미 있는 일괄 조회
+RPC)로 현재 제목을 한 번에 확인하고, 달라진 것만 조용히 바로잡는 로직을
+추가했다 — Obsidian 의 "자동 백링크 갱신" 이 만드는 결과와 같은 효과를,
+칩 개수와 무관하게 왕복 한 번으로 낸다.
+
+**`[[` 트리거 추가** — 지금까지 다른 항목을 참조하려면 `@` 로 검색해 칩을
+넣었다(`mention-command.ts`). 기능은 동일하지만 Obsidian 을 써 본 사람에게는
+`[[` 가 더 익숙한 진입점이라, 같은 검색·삽입 로직을 `[[` 로도 열리게
+추가했다(`@` 는 그대로 유지 — 둘 다 같은 결과를 낸다). 새 확장을 만들지
+않고 기존 `WorkspaceMention` 확장 하나가 서로 다른 `pluginKey` 를 가진
+Suggestion 플러그인 두 개를 등록하는 방식으로 넣어, 중복 로직이 생기지
+않게 했다.
+
+**중첩 태그(`#parent/child`)** — 지금까지 `#단어` 정규식은 `/` 에서 끊겨
+`#work/possion` 을 입력해도 `work` 까지만 태그로 잡혔다(`lib/tags.ts`).
+`/` 로 최대 5단(부모 포함)까지 이어 붙일 수 있게 정규식을 넓혔다 — Obsidian
+의 중첩 태그와 같은 단순 표기이고, MediaWiki/Logseq 처럼 태그끼리 별도의
+포함 관계를 선언하는 구조는 아니다(사용자 요청대로 "복잡한 포함관계는
+없이" 단순하게 유지). 저장(`sync_object_tags`)은 태그 이름을 그냥 문자열로
+넣을 뿐이라 이미 그대로 동작했지만, 조회(`search_by_tag`, 검색창에
+`#word` 를 치면 이걸 탄다)는 지금까지 이름을 정확히 일치해서만 찾아
+`#work` 로 검색해도 `work/possion` 이 붙은 문서가 안 나왔다 —
+`supabase/migrations/0076_nested_tags.sql` 에서 `t.name = v_name or t.name
+like v_name || '/%'` 로 바꿔, 부모 태그를 검색하면 그 자식들도 함께
+나오게 했다("/" 구분자를 반드시 넣어 `#work` 검색이 `#workshop` 같은
+글자만 비슷한 태그를 우연히 집어오지 않게 막았다).
+
+**검증**: `node lib/tags.test.mjs`(8개 케이스: 단순 태그, 중첩 태그가
+끊기지 않는지, 3단 이상, 소문자 정규화, 중복 제거, 부모/자식이 별개
+태그로 남는지, 깊이 상한, 슬래시로 끝나는 경우) 모두 통과. 로컬 Postgres
+에 0001~0076 을 재생해 `search_by_tag('#work')` 가 `work` 와
+`work/possion` 문서를 함께 돌려주고 `workshop` 문서는 제외하는지 직접
+확인. `npx tsc --noEmit`, `npm run build` 모두 정상. `[[` 트리거는
+Tiptap `Suggestion` 이 트리거 문자열 길이에 제한을 두지 않는다는 것을
+라이브러리 소스에서 확인했지만, 이 샌드박스에는 로그인 가능한 실제
+Supabase 환경이 없어 브라우저로 직접 눌러 확인하지는 못했다 — 이 부분은
+사람이 한 번 눌러서 확인해 주면 좋겠다.
 
 ## Storage Locality — Repository/Docs 의 불필요한 I/O 제거 (v1.6.11)
 

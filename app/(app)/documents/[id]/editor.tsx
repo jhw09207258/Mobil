@@ -48,6 +48,7 @@ import { RepositoryPicker } from "../../repositories/repository-picker";
 import type { Repository } from "../../repositories/actions";
 import { ActivityPanel } from "./activity-panel";
 import { createMindmapFromDocument } from "../../convert-actions";
+import { getObjectCards } from "../../sharing/actions";
 import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
 import { PresenceAvatars } from "@/components/presence-avatars";
@@ -226,6 +227,46 @@ export function DocumentEditor({
   useEffect(() => {
     return connectYjsBroadcast(ydoc, `doc:${docId}`, isApplyingRemoteRef);
   }, [ydoc, docId]);
+
+  // Obsidian 의 [[위키링크]]는 대상 파일명이 바뀌면 다음 렌더링에서 다시 그
+  // 파일을 찾아 표시 텍스트가 같이 바뀐다(파일명이 곧 식별자라 가능한 방식).
+  // 이 에디터의 워크스페이스 링크 칩은 삽입 시점의 제목을 label 속성에 스냅샷
+  // 으로 박아 두므로(workspace-link.ts, refId 는 안정적인 UUID 라 링크 자체는
+  // 깨지지 않는다) 대상 문서 제목이 그 뒤 바뀌면 낡은 채로 남는다 — 문서를 열
+  // 때 한 번, 실제로 달라진 칩만 조용히 바로잡는다. 칩 개수만큼 조회하지
+  // 않도록 get_object_cards(0065)로 한 번에 묶어 가져온다.
+  const resolvedStaleLinks = useRef(false);
+  useEffect(() => {
+    if (!editor || resolvedStaleLinks.current) return;
+    resolvedStaleLinks.current = true;
+
+    const refs: { pos: number; kind: string; refId: string }[] = [];
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "workspaceLink" && node.attrs.kind && node.attrs.refId) {
+        refs.push({ pos, kind: node.attrs.kind, refId: node.attrs.refId });
+      }
+    });
+    if (refs.length === 0) return;
+
+    const unique = new Map<string, { kind: string; id: string }>();
+    for (const r of refs) unique.set(`${r.kind}:${r.refId}`, { kind: r.kind, id: r.refId });
+
+    getObjectCards([...unique.values()]).then((cards) => {
+      const byKey = new Map(cards.map((c) => [`${c.kind}:${c.id}`, c]));
+      const tr = editor.state.tr;
+      let changed = false;
+      for (const r of refs) {
+        const card = byKey.get(`${r.kind}:${r.refId}`);
+        if (!card || !card.object_exists || !card.title) continue;
+        const node = tr.doc.nodeAt(r.pos);
+        if (node && node.type.name === "workspaceLink" && node.attrs.label !== card.title) {
+          tr.setNodeAttribute(r.pos, "label", card.title);
+          changed = true;
+        }
+      }
+      if (changed) editor.view.dispatch(tr.setMeta("addToHistory", false));
+    });
+  }, [editor]);
 
   const persist = useCallback(
     async (nextTitle: string, ed: Editor | null) => {
