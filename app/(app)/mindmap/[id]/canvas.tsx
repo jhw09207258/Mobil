@@ -626,22 +626,24 @@ function Inner({
                 {canEdit && (
                   <>
                     <button
-                      className="btn btn-sm"
+                      className="btn btn-sm btn-icon"
                       onClick={() => {
                         (meRef.current as unknown as { undo?: () => void } | null)?.undo?.();
                         syncHistoryRef.current?.();
                       }}
                       title="Undo (⌘Z)"
+                      aria-label="Undo"
                     >
                       <IconUndo size={14} />
                     </button>
                     <button
-                      className="btn btn-sm"
+                      className="btn btn-sm btn-icon"
                       onClick={() => {
                         (meRef.current as unknown as { redo?: () => void } | null)?.redo?.();
                         syncHistoryRef.current?.();
                       }}
                       title="Redo (⇧⌘Z)"
+                      aria-label="Redo"
                     >
                       <IconRedo size={14} />
                     </button>

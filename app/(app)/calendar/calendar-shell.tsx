@@ -392,7 +392,7 @@ export function CalendarShell({
       {notice && (
         <div className="notice notice-info cal-notice">
           <span>{notice}</span>
-          <button className="btn btn-ghost btn-sm" onClick={() => setNotice(null)} aria-label="Dismiss">
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setNotice(null)} aria-label="Dismiss">
             <IconClose size={11} />
           </button>
         </div>

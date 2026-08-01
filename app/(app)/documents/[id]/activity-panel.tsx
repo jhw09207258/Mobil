@@ -54,7 +54,7 @@ export function ActivityPanel({
     <aside className="activity-panel">
       <div className="activity-head">
         <span className="label">EDIT ACTIVITY</span>
-        <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Collapse activity" title="Collapse">
+        <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose} aria-label="Collapse activity" title="Collapse">
           <IconClose size={12} />
         </button>
       </div>

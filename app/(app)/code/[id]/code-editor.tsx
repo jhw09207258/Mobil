@@ -282,10 +282,10 @@ export function CodeEditor({
           </button>
           {canEdit && (
             <>
-              <button className="btn btn-sm" onClick={() => cmApiRef.current?.undo()} title="Undo (⌘Z)">
+              <button className="btn btn-sm btn-icon" onClick={() => cmApiRef.current?.undo()} title="Undo (⌘Z)" aria-label="Undo">
                 <IconUndo size={14} />
               </button>
-              <button className="btn btn-sm" onClick={() => cmApiRef.current?.redo()} title="Redo (⇧⌘Z)">
+              <button className="btn btn-sm btn-icon" onClick={() => cmApiRef.current?.redo()} title="Redo (⇧⌘Z)" aria-label="Redo">
                 <IconRedo size={14} />
               </button>
             </>

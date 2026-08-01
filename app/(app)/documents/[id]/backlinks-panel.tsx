@@ -72,7 +72,7 @@ export function BacklinksPanel({
     <aside className="activity-panel">
       <div className="activity-head">
         <span className="label">BACKLINKS</span>
-        <button className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Collapse backlinks" title="Collapse">
+        <button className="btn btn-ghost btn-sm btn-icon" onClick={onClose} aria-label="Collapse backlinks" title="Collapse">
           <IconClose size={12} />
         </button>
       </div>
