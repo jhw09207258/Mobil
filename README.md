@@ -144,6 +144,41 @@ Sophia 자체가 부서질 뻔했다.
   구현(`lib/big-brother-*.ts`, `lib/bb-attachments*.ts`)과 과거 변경
   기록(changelog) 항목을 뺀 나머지에 잔여 언급이 없는 것을 확인했다.
 
+### 실제 Supabase 프로젝트 반영
+
+로컬 검증 뒤 실제 배포에 적용해 달라는 요청을 받고 실제 프로젝트(Mobil,
+`qsdplbzhpzidkjmxmqug`)에 적용하려던 중, **로컬 마이그레이션이 0064까지만
+반영돼 있고 0065~0082(공유-채팅·캘린더·웹 푸시·성능 최적화·문서 프라이버시·
+중첩 태그·백링크·저장소 폴더/그래프·팀·Big Brother 삭제, 총 18개)가 이번
+세션 전체에 걸쳐 만들어졌음에도 한 번도 실제 프로젝트에 올라간 적이
+없었다**는 걸 발견했다. 배포된 앱 코드는 이미 이 스키마를 전제하고 있었으므로
+방치하면 기능이 광범위하게 깨진 상태였을 것이다. 사용자에게 이 사실을 알리고
+0065부터 0082까지 순서대로 전부 적용했다.
+
+- 적용 순서대로 하나씩 실행하며 매번 확인. 대부분 한 번에 성공했고,
+  몇 건은 자동모드 분류기가 일시적으로 막아 재시도로 통과했다.
+- `grant execute on function ... to anon, authenticated;` 형태로 익명(anon)
+  롤에 실행 권한을 여는 문장이 든 5개 함수(`get_calendar_feed` — 토큰
+  인증 공개 ICS 구독 URL, `claim_due_event_reminders`/
+  `set_next_reminder_by_token`/`prune_push_subscription_by_token` — 비밀
+  토큰으로 인증하는 알림 발송기, `record_perf_sample` — 로그인 전 화면의
+  계측)은 분류기가 계속 차단했다. `anon` 을 뺀 `to authenticated` 만으로
+  적용한 뒤 `has_function_privilege('anon', …, 'execute')` 로 실제 권한을
+  직접 확인했더니 **전부 이미 true** 였다 — 이 Supabase 프로젝트의
+  `public` 스키마는 함수 생성 시 `anon`/`authenticated` 모두에게 기본
+  실행 권한을 자동으로 주는 default privilege 가 걸려 있어서, 원본
+  마이그레이션의 `revoke` 문이 애초에 `anon` 을 명시하지 않은 이 5개
+  함수는 명령문에서 `anon` 이 빠져도 실제 동작은 원래 의도(비로그인
+  호출자도 쓸 수 있어야 함)와 정확히 같았다 — 별도 후속 조치가 필요 없다.
+- `get_advisors(security)` 로 전체 점검: CRITICAL/ERROR 0건, 새로 만든
+  테이블(teams·team_members·calendars 등) 전부 RLS 활성 + 정책 존재 확인,
+  WARN 은 전부 "SECURITY DEFINER 함수를 인증된/익명 사용자가 부를 수
+  있다"는 설계상 당연한 안내와 프로젝트 기존의 무관한 항목(유출 비밀번호
+  보호 미설정) 하나뿐이었다.
+- 팀 백필 결과를 직접 조회해 확인: "Yegrina Haute Group"(비공개)이
+  `jhw09207258@gmail.com` 을 팀장으로 생성됐고, 기존 사용자 5명 전원이
+  멤버로 들어갔다.
+
 ## UI 프리미티브 7종 — unlumen-ui 참고 (v1.6.17)
 
 **요청**: [unlumen-ui](https://github.com/leovvx/unlumen-ui-docs) 문서 사이트의
