@@ -120,6 +120,20 @@
   border-color: var(--text-0);
   box-shadow: 0 0 0 2px var(--bg-2) inset;
 }
+.cal-color:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* "Calendar default" — 색을 직접 안 고르고 캘린더 색을 그대로 물려받는
+   옵션(color=null). 채움색이 없으니 점선 테두리로 "지정 안 함"을 나타낸다. */
+.cal-color-inherit {
+  background: var(--bg-3);
+  border: 2px dashed var(--border-2);
+}
+.cal-color-inherit.on {
+  border-style: solid;
+  border-color: var(--text-0);
+}
 
 .cal-main {
   min-width: 0;
