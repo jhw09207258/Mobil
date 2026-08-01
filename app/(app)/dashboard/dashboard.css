@@ -1,9 +1,11 @@
 /* ==========================================================================
-   Dashboard — 통계 카드 줄 + 2단 그리드(본문/사이드바). 예전에는 데스크톱에서
-   세로 스크롤이 전혀 없도록 고정 높이로 눌러 담았는데, 카드가 늘면서(이번
-   주 활동 그래프 추가 등) 다른 목록 페이지(Documents, Repositories)처럼
-   자연스럽게 스크롤되는 쪽이 낫다고 판단해 바꿨다 — 카드 "안쪽"에서는
-   여전히 스크롤을 만들지 않는다(페이지 자체만 스크롤).
+   Dashboard — 통계 카드 줄 + 2단 그리드(본문/사이드바). 데스크톱에서는 카드
+   높이를 줄이고(그래프 높이 축소, UP NEXT 목록을 3~4개로 제한, 사이드바의
+   저장공간 카드 3개를 하나로 병합) 세로 스크롤 없이 한 화면에 들어오도록
+   눌러 담는다 — 카드 "안쪽"에서도 스크롤을 만들지 않는 게 원칙이지만, 창
+   높이가 아주 작은 예외적인 경우를 위해 .dash-content 자체엔 overflow-y:auto
+   를 안전망으로만 남겨 둔다. 모바일(≤640px)에서는 카드가 세로로 쌓이며 늘어나
+   자연스럽게 스크롤되므로 그대로 둔다.
    ========================================================================== */
 .dash-content {
   display: flex;
@@ -93,7 +95,7 @@
 }
 .wk-chart-svg {
   width: 100%;
-  height: 150px;
+  height: 110px;
   overflow: visible;
 }
 .wk-bar {
@@ -148,7 +150,7 @@
 }
 .netmon-particles {
   flex: 1;
-  min-height: 160px;
+  min-height: 110px;
   position: relative;
   border-radius: var(--radius);
   overflow: hidden;
@@ -187,11 +189,16 @@
   }
 }
 
-/* ---- 다음 일정 — 세로 목록(사이드바 카드 안, variant="list") ---- */
+/* ---- 다음 일정 — 세로 목록(사이드바 카드 안, variant="list") ----
+   높이를 3개 항목 정도로 묶어 둔다 — 일정이 많은 주라고 사이드바가 한없이
+   길어지면 데스크톱에서 페이지 전체가 다시 스크롤돼야 하므로, 카드 "안쪽"
+   에서만 스크롤되게 막아 둔다(다른 dash-card 들과 같은 원칙). */
 .dash-upnext-vlist {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: 184px;
+  overflow-y: auto;
 }
 .dash-upnext-vitem {
   display: flex;

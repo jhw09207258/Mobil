@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { Copyable } from "@/components/copyable";
-import { GlowingBadge } from "@/components/ui/glowing-badge";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { StorageBreakdownChart, StorageShareBar } from "./storage-chart";
 import { WeeklyActivityChart } from "./weekly-activity-chart";
@@ -108,7 +107,6 @@ export default async function DashboardPage() {
           <div className="dash-card dash-mega-live">
             <div className="dash-mega-live-head">
               <span className="label cell-label">LIVE DATA THROUGHPUT</span>
-              <GlowingBadge variant="success">Live</GlowingBadge>
             </div>
             <NetMonitor />
           </div>
@@ -118,21 +116,15 @@ export default async function DashboardPage() {
           <UpcomingStrip rows={upcoming ?? []} variant="list" />
 
           <div className="dash-card">
-            <span className="label cell-label">MY STORAGE USAGE</span>
+            <span className="label cell-label">STORAGE</span>
             <StorageBreakdownChart rows={myUsage} />
-          </div>
-
-          <div className="dash-card">
-            <span className="label cell-label">SHARE OF PLATFORM TOTAL</span>
-            <StorageShareBar myBytes={myBytes} platformBytes={platformBytes} />
-          </div>
-
-          <div className="dash-card">
-            <span className="label cell-label">MY SHARE ID</span>
-            <p className="dim" style={{ fontSize: 11.5, margin: "0 0 8px" }}>
-              Others paste this into their Share dialog to share items with you.
-            </p>
-            <Copyable value={userId} secret />
+            <div className="stg-share-inline">
+              <StorageShareBar myBytes={myBytes} platformBytes={platformBytes} />
+            </div>
+            <div className="stg-shareid-inline">
+              <span className="label cell-label">MY SHARE ID</span>
+              <Copyable value={userId} secret />
+            </div>
           </div>
         </div>
       </div>
