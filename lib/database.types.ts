@@ -455,59 +455,6 @@ export interface Database {
         };
         Relationships: [];
       };
-      ai_conversation_plugins: {
-        Row: {
-          id: string;
-          conversation_id: string;
-          kind: string;
-          object_id: string;
-          created_at: string;
-        };
-        Insert: {
-          conversation_id: string;
-          kind: string;
-          object_id: string;
-        };
-        Update: never;
-        Relationships: [];
-      };
-      ai_conversations: {
-        Row: {
-          id: string;
-          owner_id: string;
-          title: string;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          owner_id: string;
-          title?: string;
-        };
-        Update: {
-          title?: string;
-        };
-        Relationships: [];
-      };
-      ai_messages: {
-        Row: {
-          id: string;
-          conversation_id: string;
-          role: "user" | "assistant";
-          content: string;
-          attachments: Json;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          conversation_id: string;
-          role: "user" | "assistant";
-          content: string;
-          attachments?: Json;
-        };
-        Update: Record<string, never>;
-        Relationships: [];
-      };
       chat_conversations: {
         Row: {
           id: string;
@@ -1028,11 +975,6 @@ export interface Database {
       move_to_trash: {
         Args: { p_kind: string; p_id: string };
         Returns: undefined;
-      };
-      /** 대화에 연결된 항목 + 제목을 종류별 테이블에서 모아 준다. */
-      list_conversation_plugins: {
-        Args: { p_conversation_id: string };
-        Returns: { kind: string; object_id: string; title: string; subtitle: string | null }[];
       };
       /** 에이전트가 고친 코드 파일을 열어 둔 편집기들에 증분 Yjs 업데이트로 밀어준다. */
       broadcast_code_yupdate: {

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Tooltip } from "./tooltip";
 import "./refresh-button.css";
 
 function RefreshIcon() {
@@ -21,7 +22,7 @@ function RefreshIcon() {
  * 화면은 데이터가 도착하는 대로 갱신된다).
  */
 export function RefreshButton({
-  label,
+  label = "Refresh",
   className = "",
 }: {
   label?: string;
@@ -37,16 +38,17 @@ export function RefreshButton({
   };
 
   return (
-    <button
-      type="button"
-      className={`btn btn-sm refresh-btn ${className}`}
-      onClick={onClick}
-      aria-label={label ? undefined : "Refresh"}
-    >
-      <span className={`refresh-icon ${spinning ? "spinning" : ""}`}>
-        <RefreshIcon />
-      </span>
-      {label && <span>{label}</span>}
-    </button>
+    <Tooltip content={label}>
+      <button
+        type="button"
+        className={`btn btn-sm btn-icon refresh-btn ${className}`}
+        onClick={onClick}
+        aria-label={label}
+      >
+        <span className={`refresh-icon ${spinning ? "spinning" : ""}`}>
+          <RefreshIcon />
+        </span>
+      </button>
+    </Tooltip>
   );
 }

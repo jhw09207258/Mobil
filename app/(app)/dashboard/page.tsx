@@ -62,7 +62,7 @@ export default async function DashboardPage() {
           <p className="page-sub">Welcome back, {name}.</p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <RefreshButton label="Refresh" />
+          <RefreshButton />
           {profile.role === "admin" && (
             <Link href="/admin/users" className="btn btn-sm">
               Manage all Possion users →

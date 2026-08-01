@@ -211,7 +211,7 @@ ShimmeringText, Switch, ThemeSwitch, CopyButton, RefreshButton)를 붙여넣고,
 | `CopyButton` | `components/ui/copy-button.tsx` | `components/copyable.tsx` 내부 — 예전엔 Copyable 이 복사 상태/타이머를 직접 들고 있었는데, 그 로직을 통째로 이 프리미티브로 옮겨 중복을 줄였다(공유 ID 카드 등 7곳 호출부는 그대로) |
 | `RefreshButton` | `components/ui/refresh-button.tsx` | 대시보드/`admin/observability` 페이지 헤더 — 둘 다 `force-dynamic` 서버 컴포넌트라 새로고침 말고는 다시 불러올 방법이 없었다. `router.refresh()` 호출 |
 | `Tooltip` | `components/ui/tooltip.tsx` | 헤더의 햄버거 메뉴 버튼 + 모바일 검색 아이콘 버튼 — 아이콘만 있고 `aria-label` 뿐이던 자리에 순수 CSS 호버/포커스 툴팁(위치 계산 라이브러리 없음) |
-| `ShimmeringText` | `components/ui/shimmering-text.tsx` | 캘린더 상단 "Loading…" — Sophia 의 파티클 캔버스 `ThinkingIndicator`(무거운 연산용)와는 다르게, 한 줄짜리 짧은 대기 문구용 |
+| `ShimmeringText` | `components/ui/shimmering-text.tsx` | 캘린더 상단 "Loading…" — 한 줄짜리 짧은 대기 문구용, CSS 그라디언트만 쓰고 무거운 연산은 없다 |
 
 **적용 위치를 고를 때의 원칙**: 이미 같은 역할을 하는 게 있으면 새로 안
 얹었다(CommandMenu/ThemeSwitch). 로직을 새로 만들어야 하면 만들지 않고
@@ -1448,8 +1448,7 @@ party 위젯이라 자체 터치 최적화 여부를 보장할 수 없어 `.sh-p
 | 설정 | 표시 이름 변경, 이메일·권한·공유 ID 확인 |
 | 감사 | 주요 작업을 `audit_logs` 에 기록, 관리자 콘솔에서 조회 |
 | 온톨로지 검색 | 헤더 통합 검색 — 문서·코드·시트·마인드맵·파일을 한 번에 검색하고, 결과별로 연결된 다른 항목을 펼쳐서 확인 |
-| Sophia | 대화형 인텔리전스 어시스턴트(`/sophia`) — 온톨로지 검색·RAG(시맨틱 검색)·워크스페이스 읽기/쓰기·외부 논문/GitHub 검색(`search_papers_and_code` 도구)을 쓰는 LLM 챗 |
-| 시맨틱 검색(RAG) | 헤더 검색에 의미 기반 결과 병행 표시(마이그레이션 0041, pgvector + NVIDIA nv-embedqa-e5-v5) — 저장 시 내용 해시가 바뀐 경우에만 임베딩 재계산(`lib/embeddings.ts`), 어휘(tsvector)+의미 하이브리드, RLS(can_view_object) 동일 적용, 임베딩 API 장애 시 어휘 검색만으로 우아하게 강등. Sophia 에도 `semantic_search` 도구 추가(의미 검색→읽기→종합 = RAG). 연결 항목 펼침은 온톨로지 그래프 2단계 탐색(`get_linked_objects_deep`, 재귀 CTE, "via X" 표시) |
+| 시맨틱 검색(RAG) | 헤더 검색에 의미 기반 결과 병행 표시(마이그레이션 0041, pgvector + NVIDIA nv-embedqa-e5-v5) — 저장 시 내용 해시가 바뀐 경우에만 임베딩 재계산(`lib/embeddings.ts`), 어휘(tsvector)+의미 하이브리드, RLS(can_view_object) 동일 적용, 임베딩 API 장애 시 어휘 검색만으로 우아하게 강등. 연결 항목 펼침은 온톨로지 그래프 2단계 탐색(`get_linked_objects_deep`, 재귀 CTE, "via X" 표시) |
 | Comms(팀 채팅) | 사용자 간 DM·그룹 채팅(`/chat`, 마이그레이션 0040) — Supabase Realtime Broadcast(private 채널, 멤버만 수신/발신) 실시간 전달, 안 읽음 배지, 그룹 멤버 추가/나가기. 메시지에 문서/코드/시트/마인드맵을 첨부(⛓)하면 칩으로 표시되고 클릭 시 워크스페이스 탭으로 바로 열린다 — 채팅이 콘텐츠 도구와 한 몸으로 동작. 라이브 기능(0042): 앱 어디서나 쓰는 우하단 플로팅 채팅(버블↔패널, 확대/최소화), 새 메시지 인스타풍 토스트 알림(DB 트리거가 각 멤버의 개인 `user:<id>` topic 으로 fanout), 타이핑 표시("X is typing…"), 읽음 확인(내 마지막 메시지에 Sent/Read/Read by N). 메시지 서식(경량 마크다운, `markdown-parse.ts`): **굵게**·*기울임*·__밑줄__·~~취소선~~·`인라인 코드`·코드 블록·[링크](URL)·URL 자동 링크·번호/글머리표 목록·들여쓰기·@멘션 — Aa 토글 서식 툴바 + 이모지/멘션 메뉴. 플로팅 위젯은 /chat 페이지에서는 숨김. 긴 메시지 접기/펼치기(Show more), 프로필 사진 전면 연동(0043 — 대화 목록·메시지·토스트·멘션/연락처), 스플릿 뷰에 채팅 탭("Open as tab" — 한쪽엔 채팅, 한쪽엔 문서/코드) |
 | 테마 | 라이트/다크 두 모드(설정에서 선택, `lib/theme.ts` → `<html data-theme>`) — 팔레트는 globals.css CSS 변수(:root=다크, [data-theme=light])가 담당. 주요 버튼 액센트는 블루(구 그린 교체, `--ok` 상태 초록은 유지). localStorage + 루트 인라인 스크립트로 첫 페인트 전 적용(FOUC 없음). 알려진 한계: 코드미러/시트 에디터 캔버스는 아직 다크 고정, 마인드맵은 열 때의 모드를 따름 |
 | 저장소(Repositories) | 문서·코드·시트·마인드맵·파일을 저장소 단위로 묶는다(0044). NULL = "Null Repository". /files 는 **Google Drive 풍 목록 테이블**(타입 아이콘 + 이름 + 액션)로, 랜딩은 저장소 목록·상세는 그 저장소의 Possion 항목·파일 목록. 생성/이름변경은 모달 입력(Tauri 웹뷰에서 prompt 가 동작하지 않는 문제 시정). 각 에디터 상단바 저장소 선택으로도 이동/생성 |

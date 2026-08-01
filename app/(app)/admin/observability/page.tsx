@@ -61,7 +61,7 @@ export default async function ObservabilityPage({
           </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          <RefreshButton label="Refresh" />
+          <RefreshButton />
           <Link href="/admin" className="btn btn-ghost btn-sm">
             ← Admin console
           </Link>

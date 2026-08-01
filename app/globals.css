@@ -191,7 +191,6 @@ textarea,
 .luckysheet-cell-input,
 .sh-paper,
 .chat-msg,
-.sophia-msg,
 .chat-codeblock,
 .chat-inline-code,
 .code-block,
@@ -381,6 +380,30 @@ img {
 }
 .btn-block {
   width: 100%;
+}
+
+/* 아이콘 전용 원형 버튼 — 라벨 없이 아이콘 하나만 넣는 유틸리티 액션
+   (Refresh, Upload, +New 등)에 쓴다. 폭을 높이와 같게 눌러 원이 되게 하고,
+   .btn/.btn-sm 과 조합해 크기·색 변형(.btn-primary/.btn-ghost)은 그대로 쓴다.
+   이름이 있는 CTA(예: "Manage all users")는 이 클래스를 붙이지 않는다. */
+.btn-icon {
+  width: 32px;
+  padding: 0;
+  gap: 0;
+  border-radius: 999px;
+}
+.btn-icon.btn-sm {
+  width: 26px;
+}
+
+/* 버튼 그룹 사이의 세로 구분선 — 예: 저장소 툴바에서 "+ Doc/+ Table" 같은
+   생성 버튼 묶음과 원형 Upload 버튼을 시각적으로 갈라 둔다. */
+.btn-group-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border-1);
+  margin: 0 2px;
+  flex: none;
 }
 
 /* -------------------------------------------------------------------------
@@ -922,186 +945,6 @@ html[data-theme="light"] .btn {
 }
 
 /* ============================================================================
-   Thinking — Sophia 가 작업 중임을 보이는 표시.
-   빈 말풍선만 떠 있으면 멈춘 것처럼 보인다. 파티클이 흐르는 동안 "살아 있다"가
-   드러나고, 경과 초가 붙어 얼마나 기다렸는지도 알 수 있다.
-   ============================================================================ */
-.thinking {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  background: var(--bg-2);
-  border: 1px solid var(--border-0);
-}
-.thinking.compact {
-  padding: 2px 0;
-  background: transparent;
-  border: none;
-}
-.thinking-canvas {
-  position: relative;
-  flex: none;
-  width: 44px;
-  height: 22px;
-  overflow: hidden;
-  border-radius: 4px;
-}
-.thinking.compact .thinking-canvas {
-  width: 30px;
-  height: 16px;
-}
-.thinking-canvas canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.thinking-label {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 12.5px;
-  color: var(--text-2);
-}
-.thinking.compact .thinking-label {
-  font-size: 11.5px;
-  color: var(--text-3);
-}
-.thinking-elapsed {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-3);
-}
-.thinking-dots {
-  display: inline-flex;
-  gap: 3px;
-}
-.thinking-dots i {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.35;
-  animation: thinking-pulse 1.2s ease-in-out infinite;
-}
-.thinking-dots i:nth-child(2) {
-  animation-delay: 0.15s;
-}
-.thinking-dots i:nth-child(3) {
-  animation-delay: 0.3s;
-}
-@keyframes thinking-pulse {
-  0%, 60%, 100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(-2px);
-  }
-}
-/* 모션을 줄이도록 설정한 사용자에게는 점만 은은하게 — 캔버스는 멈춘다. */
-@media (prefers-reduced-motion: reduce) {
-  .thinking-canvas {
-    display: none;
-  }
-  .thinking-dots i {
-    animation-duration: 2.4s;
-  }
-}
-
-/* ============================================================================
-   Agent 완료 알림 — 어느 화면에 있든 우측 상단에 뜬다.
-   에이전트를 돌려놓고 다른 일을 하다가 끝난 걸 알 수 있어야 "백그라운드"가
-   의미를 갖는다.
-   ============================================================================ */
-.agent-toasts {
-  position: fixed;
-  top: calc(var(--header-h, 56px) + 12px);
-  right: 16px;
-  z-index: 70;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: min(360px, calc(100vw - 32px));
-}
-.agent-toast {
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  padding: 4px 4px 4px 0;
-  background: var(--bg-1);
-  border: 1px solid var(--border-1);
-  border-left: 2px solid var(--ok);
-  border-radius: var(--radius);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-  animation: agent-toast-in 0.22s ease-out;
-}
-.agent-toast.failed {
-  border-left-color: var(--danger, #e5484d);
-}
-@keyframes agent-toast-in {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-}
-.agent-toast-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 8px 4px 8px 12px;
-  text-align: left;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-.agent-toast-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-0);
-}
-.agent-toast-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ok);
-}
-.agent-toast.failed .agent-toast-dot {
-  background: var(--danger, #e5484d);
-}
-.agent-toast-body {
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--text-3);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.agent-toast-close {
-  flex: none;
-  padding: 0 6px;
-  font-size: 10px;
-  color: var(--text-3);
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.agent-toast-close:hover {
-  color: var(--text-0);
-  background: var(--bg-3);
-}
-
-/* ============================================================================
    오버플로 메뉴 — 좁은 화면에서 툴바 버튼을 접어 넣는다.
    버튼 여러 개를 가로 스크롤에 밀어 넣으면 뒤쪽 항목을 발견할 수 없다.
    ============================================================================ */
@@ -1187,7 +1030,6 @@ html[data-theme="light"] .btn {
   html .textarea,
   html .select,
   html .chat-textarea,
-  html .sophia-textarea,
   html .console-input,
   html .quick-open-input,
   html .chat-edit-input {
@@ -1201,19 +1043,6 @@ html[data-theme="light"] .btn {
    여기서는 좁은 화면에서 부차 요소만 접어 대화가 보일 높이를 남긴다.
    ============================================================================ */
 @media (max-width: 640px) {
-  .keyboard-open .plugin-bar,
-  .keyboard-open .attach-chips {
-    padding-top: 4px;
-    padding-bottom: 0;
-  }
-  .keyboard-open .plugin-hint,
-  .keyboard-open .sophia-model {
-    display: none;
-  }
-  /* 대화 목록(가로 스트립)은 키보드가 떠 있을 땐 자리만 차지한다. */
-  .keyboard-open .sophia-list {
-    display: none;
-  }
   .keyboard-open .console-status {
     display: none;
   }
@@ -1243,10 +1072,7 @@ svg {
 .tree-actions svg,
 .tab-close svg,
 .attach-chip svg,
-.plugin-x svg,
 .more-wrap > button svg,
-.sophia-conv-action svg,
-.sophia-conv-delete svg,
 .wk-icon-btn svg,
 .assist-close svg,
 .upload-item-close svg,

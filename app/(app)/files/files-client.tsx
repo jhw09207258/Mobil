@@ -22,7 +22,9 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconEye,
+  IconPlus,
 } from "../icons";
+import { Tooltip } from "@/components/ui/tooltip";
 import { RepositoryGraph } from "../repositories/repository-graph";
 import {
   deleteFile,
@@ -340,12 +342,15 @@ export function FilesClient({
                 folders. Open one to view as a list or as a graph.
               </p>
             </div>
-            <button
-              className="btn btn-primary"
-              onClick={() => setRepoDialog({ mode: "create", name: "", parentId: null })}
-            >
-              + New repository
-            </button>
+            <Tooltip content="New repository">
+              <button
+                className="btn btn-primary btn-icon"
+                onClick={() => setRepoDialog({ mode: "create", name: "", parentId: null })}
+                aria-label="New repository"
+              >
+                <IconPlus size={16} />
+              </button>
+            </Tooltip>
           </div>
           <div className="panel">
             <div className="panel-header">
@@ -462,9 +467,17 @@ export function FilesClient({
                 </button>
               )}
               <input ref={inputRef} type="file" multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
-              <button className="btn btn-primary btn-sm" onClick={onPick} disabled={uploading}>
-                {uploading ? "Uploading…" : "Upload file"}
-              </button>
+              <span className="btn-group-sep" aria-hidden="true" />
+              <Tooltip content={uploading ? "Uploading…" : "Upload file"}>
+                <button
+                  className="btn btn-primary btn-sm btn-icon"
+                  onClick={onPick}
+                  disabled={uploading}
+                  aria-label={uploading ? "Uploading…" : "Upload file"}
+                >
+                  <IconPlus size={15} />
+                </button>
+              </Tooltip>
             </div>
           </div>
 
