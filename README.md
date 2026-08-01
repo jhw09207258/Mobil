@@ -1,12 +1,108 @@
-# Possion (H-1 Prototype, beta v1.6.18)
+# Possion (H-1 Prototype, beta v1.6.20)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in August 1, v1.6.18 by Haewon Jeong
+Last Update in August 1, v1.6.20 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## 대시보드 재구성 · 저장소 그래프 SNA · 모바일 리스트 · 캘린더 색상 (v1.6.20)
+
+**요청**: 여덟 가지. (1) Refresh/Add new 류의 "아이콘+텍스트" 알약 버튼을
+앱 전반에서 아이콘만 있는 원형으로 바꾸되(단, "Manage all Possion users"
+류의 의미 있는 라벨 버튼은 유지), (2) 대시보드 LIVE 배지 제거 + 태블릿
+폭에서 저장공간 카드 우측이 비는 버그 수정 + 데스크톱에서 세로 스크롤 없이
+한 화면에 들어오게, (3) Repository 의 List/Graph 를 Switch 형 토글로 분리하고
+그래프에 클릭/스크롤/확대(팬·줌) 지원 + 실제 연결관계(object_links)를 SNA
+알고리즘(Brandes 매개 중심성, Louvain 커뮤니티 탐지)으로 시각화, (4) 문서
+목록류(Docs/Sheets/Link Graph/Code Space/Files/Trash)의 모바일 좌우 스크롤을
+없애고 세로 카드로, (5) 캘린더 인터페이스 보완, (6) PC/모바일 인터페이스를
+사용 방식에 맞게 다르게 설계, (7) 캘린더 일정에 색상+의미(태그) 지정 기능
+추가(채팅 공유는 이미 있음). 마지막으로 기능 검증과 PC 레이아웃 스크린샷을
+요청.
+
+### 아이콘 전용 원형 버튼
+
+`app/globals.css` 에 `.btn-icon`(정사각형 → `border-radius:999px`, 기존
+`.btn`/`.btn-sm`/`.btn-primary`/`.btn-ghost` 와 조합) 을 추가하고
+Refresh(`refresh-button.tsx`), 각 페이지의 "+ New"/"Add files" 류 버튼,
+저장소의 Upload File(원형 `+`, `.btn-group-sep` 구분선으로 나머지
++Doc/+Table 묶음과 분리), 캘린더 "New calendar"/"Reset link" 등을
+전환했다. 이미 아이콘만 있었지만 원형이 아니었던 Undo/Redo/닫기 버튼들도
+같은 클래스를 입혀 통일했다. 터치 기기(`@media (pointer: coarse)`)에서는
+시각 크기는 그대로 두고 히트 영역만 WCAG 권장치(~44px)에 가깝게 키웠다.
+
+### 대시보드 — 스크롤 없이 한 화면
+
+LIVE 배지(`GlowingBadge`) 제거, 그래프 높이 축소(150px→110px), UP NEXT
+목록을 3~4개로 캡(`max-height` + 내부 스크롤), 사이드바의 MY STORAGE
+USAGE/SHARE OF PLATFORM TOTAL/MY SHARE ID 세 카드를 STORAGE 카드 하나로
+병합(구분선만으로 구획). 저장공간 범례가 태블릿 폭에서 오른쪽이 비어
+보이던 버그는 `.stg-legend` 의 `grid-template-columns` 가
+`auto-fill`(항목 수와 무관하게 폭에 맞는 트랙을 예약) 이었던 게 원인 —
+`auto-fit`(빈 트랙을 접어 채워진 항목이 남는 폭으로 재분배)으로 고쳤다.
+
+### 저장소 그래프 — 팬/줌 + SNA
+
+List/Graph 탭 버튼을 `Switch` 하나로(라벨 클릭 또는 드래그로 토글).
+그래프 SVG 에 휠/핀치 확대·배경 드래그로 팬·리셋 버튼을 추가했다(이전엔
+클릭 내비게이션과 노드 드래그만 가능했다). 그래프 자체는 이미
+`get_repository_graph`(0078)로 실제 `object_links`/폴더 포함관계/캘린더
+연결을 그리고 있었다 — 여기에 SNA 두 지표를 얹었다: 노드 반지름은 Brandes
+매개 중심성(다리 역할을 하는 노드일수록 큼), 테두리 색은 Louvain
+커뮤니티(같은 색 = 촘촘히 엮인 군집). 두 알고리즘은
+`lib/graph-sna.ts`(순수 함수) + `lib/graph-sna.test.mjs`(다리/별/완전
+그래프로 매개 중심성을, 두 삼각형이 다리 하나로 이어진 그래프로 커뮤니티
+분리를 검증)로 독립적으로 테스트했다.
+
+### 모바일 리스트 — 카드로 펼치기
+
+`.table` 이 640px 이하에서 각 `<tr>` 을 세로 카드로 펼치도록
+`app/globals.css` 에 규칙을 추가했다 — 헤더 행은 숨기고(`data-label`
+속성이 그 역할을 대신한다), 제목 칸(`.table-cell-title`)은 카드 제목처럼
+크게, 값이 있는 칸은 `라벨 · 값` 형태로 양쪽 정렬. Documents/Sheets/Link
+Graph/Files/Trash 각 리스트의 `<td>` 에 `data-label` 을 달았고, 이전엔
+모바일에서 `.col-hide-mobile` 로 통째로 숨기던 열(Code Space 의 Source,
+Files 의 Size/Move to, Trash 의 Type)도 이제 라벨 붙은 줄로 보여준다 —
+정보를 숨기는 대신 세로로 펼치는 쪽을 택했다.
+
+### 캘린더 — 일정별 색상(태그)
+
+`calendar_events.color`(nullable — null 이면 캘린더 자체 색 상속)와
+`save_calendar_event` RPC 는 이미 색을 받고 있었고, 월/주/일/아젠다
+렌더링도 `eventColor()` 로 이미 그 값을 읽고 있었다 — 다만 일정
+편집창에 색을 고르는 UI 자체가 없었다. 캘린더 생성창의 원형 스와치
+(`.cal-color`)를 재사용해 이름이 붙은 프리셋(Work/Meeting/Urgent/
+Deadline/Personal/Travel/Social/Other + "Calendar default")을 추가했다
+— 색마다 의미가 고정돼 있어야 "태깅"의 의미가 생기므로, 자유 색상 선택
+대신 이름 있는 팔레트로 설계했다. 채팅으로 일정 공유는 이미
+`SendToChatButton` 으로 되어 있었다.
+
+### Sophia 삭제 (v1.6.19)
+
+0082 는 Big Brother 만 지우고 Sophia(`/sophia`, 개인 AI 채팅)는 남겨
+뒀는데, 이번엔 그 기능 자체가 필요 없다는 요청으로 코드를 통째로
+지웠다. `app/(app)/sophia/`, `app/api/sophia/`,
+`lib/big-brother-*.ts`(Big Brother 삭제 때 놓친 잔재), `lib/bb-attachments*.ts`,
+`lib/paper-code-search.ts`, `lib/code-space.ts`, `components/thinking-indicator.tsx`
+삭제. `code-agent`/`code-assist`(별개의 실제 기능, GEMINI/CLAUDE 키를
+공유할 뿐)와 `lib/embeddings.ts`(헤더 검색의 RAG 파이프라인, Sophia 와
+무관하게 계속 쓰임)는 감사 후 남겼다. 마이그레이션 0083 이 `ai_conversations`/
+`ai_messages`/`ai_conversation_plugins` 세 테이블과 `list_conversation_plugins()`
+를 지운다.
+
+### 검증
+
+`npx tsc --noEmit`, `npm run build`, `node --test`(18개, `graph-sna.test.mjs`
+신규) 모두 통과. 라이브 Supabase 프로젝트나 `.env.local` 이 이 작업 환경에
+없어 실제 인증된 화면을 띄워 볼 수는 없었다 — 대신 실제 프로젝트 CSS를
+그대로 복사해 정적 HTML로 재현하고 Playwright(사전 설치된 Chromium)로
+여러 뷰포트(1440/1280/900/390px)에서 스크린샷을 찍어 레이아웃을
+검증했다(대시보드 태블릿 폭 버그 재현/수정 확인, 모바일 카드 스택,
+그래프 팬·줌 CSS, 터치 히트 영역 실측 포함). 이 방식이 실제 앱 코드가
+아니라 그 복제본을 그린 것이라는 한계는 있다.
 
 ## 팀(워크스페이스) 시스템 + Big Brother 삭제 (v1.6.18)
 
