@@ -397,6 +397,14 @@ export async function shareDocument(
     return { ok: false, error: "You can't share with yourself." };
   }
 
+  // 팀 분리(0080) 이후 document_permissions_insert RLS 는 팀이 같은 상대에게만
+  // 행 삽입을 허용한다 — 여기서 미리 확인해 실패 시 "존재하지 않는 사용자"로
+  // 오해할 만한 일반 에러 대신 정확한 이유를 알려준다.
+  const { data: sameTeam } = await supabase.rpc("shares_active_team", { p_other: id });
+  if (!sameTeam) {
+    return { ok: false, error: "You can only share with members of your current team." };
+  }
+
   // document_permissions_insert RLS(0074)는 소유자 본인이면 owner 단계 문서에도
   // 행을 넣는 것 자체는 막지 않는다(무해하다 — documents_select 가 어차피 그
   // 공유를 무시한다). 하지만 그러면 "공유했는데 상대가 못 본다"는 혼란스러운

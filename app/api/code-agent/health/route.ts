@@ -2,7 +2,6 @@ import { GoogleGenAI } from "@google/genai";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { ANTIGRAVITY_AGENT, AGENT_MODELS, agentBaseConfig } from "@/lib/antigravity";
 import { CLAUDE_MODELS } from "@/lib/big-brother-claude";
 
 // 코드 에이전트 진단(로그인 필요). /api/code-agent/health 를 브라우저에서 열면
@@ -13,54 +12,6 @@ import { CLAUDE_MODELS } from "@/lib/big-brother-claude";
 export const maxDuration = 30;
 
 const MODEL = "gemini-3.5-flash";
-
-/**
- * Antigravity 에이전트(Interactions API)가 이 키로 열리는지 실제로 찔러본다.
- * preview 라 키/프로젝트마다 접근 여부가 다르므로, Code Space 에이전트를
- * 쓰기 전에 여기서 먼저 확인할 수 있어야 한다. 샌드박스 비용이 들지 않도록
- * environment 없이 인사만 시킨다.
- */
-async function probeAntigravity(ai: GoogleGenAI) {
-  const t = Date.now();
-  try {
-    // 실제 에이전트와 똑같은 설정으로 부른다 — 여기서 손으로 따로 짜면 필수
-    // 필드가 어긋나 멀쩡한 키를 "안 된다"고 오진한다. 다른 건 두 가지뿐:
-    // 빈 샌드박스(마운트할 파일이 없다)와 동기 실행(폴링 없이 바로 답을 본다).
-    const res = await ai.interactions.create({
-      ...agentBaseConfig(AGENT_MODELS[0]),
-      environment: { type: "remote", sources: [] },
-      background: false,
-      input: "Reply with the single word OK. Do not use any tools.",
-    });
-    return {
-      available: true,
-      agent: ANTIGRAVITY_AGENT,
-      status: res.status,
-      elapsedMs: Date.now() - t,
-      totalTokens: res.usage?.total_tokens ?? 0,
-      reply: (res.output_text ?? "").trim().slice(0, 60),
-    };
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
-    return {
-      available: false,
-      agent: ANTIGRAVITY_AGENT,
-      elapsedMs: Date.now() - t,
-      // "키에 접근 권한이 없다"와 "요청을 잘못 만들었다"를 섞으면 안 된다 —
-      // 전자는 사용자가, 후자는 우리가 고쳐야 하는 문제다. 400 대부분은 후자다.
-      reason: /NOT_FOUND|not found|unsupported|is not available/i.test(detail)
-        ? "agent-not-available-on-this-key"
-        : /PERMISSION_DENIED/i.test(detail)
-        ? "permission-denied"
-        : /RESOURCE_EXHAUSTED|quota|429/i.test(detail)
-        ? "quota"
-        : /^4\d\d|INVALID_ARGUMENT|Missing required|invalid/i.test(detail)
-        ? "bad-request-our-bug"
-        : "request-failed",
-      detail: detail.slice(0, 300),
-    };
-  }
-}
 
 /**
  * Claude 키가 이 배포에 실제로 주입됐고 통하는지 확인한다.
@@ -168,7 +119,6 @@ export async function GET() {
       model: MODEL,
       elapsedMs: Date.now() - started,
       reply: (res.text ?? "").trim().slice(0, 40),
-      antigravity: await probeAntigravity(ai),
       claude: await probeClaude(),
     });
   } catch (e) {

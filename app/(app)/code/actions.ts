@@ -151,6 +151,13 @@ export async function shareCodeFile(
     return { ok: false, error: "You can't share with yourself." };
   }
 
+  // 팀이 다르면 code_file_permissions_insert RLS(0080)가 막는다 — 미리
+  // 확인해 정확한 이유를 알려준다.
+  const { data: sameTeam } = await supabase.rpc("shares_active_team", { p_other: id });
+  if (!sameTeam) {
+    return { ok: false, error: "You can only share with members of your current team." };
+  }
+
   const { error } = await supabase.from("code_file_permissions").upsert(
     {
       code_file_id: codeFileId,

@@ -91,6 +91,7 @@ export const requireUser = cache(async function requireUser(): Promise<{
         age_public: false,
         address_public: false,
         phone_public: false,
+        active_team_id: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       } as Profile),

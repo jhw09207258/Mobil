@@ -23,9 +23,7 @@ export type ChatReaction = { emoji: string; count: number; reacted_by_me: boolea
 
 export type ChatMessage = {
   id: string;
-  /** Big Brother 가 보낸 메시지는 보낸 사람이 없다(is_bot 이 true). */
-  sender_id: string | null;
-  is_bot?: boolean;
+  sender_id: string;
   sender_name: string;
   sender_avatar_url: string | null;
   content: string;
@@ -171,10 +169,14 @@ export async function startDm(
 ): Promise<{ id: string } | { error: string }> {
   await requireUser();
   const supabase = await createClient();
+  // start_chat_dm(0080)의 예외 문구는 전부 사용자에게 그대로 보여줄 수 있게
+  // 손으로 쓴 것이다(예: "You can only message people on your current team") —
+  // 그대로 통과시켜야 "대화를 시작할 수 없습니다" 같은 뭉뚱그린 메시지 대신
+  // 정확한 이유가 보인다.
   const { data, error } = await supabase.rpc("start_chat_dm", {
     p_other: otherUserId,
   });
-  if (error || !data) return { error: "Could not start the conversation." };
+  if (error || !data) return { error: error?.message || "Could not start the conversation." };
   return { id: data };
 }
 
@@ -190,7 +192,7 @@ export async function createGroup(
     p_title: title.trim(),
     p_members: memberIds,
   });
-  if (error || !data) return { error: "Could not create the group." };
+  if (error || !data) return { error: error?.message || "Could not create the group." };
   return { id: data };
 }
 
@@ -205,7 +207,7 @@ export async function addMembers(
     p_conversation: conversationId,
     p_members: memberIds,
   });
-  if (error) return { error: "Could not add members." };
+  if (error) return { error: error.message || "Could not add members." };
   return { ok: true };
 }
 
@@ -296,31 +298,4 @@ export async function listChatContacts(): Promise<ChatContact[]> {
     console.error("[chat:listChatContacts] unexpected failure:", e instanceof Error ? e.message : e);
     return [];
   }
-}
-
-/** 이 대화에 Big Brother 가 들어와 있는지. */
-export async function getBigBrotherEnabled(conversationId: string): Promise<boolean> {
-  await requireUser();
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("chat_conversations")
-    .select("bigbrother_enabled")
-    .eq("id", conversationId)
-    .maybeSingle();
-  return !!data?.bigbrother_enabled;
-}
-
-/** 초대/해제 — 그 대화의 멤버만(SQL 쪽에서도 한 번 더 막는다). */
-export async function setBigBrother(
-  conversationId: string,
-  enabled: boolean
-): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("set_bigbrother", {
-    p_conversation: conversationId,
-    p_enabled: enabled,
-  });
-  if (error) return { error: "Could not change Big Brother for this chat." };
-  return { ok: true };
 }

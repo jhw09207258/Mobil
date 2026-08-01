@@ -115,7 +115,7 @@ export async function runBigBrotherGemini(opts: {
     if (Date.now() >= opts.deadline) {
       return {
         text: full,
-        error: full ? undefined : "Big Brother ran out of time before finishing.",
+        error: full ? undefined : "Sophia ran out of time before finishing.",
         inputTokens,
         outputTokens,
         totalTokens,
@@ -219,10 +219,10 @@ export async function runBigBrotherGemini(opts: {
 
 function geminiErrorMessage(detail: string): string {
   if (/API_KEY|api key|PERMISSION_DENIED/i.test(detail)) {
-    return "Big Brother's Gemini API key was rejected.";
+    return "Sophia's Gemini API key was rejected.";
   }
   if (/RESOURCE_EXHAUSTED|quota|429/i.test(detail)) {
     return "Gemini quota or rate limit reached — try again shortly.";
   }
-  return `Big Brother's Gemini request failed: ${detail.slice(0, 200)}`;
+  return `Sophia's Gemini request failed: ${detail.slice(0, 200)}`;
 }

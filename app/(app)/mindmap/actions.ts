@@ -399,6 +399,11 @@ export async function shareMindMap(
   if (!uuidRe.test(id)) return { ok: false, error: "Not a valid Share ID (UUID)." };
   if (id === user.id) return { ok: false, error: "You can't share with yourself." };
 
+  // 팀이 다르면 mind_map_permissions_insert RLS(0080)가 막는다 — 미리 확인해
+  // 정확한 이유를 알려준다.
+  const { data: sameTeam } = await supabase.rpc("shares_active_team", { p_other: id });
+  if (!sameTeam) return { ok: false, error: "You can only share with members of your current team." };
+
   const { error } = await supabase.from("mind_map_permissions").upsert(
     { mind_map_id: mapId, user_id: id, permission, granted_by: user.id },
     { onConflict: "mind_map_id,user_id" }

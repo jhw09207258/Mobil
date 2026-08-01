@@ -29,7 +29,7 @@ const MAIN: Item[] = [
   { href: "/sheets", label: "Table", icon: <IconSheet /> },
   { href: "/code", label: "Codespace", icon: <IconCode /> },
   { href: "/mindmap", label: "Link Graph", icon: <IconMindmap /> },
-  { href: "/big-brother", label: "Big Brother", icon: <IconEye /> },
+  { href: "/sophia", label: "Sophia", icon: <IconEye /> },
   { href: "/chat", label: "Chat", icon: <IconChat /> },
   { href: "/calendar", label: "Calendar", icon: <IconCalendar /> },
   { href: "/coworkers", label: "Co-workers", icon: <IconCoworkers /> },

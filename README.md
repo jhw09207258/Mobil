@@ -1,12 +1,148 @@
-# Possion (H-1 Prototype, beta v1.6.17)
+# Possion (H-1 Prototype, beta v1.6.18)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in August 1, v1.6.17 by Haewon Jeong
+Last Update in August 1, v1.6.18 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## 팀(워크스페이스) 시스템 + Big Brother 삭제 (v1.6.18)
+
+**요청**: 세 가지. (1) 대시보드 "THIS WEEK" 위젯이 이번 주에 새로 만든 것만
+세던 걸 고쳐서 만든 것과 고친 것을 함께 세게 할 것. (2) 가입 시 팀을
+선택/생성하는 다중 테넌트 워크스페이스 기능을 처음부터 설계해 추가할 것 —
+팀장 위임/승인/공개설정/삭제, 팀별 Repository·채팅 분리, 여러 팀 소속 +
+헤더에서 전환, 그 과정에서 필요하다고 판단되는 것들도 함께 고려할 것.
+(3) Big Brother 메뉴/기능을 코드까지 전부 삭제하되 Sophia 등 기존 기능이
+깨지지 않게 검토할 것. 마지막으로 이 모든 걸 시뮬레이션으로 검증할 것.
+
+### THIS WEEK — 편집도 센다
+
+`my_weekly_activity()`(0079)가 documents/code_files/sheets/mind_maps 를
+`created_at` 기준으로만 버킷팅해서, 이번 주에 고친 지난주 문서는 잡히지
+않았다. **0081**에서 이 네 테이블만 `updated_at` 기준으로 바꿨다(모든
+테이블이 `updated_at` 이 `created_at` 과 같은 값으로 시작해 편집 시에만
+갱신되므로, "새로 만든 것"과 "고친 것"을 자연스럽게 함께 센다).
+`files` 는 `updated_at` 컬럼 자체가 없어 그대로 `created_at`. 대시보드
+막대그래프(`weekly-activity-chart.tsx`) 캡션도 "items created this week"
+→ "items added or edited this week" 로 맞춰, 숫자가 실제로 세는 것과
+문구가 어긋나지 않게 했다.
+
+### 팀(워크스페이스) — 설계와 범위
+
+Slack 의 워크스페이스 전환 모델을 참고했다: 한 사용자가 여러 팀에 속할 수
+있고, 헤더의 팀 전환기로 "지금 활동 중인 팀"(`profiles.active_team_id`)을
+바꾼다. 요청 문장을 그대로 따라 **Repository 와 채팅만** `team_id` 로
+직접 스코프했다("Repository 와 그에 속한 파일, 채팅 내용들은 상이하며").
+문서/코드/시트/마인드맵은 저장소와 달리 원래부터 개인 소유 + 개별 공유
+모델이라 팀 컬럼을 새로 얹지 않고, 대신 **공유(공유 권한 부여) 자체를
+"같은 팀끼리만" 로 제한**했다 — 다섯 개 `*_permissions` 테이블의 INSERT
+정책 전부에 `shares_active_team(user_id)` 조건을 추가하는 방식. 소유권/열람
+모델 전체를 다시 쓰는 것보다 범위가 좁고 안전하면서, "같은 팀끼리만 공유"
+라는 요청을 그대로 만족한다.
+
+**스키마 (`0080_teams.sql`)**
+- `teams`(이름/설명/공개여부/팀장) + `team_members`(팀·유저·상태
+  `active`/`pending`) — 직접 INSERT/UPDATE/DELETE 는 RLS 로 전부 막고
+  아래 SECURITY DEFINER RPC 로만 바뀐다(0017/0018/0040 에서 확립한, RLS
+  자기참조 재귀를 피하는 패턴을 그대로 재사용).
+- `profiles.active_team_id` — "지금 선택된 워크스페이스" 포인터. 팀이
+  삭제되면(`on delete set null`) 자동으로 비고, 다음 진입 시 온보딩으로
+  다시 보낸다.
+- RPC: `create_team`/`request_join_team`(공개 팀은 즉시 가입, 비공개는
+  대기)/`approve_team_member`/`reject_team_member`/`remove_team_member`/
+  `leave_team`(팀장은 위임·삭제 전엔 못 나간다)/
+  `transfer_team_leadership`/`set_team_open`/`delete_team`/
+  `set_active_team`, 조회용 `search_teams`/`list_my_teams`/
+  `list_team_members`.
+- `repositories.team_id` — BEFORE INSERT 트리거(`set_repository_team`)가
+  소유자의 현재 활성 팀에서 자동으로 채운다. 기존
+  `createRepository()`(app 코드)는 손댈 필요가 없다.
+- 채팅: `chat_conversations.team_id` 추가, `start_chat_dm`/
+  `create_chat_group`/`add_chat_members` 가 전부
+  `shares_active_team()` 로 상대를 걸러낸다. `list_coworkers()` 도 같은
+  조건을 얹어 — 이 RPC 하나를 스코프하는 것만으로 코워커 디렉터리 페이지,
+  채팅 새 대화 상대 선택창이 **전부 자동으로** 같은 팀으로 좁혀진다(호출
+  지점을 하나하나 고칠 필요가 없었다).
+- 팀 삭제는 비파괴적이다 — `repositories.team_id`/`chat_conversations.
+  team_id`/`profiles.active_team_id` 전부 `on delete set null`. 이
+  세션이 지금까지 지켜온 "사용자 콘텐츠는 진짜로 지우지 않는다" 원칙과
+  같다(Repository 삭제가 자식을 "Null Repository" 로 고아 처리하는 것과
+  동일한 결).
+
+**앱 레이어**
+- 가입 온보딩(`app/(auth)/choose-team/`) — `active_team_id` 가 없으면
+  `app/(app)/layout.tsx` 가 관리자 승인 검사보다 먼저 이리로 보낸다(대기
+  중에도 팀은 먼저 고를 수 있어야 하므로). 팀 검색+가입 신청 / 새 팀
+  만들기 두 탭.
+- 헤더 팀 전환기(`app/(app)/team-switcher.tsx`) — 계정 메뉴(`.acct`)와
+  같은 유리 드롭다운 규약. 내 팀 목록(클릭 전환, pending/현재 배지),
+  팀 검색+가입, 새 팀 만들기, 팀장이면 "Team settings →" 로 관리 페이지
+  링크.
+- 팀 관리 페이지(`/team`, `app/(app)/team/`) — 대기 승인 요청(팀장),
+  멤버 명단(공개/비공개 전환, 리더 위임, 추방 — 전부 팀장 한정), 나가기
+  버튼(팀장은 위임/삭제 전엔 비활성 — 이유를 그대로 보여준다).
+- 공유 대화상자 5곳(문서/코드/시트/마인드맵/파일) — "Share ID" 를 입력해
+  공유하는 흐름이 팀이 다른 상대를 골라도 그전엔 "존재하지 않는 사용자
+  같다"는 뭉뚱그린 에러만 봤다. `shares_active_team` RPC 로 미리 확인해
+  "You can only share with members of your current team." 로 정확한
+  이유를 보여준다. 채팅의 `startDm`/`createGroup`/`addMembers` 도
+  RPC 가 이미 손으로 써 둔 친절한 예외 문구(`raise exception`)를 뭉뚱그린
+  메시지로 덮지 않고 그대로 통과시키도록 고쳤다.
+- 설정 페이지의 "MY SHARE ID" 설명 문구도 "팀끼리만 공유된다"는 걸
+  명시하도록 수정.
+
+### Big Brother 삭제
+
+`/big-brother` 메뉴와 그 아래 세 탭(Assistant · Agent/Antigravity 전체
+코드스페이스 에디터 · 논문/깃허브 검색 콘솔)을 전부 지웠다. 삭제 전에
+탐색 에이전트로 먼저 감사한 이유: Sophia 의 실제 채팅 백엔드
+(`lib/big-brother-claude.ts`/`lib/big-brother-gemini.ts`/
+`lib/bb-attachments*.ts`, `/api/sophia/chat`)가 이름만 같은 "Big
+Brother" 네이밍을 내부적으로 그대로 쓰고 있어서, 이름으로만 지우면
+Sophia 자체가 부서질 뻔했다.
+
+- 지운 것: `app/(app)/big-brother/` 전체, `/api/antigravity`,
+  `/api/sophia/chat-mention`, `lib/antigravity.ts` — Agent 탭(전체
+  코드스페이스 AI 에디터)은 메뉴 삭제 요청에 포함된 기능이라 별도 보존
+  요청이 없는 한 함께 지웠다.
+- `app/(app)/sophia/page.tsx` 를 `/big-brother` 로의 리다이렉트에서
+  원래의 채팅 화면으로 되돌리고, 사이드바에 `/sophia` 항목을 다시 추가—
+  메뉴가 없어지면 Sophia 로 들어갈 방법이 아예 사라지기 때문.
+- Sophia 백엔드 파일명/내부 식별자(`lib/big-brother-*.ts`,
+  `runBigBrotherClaude` 등)는 그대로 뒀다 — 실사용자 눈에 안 보이는
+  내부 리팩터라 이번 요청의 범위 밖. 대신 시스템 프롬프트, 에러 메시지,
+  채팅 UI 문구, `.env.example` 주석, README 기능표 등 **사용자에게
+  보이는 문자열은 전부** "Big Brother" → "Sophia" 로 고쳤다 — 메뉴는
+  지웠는데 화면에 옛 이름이 남으면 그 자체로 버그처럼 보인다.
+- 채팅에서도 `@bigbrother` 멘션, "+ Big Brother" 초대/제거 버튼,
+  `bigbrother_enabled` 컬럼, `is_bot` 메시지 분기(`0082`)를 전부
+  지웠다. 그룹이 아닌 DM 에서만 있던 "..." 더보기 메뉴가 Big Brother
+  버튼이 빠지며 텅 빈 채로 남지 않도록, 그 메뉴 자체를 그룹 대화에서만
+  렌더링하게 조건을 다시 짰다.
+
+### 검증
+
+- `npx tsc --noEmit -p .`, `npm run build` — 전부 경고 없이 통과
+  (`/big-brother` 라우트 사라짐, `/team`·`/choose-team` 새 라우트 확인).
+- `node --test` — 단위 테스트 18개 전부 통과(Big Brother 전용 테스트
+  파일 2개는 삭제와 함께 목록에서 자연히 빠짐, 그 외 회귀 없음).
+- 로컬 Postgres 16(+ 실제 pgvector/pg_cron 확장 설치, 이전엔 조악한
+  스텁으로 대신하던 걸 이번에 진짜 확장으로 바꿨다)에 82개 마이그레이션을
+  전부 재생해 스키마가 처음부터 끝까지 충돌 없이 쌓이는 것을 확인했다.
+  이어서 가짜 사용자 3명(alice/bob/carol)으로 실제 RLS/JWT 클레임을
+  흉내 내는 기능 시뮬레이션을 돌려 — 팀 생성/검색/공개 팀 즉시가입/
+  비공개 팀 승인 대기, 팀이 다르면 DM·문서 공유가 막히고 같은 팀이면
+  되는지, 저장소 `team_id` 자동 채움, 리더 위임과 위임 전 삭제 금지,
+  삭제 시 멤버 전원의 `active_team_id` 가 콘텐츠는 그대로 둔 채 풀리는지,
+  코워커 목록 팀 스코핑, 이번 주 활동에 편집이 잡히는지까지 전부
+  확인했다 — 스크립트 자체의 문법 실수 몇 건 외에 스키마/정책 결함은
+  없었다.
+- 저장소 전체를 `big brother`/`bigbrother` 로 훑어 Sophia 내부
+  구현(`lib/big-brother-*.ts`, `lib/bb-attachments*.ts`)과 과거 변경
+  기록(changelog) 항목을 뺀 나머지에 잔여 언급이 없는 것을 확인했다.
 
 ## UI 프리미티브 7종 — unlumen-ui 참고 (v1.6.17)
 
@@ -40,7 +176,7 @@ ShimmeringText, Switch, ThemeSwitch, CopyButton, RefreshButton)를 붙여넣고,
 | `CopyButton` | `components/ui/copy-button.tsx` | `components/copyable.tsx` 내부 — 예전엔 Copyable 이 복사 상태/타이머를 직접 들고 있었는데, 그 로직을 통째로 이 프리미티브로 옮겨 중복을 줄였다(공유 ID 카드 등 7곳 호출부는 그대로) |
 | `RefreshButton` | `components/ui/refresh-button.tsx` | 대시보드/`admin/observability` 페이지 헤더 — 둘 다 `force-dynamic` 서버 컴포넌트라 새로고침 말고는 다시 불러올 방법이 없었다. `router.refresh()` 호출 |
 | `Tooltip` | `components/ui/tooltip.tsx` | 헤더의 햄버거 메뉴 버튼 + 모바일 검색 아이콘 버튼 — 아이콘만 있고 `aria-label` 뿐이던 자리에 순수 CSS 호버/포커스 툴팁(위치 계산 라이브러리 없음) |
-| `ShimmeringText` | `components/ui/shimmering-text.tsx` | 캘린더 상단 "Loading…" — Big Brother 의 파티클 캔버스 `ThinkingIndicator`(무거운 연산용)와는 다르게, 한 줄짜리 짧은 대기 문구용 |
+| `ShimmeringText` | `components/ui/shimmering-text.tsx` | 캘린더 상단 "Loading…" — Sophia 의 파티클 캔버스 `ThinkingIndicator`(무거운 연산용)와는 다르게, 한 줄짜리 짧은 대기 문구용 |
 
 **적용 위치를 고를 때의 원칙**: 이미 같은 역할을 하는 게 있으면 새로 안
 얹었다(CommandMenu/ThemeSwitch). 로직을 새로 만들어야 하면 만들지 않고
@@ -1264,6 +1400,7 @@ party 위젯이라 자체 터치 최적화 여부를 보장할 수 없어 `.sh-p
 | 영역 | 내용 |
 | --- | --- |
 | 인증 | 회원가입 / 로그인 (Supabase Auth), 가입 시 프로필 자동 생성 |
+| 팀(워크스페이스) | 가입 시 팀 선택/생성 온보딩(`/choose-team`), 한 사용자가 여러 팀에 속하고 헤더 팀 전환기(`app/(app)/team-switcher.tsx`)로 활성 팀을 바꾼다. 팀장은 위임·멤버 승인/거절/추방·공개(open)/비공개(closed) 전환·팀 삭제가 가능하고(`/team` 관리 페이지), 비공개 팀은 가입 신청 후 팀장 승인이 필요하다. Repository 와 채팅은 팀별로 분리되고, 문서/코드/시트/마인드맵 공유는 같은 팀 멤버끼리만 가능하다(0080) |
 | 관리자 | 코드 등록(`/admin/redeem`)으로 권한 승격, 관리자 콘솔에서 코드 발급 |
 | 파일 | 업로드(드래그앤드롭 포함) · 다운로드(서명 URL) · 이름변경 · 삭제 · 공유(view/edit) · 검색 |
 | 문서 | 생성 · 조회 · 편집(자동/수동 저장) · 공유(view/edit) · 공개 토글 · 검색 |
@@ -1276,8 +1413,8 @@ party 위젯이라 자체 터치 최적화 여부를 보장할 수 없어 `.sh-p
 | 설정 | 표시 이름 변경, 이메일·권한·공유 ID 확인 |
 | 감사 | 주요 작업을 `audit_logs` 에 기록, 관리자 콘솔에서 조회 |
 | 온톨로지 검색 | 헤더 통합 검색 — 문서·코드·시트·마인드맵·파일을 한 번에 검색하고, 결과별로 연결된 다른 항목을 펼쳐서 확인 |
-| Big Brother | 대화형 인텔리전스 어시스턴트(구 Sophia 통합, `/big-brother`) — 온톨로지 검색·RAG(시맨틱 검색)·워크스페이스 읽기/쓰기·외부 논문/GitHub 검색을 도구로 쓰는 LLM 챗. Search console 탭에서 LLM 없이 직접 검색도 가능. `/sophia` 는 `/big-brother` 로 리다이렉트, 대화 기록은 그대로 유지 |
-| 시맨틱 검색(RAG) | 헤더 검색에 의미 기반 결과 병행 표시(마이그레이션 0041, pgvector + NVIDIA nv-embedqa-e5-v5) — 저장 시 내용 해시가 바뀐 경우에만 임베딩 재계산(`lib/embeddings.ts`), 어휘(tsvector)+의미 하이브리드, RLS(can_view_object) 동일 적용, 임베딩 API 장애 시 어휘 검색만으로 우아하게 강등. Big Brother 어시스턴트에도 `semantic_search` 도구 추가(의미 검색→읽기→종합 = RAG). 연결 항목 펼침은 온톨로지 그래프 2단계 탐색(`get_linked_objects_deep`, 재귀 CTE, "via X" 표시) |
+| Sophia | 대화형 인텔리전스 어시스턴트(`/sophia`) — 온톨로지 검색·RAG(시맨틱 검색)·워크스페이스 읽기/쓰기·외부 논문/GitHub 검색(`search_papers_and_code` 도구)을 쓰는 LLM 챗 |
+| 시맨틱 검색(RAG) | 헤더 검색에 의미 기반 결과 병행 표시(마이그레이션 0041, pgvector + NVIDIA nv-embedqa-e5-v5) — 저장 시 내용 해시가 바뀐 경우에만 임베딩 재계산(`lib/embeddings.ts`), 어휘(tsvector)+의미 하이브리드, RLS(can_view_object) 동일 적용, 임베딩 API 장애 시 어휘 검색만으로 우아하게 강등. Sophia 에도 `semantic_search` 도구 추가(의미 검색→읽기→종합 = RAG). 연결 항목 펼침은 온톨로지 그래프 2단계 탐색(`get_linked_objects_deep`, 재귀 CTE, "via X" 표시) |
 | Comms(팀 채팅) | 사용자 간 DM·그룹 채팅(`/chat`, 마이그레이션 0040) — Supabase Realtime Broadcast(private 채널, 멤버만 수신/발신) 실시간 전달, 안 읽음 배지, 그룹 멤버 추가/나가기. 메시지에 문서/코드/시트/마인드맵을 첨부(⛓)하면 칩으로 표시되고 클릭 시 워크스페이스 탭으로 바로 열린다 — 채팅이 콘텐츠 도구와 한 몸으로 동작. 라이브 기능(0042): 앱 어디서나 쓰는 우하단 플로팅 채팅(버블↔패널, 확대/최소화), 새 메시지 인스타풍 토스트 알림(DB 트리거가 각 멤버의 개인 `user:<id>` topic 으로 fanout), 타이핑 표시("X is typing…"), 읽음 확인(내 마지막 메시지에 Sent/Read/Read by N). 메시지 서식(경량 마크다운, `markdown-parse.ts`): **굵게**·*기울임*·__밑줄__·~~취소선~~·`인라인 코드`·코드 블록·[링크](URL)·URL 자동 링크·번호/글머리표 목록·들여쓰기·@멘션 — Aa 토글 서식 툴바 + 이모지/멘션 메뉴. 플로팅 위젯은 /chat 페이지에서는 숨김. 긴 메시지 접기/펼치기(Show more), 프로필 사진 전면 연동(0043 — 대화 목록·메시지·토스트·멘션/연락처), 스플릿 뷰에 채팅 탭("Open as tab" — 한쪽엔 채팅, 한쪽엔 문서/코드) |
 | 테마 | 라이트/다크 두 모드(설정에서 선택, `lib/theme.ts` → `<html data-theme>`) — 팔레트는 globals.css CSS 변수(:root=다크, [data-theme=light])가 담당. 주요 버튼 액센트는 블루(구 그린 교체, `--ok` 상태 초록은 유지). localStorage + 루트 인라인 스크립트로 첫 페인트 전 적용(FOUC 없음). 알려진 한계: 코드미러/시트 에디터 캔버스는 아직 다크 고정, 마인드맵은 열 때의 모드를 따름 |
 | 저장소(Repositories) | 문서·코드·시트·마인드맵·파일을 저장소 단위로 묶는다(0044). NULL = "Null Repository". /files 는 **Google Drive 풍 목록 테이블**(타입 아이콘 + 이름 + 액션)로, 랜딩은 저장소 목록·상세는 그 저장소의 Possion 항목·파일 목록. 생성/이름변경은 모달 입력(Tauri 웹뷰에서 prompt 가 동작하지 않는 문제 시정). 각 에디터 상단바 저장소 선택으로도 이동/생성 |
@@ -1306,7 +1443,9 @@ Notion 류 **"/" 명령 메뉴**(제목·목록·체크리스트·인용·코드
 
 공유는 상대방의 **공유 ID(user UUID)** 로 이루어집니다. 제공된 RLS 정책상 일반
 사용자는 타인의 프로필을 이메일로 조회할 수 없으므로, 각 사용자는 대시보드에서
-자신의 공유 ID 를 복사해 상대에게 전달합니다.
+자신의 공유 ID 를 복사해 상대에게 전달합니다. 단, 팀 시스템 도입(0080) 이후
+공유는 **같은 팀 멤버끼리만** 가능합니다 — 다른 팀 소속의 공유 ID 를 입력하면
+"You can only share with members of your current team." 안내와 함께 거부됩니다.
 
 ### 작업공간(탭·스플릿뷰)
 

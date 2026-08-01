@@ -243,8 +243,8 @@ export function CodeSpaceWorkspace({
     };
   }, []);
 
-  // 에이전트가 Big Brother 쪽에서 파일을 고치므로, 여기서 다시 읽어온다.
-  // 문서를 갈아끼우지 않고 최소 델타로 반영한다 — 그래야 같은 파일을 보고 있는
+  // 다른 곳(다른 탭 등)에서 파일이 바뀌면 여기서 다시 읽어온다. 문서를
+  // 갈아끼우지 않고 최소 델타로 반영한다 — 그래야 같은 파일을 보고 있는
   // 다른 접속자에게도 Yjs 업데이트로 전파되고 커서가 튀지 않는다.
   const onFilesChanged = useCallback(async () => {
     const next = await refreshFiles();
@@ -510,10 +510,7 @@ export function CodeSpaceWorkspace({
       <div className="space-body">
         <aside className="space-tree hscroll">
           {files.length === 0 ? (
-            <p className="tree-empty">
-              Empty Code Space. Add a file here, or build it with the agent in Big Brother →
-              Vibe coding.
-            </p>
+            <p className="tree-empty">Empty Code Space. Add a file here to get started.</p>
           ) : (
             renderNodes(tree)
           )}

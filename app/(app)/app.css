@@ -406,6 +406,112 @@ html[data-desktop] .app-header .hsearch {
   color: var(--accent-hover);
 }
 
+/* ---- team switcher (header, left of search) — .acct 와 같은 유리 드롭다운 규약 */
+.team-switcher {
+  position: relative;
+  flex: none;
+}
+.team-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--border-0);
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--text-1);
+  transition: background 0.12s, border-color 0.12s;
+}
+.team-switcher-btn:hover {
+  background: color-mix(in srgb, var(--bg-3) 80%, transparent);
+  border-color: var(--border-1);
+}
+.team-switcher-btn svg {
+  color: var(--text-3);
+}
+.team-switcher-name {
+  font-size: 13px;
+  color: var(--text-1);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-switcher-menu {
+  position: absolute;
+  left: 0;
+  top: 40px;
+  width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  padding: 10px 0;
+  z-index: 40;
+}
+.team-switcher-section-label {
+  padding: 4px 12px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.team-switcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.team-switcher-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius);
+  color: var(--text-1);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+button.team-switcher-item:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+button.team-switcher-item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.team-switcher-item.active {
+  background: color-mix(in srgb, var(--steel) 14%, transparent);
+}
+.team-switcher-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-switcher-sep {
+  height: 1px;
+  background: var(--border-0);
+  margin: 8px 0;
+}
+.team-switcher-search {
+  width: calc(100% - 20px);
+  margin: 0 10px 8px;
+  height: 32px;
+  font-size: 12.5px;
+}
+
 .avatar {
   width: 28px;
   height: 28px;
@@ -733,6 +839,9 @@ html[data-desktop] .app-header .hsearch {
 
 @media (max-width: 860px) {
   .acct-name {
+    display: none;
+  }
+  .team-switcher-name {
     display: none;
   }
   .admin-cta-body {

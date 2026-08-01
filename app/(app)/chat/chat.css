@@ -1185,14 +1185,3 @@
     width: min(320px, calc(100vw - 28px));
   }
 }
-
-/* Big Brother 가 보낸 메시지 — 사람 메시지와 한눈에 구분되어야 한다.
-   상시 참여가 아니라 @bigbrother 로 부를 때만 답하므로, 드물게 나타난다. */
-.chat-msg.bot .chat-msg-sender {
-  color: var(--create);
-}
-.chat-msg.bot .chat-msg-body {
-  border-left: 2px solid var(--create-dim);
-  padding-left: 10px;
-  background: var(--create-ghost);
-}

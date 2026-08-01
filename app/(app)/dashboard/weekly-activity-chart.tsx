@@ -22,8 +22,9 @@ function topRoundedBarPath(x: number, y: number, w: number, h: number, r: number
 }
 
 /**
- * 이번 주 활동 막대그래프 — 최근 7일간 내가 만든 항목 수(my_weekly_activity,
- * 0079). bklit-ui(github.com/bklit/bklit-ui) 의 Bar 컴포넌트에서 위쪽만
+ * 이번 주 활동 막대그래프 — 최근 7일간 내가 만들거나 수정한 항목 수
+ * (my_weekly_activity, 0079/0081 — 문서·코드·시트·맵은 updated_at 기준이라
+ * 새로 만든 것과 고친 것을 함께 센다). bklit-ui(github.com/bklit/bklit-ui) 의 Bar 컴포넌트에서 위쪽만
  * 둥근 막대 + 진입 애니메이션 + 호버 시 나머지를 옅게 만드는 시각 언어를
  * 가져왔다 — visx/motion 의존성 없이 순수 SVG + CSS 애니메이션으로 다시
  * 구현했다(이 프로젝트는 지금까지 그래프를 전부 이런 식으로 직접 그려 왔다,
@@ -47,7 +48,7 @@ export function WeeklyActivityChart({ rows }: { rows: Row[] }) {
       <div className="wk-chart-head">
         <span className="wk-chart-total">{total}</span>
         <span className="dim" style={{ fontSize: 12 }}>
-          item{total === 1 ? "" : "s"} created this week
+          item{total === 1 ? "" : "s"} added or edited this week
         </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="wk-chart-svg" preserveAspectRatio="none">
