@@ -802,6 +802,24 @@ html[data-theme="light"] .btn {
   font-size: 12px;
   color: var(--text-3);
 }
+/* List/Graph 뷰 전환 — 텍스트 두 개를 나열한 탭 대신 Switch 하나를 양쪽
+   라벨로 감싼 형태(체크 안 됨=List, 됨=Graph). */
+.view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.view-switch-label {
+  font-size: 12px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.view-switch-label.active {
+  color: var(--text-0);
+  font-weight: 500;
+}
+
 .repo-card-actions {
   position: absolute;
   top: 10px;
@@ -811,7 +829,15 @@ html[data-theme="light"] .btn {
 }
 
 /* 저장소 그래프 뷰(Obsidian 식 force-directed graph) */
+.repo-graph-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
 .repo-graph-wrap {
+  position: relative;
   flex: 1;
   min-height: 420px;
   border: 1px solid var(--border-0);
@@ -819,12 +845,25 @@ html[data-theme="light"] .btn {
   background: var(--bg-1);
   overflow: hidden;
 }
+.repo-graph-reset {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  background: var(--bg-2);
+  box-shadow: var(--shadow-card);
+}
 .repo-graph-svg {
   width: 100%;
   height: 100%;
   display: block;
   user-select: none;
   touch-action: none;
+  cursor: grab;
+}
+.repo-graph-caption {
+  flex: none;
+  margin: 0;
 }
 .repo-graph-edge-contain {
   stroke: var(--border-2);
@@ -839,17 +878,16 @@ html[data-theme="light"] .btn {
 .repo-graph-node circle {
   fill: var(--bg-3);
   stroke: var(--border-2);
-  stroke-width: 1.5;
+  stroke-width: 2;
   cursor: pointer;
-  transition: stroke 0.12s, fill 0.12s;
+  transition: stroke 0.12s, fill 0.12s, r 0.15s var(--ease-spring);
 }
 .repo-graph-node:hover circle {
-  stroke: var(--create);
   fill: var(--bg-2);
+  stroke-width: 3;
 }
 .repo-graph-node-folder circle {
   fill: var(--accent-ghost);
-  stroke: var(--accent-dim);
 }
 .repo-graph-node text {
   fill: var(--text-3);

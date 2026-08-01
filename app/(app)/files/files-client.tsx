@@ -25,6 +25,7 @@ import {
   IconPlus,
 } from "../icons";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import { RepositoryGraph } from "../repositories/repository-graph";
 import {
   deleteFile,
@@ -440,19 +441,23 @@ export function FilesClient({
             </div>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
               {repoView !== "null" && (
-                <div className="row" role="tablist" aria-label="View" style={{ gap: 2 }}>
-                  <button
-                    className={`btn btn-sm ${viewMode === "list" ? "chat-tool-active" : ""}`}
+                <div className="view-switch" role="group" aria-label="View">
+                  <span
+                    className={`view-switch-label ${viewMode === "list" ? "active" : ""}`}
                     onClick={() => setViewMode("list")}
                   >
                     List
-                  </button>
-                  <button
-                    className={`btn btn-sm ${viewMode === "graph" ? "chat-tool-active" : ""}`}
+                  </span>
+                  <Switch
+                    checked={viewMode === "graph"}
+                    onCheckedChange={(v) => setViewMode(v ? "graph" : "list")}
+                  />
+                  <span
+                    className={`view-switch-label ${viewMode === "graph" ? "active" : ""}`}
                     onClick={() => setViewMode("graph")}
                   >
                     Graph
-                  </button>
+                  </span>
                 </div>
               )}
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("document")}>+ Doc</button>
