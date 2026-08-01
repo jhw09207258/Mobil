@@ -373,7 +373,7 @@ export function FilesClient({
                         <IconFiles size={16} />
                       </span>
                     </td>
-                    <td>
+                    <td className="table-cell-title">
                       <span className="drive-name">Null Repository</span>
                       <span className="drive-sub">Unfiled items</span>
                     </td>
@@ -386,7 +386,7 @@ export function FilesClient({
                           <IconFiles size={16} />
                         </span>
                       </td>
-                      <td>
+                      <td className="table-cell-title">
                         <span className="drive-name">{r.name}</span>
                       </td>
                       <td>
@@ -526,8 +526,8 @@ export function FilesClient({
                         <th style={{ width: 34 }}></th>
                         <th>Name</th>
                         <th style={{ width: 90 }}>Type</th>
-                        <th style={{ width: 90 }} className="col-hide-mobile">Size</th>
-                        <th style={{ width: 150 }} className="col-hide-mobile">Move to</th>
+                        <th style={{ width: 90 }}>Size</th>
+                        <th style={{ width: 150 }}>Move to</th>
                         <th style={{ width: 220 }}></th>
                       </tr>
                     </thead>
@@ -552,7 +552,7 @@ export function FilesClient({
                                 </span>
                               )}
                             </td>
-                            <td>
+                            <td className="table-cell-title">
                               {row.kind === "folder" ? (
                                 <span className="drive-name">{row.label}</span>
                               ) : row.kind === "file" ? (
@@ -569,13 +569,13 @@ export function FilesClient({
                                 </OpenItemButton>
                               )}
                             </td>
-                            <td>
+                            <td data-label="Type">
                               <span className="badge">{KIND_LABEL[row.kind]}</span>
                             </td>
-                            <td className="mono muted col-hide-mobile">
+                            <td className="mono muted" data-label="Size">
                               {row.kind === "file" ? formatBytes(f?.size_bytes ?? null) : "—"}
                             </td>
-                            <td className="col-hide-mobile" onClick={(e) => e.stopPropagation()}>
+                            <td data-label="Move to" onClick={(e) => e.stopPropagation()}>
                               <select
                                 className="select repo-picker"
                                 value=""

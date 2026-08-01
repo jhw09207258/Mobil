@@ -527,6 +527,61 @@ img {
   .share-grant-row .btn {
     flex: none;
   }
+
+  /* 리스트 테이블(Documents/Sheets/Link Graph/Code Space/Trash 등) — 좁은
+     화면에서 좌우로 스크롤하는 대신 행마다 세로로 펼친 카드로 바꾼다. 칸
+     높이가 넉넉해지니 data-label 로 각 값에 이름표를 붙이고(헤더 행은
+     이제 라벨이 그 역할을 대신하므로 숨긴다), 제목 칸은 카드 제목처럼
+     한 단계 크게 보여준다. */
+  .table-scroll {
+    overflow-x: visible;
+  }
+  .table thead {
+    display: none;
+  }
+  .table,
+  .table tbody,
+  .table tr {
+    display: block;
+    width: 100%;
+  }
+  .table tr {
+    padding: 10px 14px 12px;
+    border-bottom: 1px solid var(--border-0);
+  }
+  .table tbody tr:last-child {
+    border-bottom: none;
+  }
+  .table td {
+    display: block;
+    padding: 3px 0;
+    border-bottom: none;
+  }
+  .table td:empty {
+    display: none;
+  }
+  .table td[data-label] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .table td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .table td.table-cell-title {
+    font-size: 15px;
+    margin: 2px 0 4px;
+  }
+  .table td .row-actions {
+    justify-content: flex-start !important;
+    margin-top: 6px;
+  }
 }
 .link-btn {
   background: none;

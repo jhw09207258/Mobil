@@ -103,12 +103,12 @@ export function DocumentsList({
                     onChange={(v) => setStarred(d.id, v)}
                   />
                 </td>
-                <td>
+                <td className="table-cell-title">
                   <OpenItemButton kind="document" id={d.id} title={d.title || "Untitled"} className="link-btn">
                     {d.title || "Untitled"}
                   </OpenItemButton>
                 </td>
-                <td>
+                <td data-label="Visibility">
                   {d.visibility === "public" ? (
                     <span className="badge badge-ok">public</span>
                   ) : d.visibility === "owner" ? (
@@ -119,12 +119,12 @@ export function DocumentsList({
                     <span className="badge">private</span>
                   )}
                 </td>
-                <td>
+                <td data-label="Owner">
                   <span className="badge">
                     {d.owner_id === userId ? "Mine" : "Shared"}
                   </span>
                 </td>
-                <td className="mono muted" style={{ fontSize: 12 }}>
+                <td className="mono muted" data-label="Updated" style={{ fontSize: 12 }}>
                   {formatDate(d.updated_at)}
                 </td>
                 <td>

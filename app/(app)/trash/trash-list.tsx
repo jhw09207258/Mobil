@@ -68,7 +68,7 @@ export function TrashList({ items }: { items: TrashItem[] }) {
             <tr>
               <th style={{ width: 44 }}></th>
               <th>Name</th>
-              <th style={{ width: 110 }} className="col-hide-mobile">Type</th>
+              <th style={{ width: 110 }}>Type</th>
               <th style={{ width: 130 }}>Auto-delete</th>
               <th style={{ width: 190 }}></th>
             </tr>
@@ -84,9 +84,9 @@ export function TrashList({ items }: { items: TrashItem[] }) {
                       <Icon size={16} />
                     </span>
                   </td>
-                  <td>{it.title}</td>
-                  <td className="muted col-hide-mobile">{KIND_LABEL[it.kind] ?? it.kind}</td>
-                  <td className="mono muted" style={{ fontSize: 12 }}>
+                  <td className="table-cell-title">{it.title}</td>
+                  <td className="muted" data-label="Type">{KIND_LABEL[it.kind] ?? it.kind}</td>
+                  <td className="mono muted" data-label="Auto-delete" style={{ fontSize: 12 }}>
                     {timeLeft(it.expires_at, now)}
                   </td>
                   <td>

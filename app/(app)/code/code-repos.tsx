@@ -65,7 +65,7 @@ export function CodeRepos({ repos }: { repos: CodeRepository[] }) {
                 <th style={{ width: 46 }}></th>
                 <th>Code Space</th>
                 <th style={{ width: 90 }}>Files</th>
-                <th style={{ width: 200 }} className="col-hide-mobile">Source</th>
+                <th style={{ width: 200 }}>Source</th>
                 <th style={{ width: 190 }}></th>
               </tr>
             </thead>
@@ -75,9 +75,9 @@ export function CodeRepos({ repos }: { repos: CodeRepository[] }) {
                   <td onClick={() => open(r)}>
                     <span className="drive-icon folder"><IconFiles size={16} /></span>
                   </td>
-                  <td onClick={() => open(r)}>{r.name}</td>
-                  <td className="mono muted">{r.file_count}</td>
-                  <td className="muted col-hide-mobile" style={{ fontSize: 12 }}>
+                  <td className="table-cell-title" onClick={() => open(r)}>{r.name}</td>
+                  <td className="mono muted" data-label="Files">{r.file_count}</td>
+                  <td className="muted" data-label="Source" style={{ fontSize: 12 }}>
                     {r.github_owner ? `${r.github_owner}/${r.github_repo}` : "—"}
                   </td>
                   <td>
