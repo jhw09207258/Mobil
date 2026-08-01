@@ -395,6 +395,20 @@ img {
 .btn-icon.btn-sm {
   width: 26px;
 }
+/* 터치 기기에서는 마우스 커서 같은 정밀도가 없다 — 원형 아이콘 버튼의
+   히트 영역을 WCAG 권장 최소치(44px)에 가깝게 키운다. height 는 .btn 이
+   고정폭(32px)으로 이미 깔아 둔 값이라 padding 만으로는(box-sizing:
+   border-box) 커지지 않는다 — width/height 자체를 늘린다. */
+@media (pointer: coarse) {
+  .btn-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .btn-icon.btn-sm {
+    width: 34px;
+    height: 34px;
+  }
+}
 
 /* 버튼 그룹 사이의 세로 구분선 — 예: 저장소 툴바에서 "+ Doc/+ Table" 같은
    생성 버튼 묶음과 원형 Upload 버튼을 시각적으로 갈라 둔다. */
