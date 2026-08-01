@@ -214,12 +214,12 @@
   background: var(--bg-3);
   border: 0;
   border-left: 3px solid var(--create);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
-  transition: background 0.15s var(--ease-spring);
+  transition: background 0.15s var(--ease-spring), filter 0.15s var(--ease-spring);
 }
-.cal-pill:hover { background: var(--bg-4); }
+.cal-pill:hover { filter: brightness(1.12); }
 .cal-pill.cancelled .cal-pill-title { text-decoration: line-through; opacity: 0.6; }
 .cal-pill-time { font-size: 10px; color: var(--text-3); flex: none; }
 .cal-pill-title {
@@ -323,7 +323,7 @@
   color: var(--text-0);
   border: 1px solid var(--border-0);
   border-left: 3px solid var(--create);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
   display: flex;
@@ -666,10 +666,11 @@
   transform: scale(0.985);
 }
 .cal-block {
-  transition: box-shadow 0.15s var(--ease-spring), transform 0.12s var(--ease-spring);
+  transition: box-shadow 0.15s var(--ease-spring), transform 0.12s var(--ease-spring), filter 0.15s var(--ease-spring);
 }
 .cal-block:hover {
   box-shadow: var(--shadow-card);
+  filter: brightness(1.1);
 }
 
 /* 아젠다의 Join 버튼 — 행 전체가 버튼이라 그 위에 겹쳐 놓는다. */

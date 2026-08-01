@@ -1,12 +1,153 @@
-# Possion (H-1 Prototype, beta v1.6.15)
+# Possion (H-1 Prototype, beta v1.6.16)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in July 31, v1.6.15 by Haewon Jeong
+Last Update in August 1, v1.6.16 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## 대시보드/캘린더/모달/문서 목록 시각 리디자인 — bklit-ui + Toggl 참고 (v1.6.16)
+
+**요청**: 오픈소스 차트 모음
+[bklit/bklit-ui](https://github.com/bklit/bklit-ui) 를 참고해 우리 그래프에
+적용하고, Toggl Track 화면 4장(Admin Overview 대시보드 · 캘린더 주간뷰 ·
+"Create a goal" 팝업 · Reports 상세 조회)을 참고해 "내용과 구성요소는
+유지한 채 디자인과 가시화만 조금" 다듬어 달라는 요청. 모바일 인터페이스도
+맞춰 바꾸고 레이아웃이 카드 밖으로 튀어나오지 않는지, 기능에 오류가 없는지
+전부 점검해 달라는 요청이 함께 있었다.
+
+### 왜 visx/motion 을 새 의존성으로 넣지 않았는가
+
+bklit-ui 는 shadcn 레지스트리 방식(설치가 아니라 소스를 복사해 오는 방식)의
+MIT 컴포넌트 모음으로, 내부적으로 `@visx/*`(D3 래퍼) 와 `motion/react`
+(Framer Motion) 위에 그려져 있다. 이 프로젝트는 지금까지 그래프를 전부
+순수 SVG + CSS 로 직접 그려 왔고(레포지토리 그래프의 `d3-force` 정도가
+유일한 예외 — 물리 시뮬레이션은 대체할 만한 가벼운 방법이 없었다), 막대
+그래프 하나를 위해 무거운 차트 런타임 두 개를 새로 끌어오는 건 그 원칙과
+어긋난다. 그래서 컴포넌트를 그대로 옮기지 않고 **시각적 기법만** 뽑아
+순수 SVG/CSS 로 다시 구현했다:
+
+- 막대 위쪽 두 모서리만 둥근 경로(바닥에 틈이 안 생기게 직접 SVG path 를
+  그린다 — `<rect rx>` 는 네 모서리를 다 둥글린다)
+- 링/도넛 차트의 `strokeLinecap="round"` 캡슐형 끝 + 세그먼트 사이 작은 틈
+- 호버 시 드롭섀도 글로우, 나머지 옅어짐
+- 진입 시 짧게 자라나는 CSS 애니메이션(스태거드 지연)
+
+Toggl 화면의 보라/핑크 브랜드 컬러도 그대로 가져오지 않았다 — 기존에 다듬어
+둔 Possion 의 다크 "Liquid Glass" 팔레트(v1.6.2 감사 이후 유지)를 그대로
+쓰고, 참고 화면에서는 **구조**(카드 그리드, 통계 줄, 사이드바 위젯, 차트
+모양)만 가져왔다. 요청 원문의 "조금 바꾸자" 라는 표현에 맞춘 판단이다.
+
+### DB — `supabase/migrations/0079_weekly_activity.sql`
+
+대시보드의 "This week" 막대그래프는 Toggl 의 시간 기록 데이터를 흉내 낸
+가짜 수치를 넣는 대신, 실제로 의미 있는 새 집계를 하나 만들었다:
+`my_weekly_activity()` — 최근 7일간 내가 만든 문서/코드/시트/맵/파일 개수를
+날짜별로 합친다. `generate_series` 로 7일을 먼저 만들고 `left join` 해서
+활동이 없던 날도 0 으로 채운다(막대그래프가 빈 날을 조용히 건너뛰지 않게).
+SECURITY DEFINER + `auth.uid()` 로 본인 것만 집계하는 점은 같은 파일의
+`my_content_breakdown()` 자매 함수와 동일한 패턴이다.
+
+로컬 Postgres 스텁(`mobil_design_test`)에 79개 마이그레이션을 전부 순서대로
+재생해 통과를 확인했고, 테스트 사용자로 "3일 전 문서 1개 + 오늘 문서 2개"를
+넣어 함수가 정확히 7행(0 채움 포함)을 돌려주는 것도 확인한 뒤 테스트 DB는
+지웠다. 실제 Supabase 프로젝트에는 적용하지 않았다 — git 커밋만 하고, 운영
+프로젝트에 마이그레이션을 실제로 미는 것은 별도로 요청받았을 때만 하는
+일이라는 이 세션의 원칙을 그대로 따랐다.
+
+### 대시보드 — `app/(app)/dashboard/`
+
+Toggl 의 Admin Overview 화면처럼 상단 통계 카드 줄(Docs+/Code/Repository/
+Table/Link Graph/Access Level, 6개) 아래 2단 그리드로 재구성했다:
+
+- **본문**: 이번 주 활동 막대그래프(`weekly-activity-chart.tsx`, 신규) +
+  실시간 데이터 처리량(기존 `NetMonitor` 재배치)
+- **사이드바**: Up Next 세로 목록(`upcoming-strip.tsx` 에 `variant="list"`
+  추가 — 기존 가로 스크롤 `"strip"` 모드는 그대로 남겨 뒀다, 다른 화면이
+  나중에 쓸 수 있게) + 스토리지 도넛 + 플랫폼 대비 비중 바 + 내 공유 ID
+
+예전에는 데스크톱에서 세로 스크롤이 전혀 없도록 고정 높이로 눌러 담는
+제약이 있었는데(주석으로 명시돼 있었다), 카드가 늘면서 Documents/
+Repositories 같은 다른 목록 페이지처럼 자연스럽게 스크롤되는 쪽이 낫다고
+판단해 그 제약을 풀었다 — 카드 "안쪽"에서는 여전히 스크롤을 만들지
+않는다(페이지 자체만 스크롤).
+
+### 도넛/링 차트 — `app/(app)/dashboard/storage-chart.tsx`
+
+`StorageBreakdownChart` 에 bklit-ui 의 Ring 컴포넌트 시각 언어를 입혔다:
+세그먼트 끝을 `strokeLinecap="round"` 로 둥글리고, 세그먼트 사이에 작은
+틈을 두고(실제 비중 계산은 틈 없는 값으로 하고 그리는 길이만 줄여서, 자리
+배분은 정확하게 유지), 호버 시 `drop-shadow` 글로우를 준다. 비중이 아주
+작은 카테고리가 이 틈 때문에 링에서 아예 사라지지 않도록 최소 표시 길이를
+보장했다(0에 가까운 값도 범례에는 있는데 링에는 없는 상황을 막는다).
+
+### 모달 — `components/modal.tsx`
+
+포커스 트랩·모달 스택(Escape 가 맨 위 모달만 닫는 로직)·스크롤 잠금 같은
+JS 로직은 전혀 건드리지 않고, CSS만 다듬었다: 진입 애니메이션(살짝
+떠오르며 나타남), `box-shadow: var(--shadow-pop)` 로 배경과의 뜬 느낌 강조,
+헤더 여백 확장, 제목 굵기 상향. 닫기 버튼의 hover 배경이 헤더 배경
+(`--bg-3`)과 같은 색이라 사실상 안 보이던 것도 `--bg-4` 로 분리해 고쳤다.
+
+### 캘린더 — `app/(app)/calendar/`
+
+주/일 보기 시간 격자 블록(`.cal-block`)에만 있던 "이벤트 색으로 옅게
+칠하기"(`color-mix(in srgb, 색 18%, --bg-2)`) 기법을 월 보기/종일 줄의
+알약형 칩(`.cal-pill`)에도 넓혔다. 모서리를 4px → 6px 로 조금 더 둥글리고,
+호버를 배경색 교체 대신 `filter: brightness()` 로 바꿨다 — 이제 칩 배경이
+이벤트마다 다른 색이라 고정된 hover 배경색을 쓰면 부자연스럽기 때문이다.
+
+### 문서 목록 — `app/(app)/documents/`
+
+Toggl 의 Reports 화면처럼 표 위에 통계 카드 줄을 얹었다(Total / Mine /
+Shared with me / Public, 서버 컴포넌트에서 이미 불러온 목록으로 그 자리에서
+집계 — 별도 쿼리 없음).
+
+### 모바일 · 오버플로 점검
+
+이 환경에는 실제 Supabase 자격 증명이 없어(`NEXT_PUBLIC_SUPABASE_URL` 등
+미설정) 인증이 필요한 실제 페이지를 dev 서버로 띄워 볼 수 없었다. 대신
+프로젝트의 실제 CSS 파일(`globals.css`/`app.css`/`dashboard.css`/
+`storage-chart.css`/`documents.css`/`calendar.css`)을 그대로 링크한 정적
+HTML 로 각 화면의 실제 마크업 구조를 재현해, 사전 설치된 Chromium +
+Playwright 로 320/375/414/768px 네 폭에서 렌더링하고 모든 노드의
+`scrollWidth`/`clientWidth` 를 스크립트로 비교했다.
+
+**발견하고 고친 실제 버그 1건**: 스토리지 도넛 카드의 범례
+(`.stg-legend`, `grid-template-columns: repeat(auto-fill, minmax(140px,
+1fr))`)가 320px 폭에서 도넛과 한 줄에 욱여넣어지며 140px 최소 트랙 폭 때문에
+카드 밖으로 14px 삐져나갔다. `.stg-donut-wrap` 에 380px 이하에서
+`flex-direction: column` 으로 바꾸는 규칙을 추가해, 아주 좁은 화면에서는
+도넛과 범례가 세로로 쌓이도록 고쳤다.
+
+**점검했지만 문제 없던 항목**: 대시보드 재구성 과정에서 "내 공유 ID" 카드가
+과거에 갖고 있던 `min(130px, 34vw)` 폭 강제 클램프가 빠졌는데, `Copyable`
+컴포넌트의 코드 박스는 `flex: 1`(flex-basis 0%)이라 함께 걸려 있는 인라인
+`width: 36ch` 는 애초에 flex 배치에 영향을 주지 못하고 남는 공간만큼만
+차지한다 — 320px 폭에서 UUID 를 완전히 펼친(가장 넓어지는) 상태까지
+캡처해 카드 밖으로 넘치지 않음을 확인했다. `.dash-upnext-title` 의
+`text-overflow: ellipsis`, `.cal-pill-title` 의 말줄임, `.table-scroll` 의
+가로 스크롤은 전부 의도된 동작이라 그대로 뒀다.
+
+### 검증
+
+- `npx tsc --noEmit` — 경고 없음
+- `npm run build` — 전체 라우트 정적/동적 생성 성공(빌드 로그의 Supabase
+  환경변수 경고는 이 로컬 빌드 환경에 실제 키가 없어 나는 것이지 코드
+  결함이 아니다 — Vercel 배포 환경에는 키가 있다)
+- `node --test lib/*.test.mjs ...` — 기존 단위 테스트 19개 전부 통과
+  (`recurrence`/`ics`/`tags`/`text-delta` 등, 이번 변경과 무관하지만 회귀가
+  없는지 함께 확인)
+
+### 알려진 한계
+
+- bklit-ui 원본에 있는 sankey/candlestick/funnel/gauge/scatter 같은 다른
+  차트 타입은 Possion 데이터 모델에 대응할 화면이 없어 적용하지 않았다.
+- ESLint 는 이 저장소에 설정 파일이 없어(`next lint` 가 대화형 초기 설정을
+  요구) 이번에도 돌리지 못했다 — 기존부터 있던 상태이고, 이번 변경 범위를
+  넘는 프로젝트 전역 설정이라 손대지 않았다.
 
 ## Repository 폴더 계층 + Obsidian 식 그래프 뷰 (v1.6.15)
 

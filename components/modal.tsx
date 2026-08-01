@@ -157,7 +157,28 @@ const modalCss = `
   animation: modal-backdrop-in 0.2s ease;
 }
 @keyframes modal-backdrop-in { from { opacity: 0 } to { opacity: 1 } }
-.modal { width: 100%; }
+.modal {
+  width: 100%;
+  box-shadow: var(--shadow-pop);
+  animation: modal-panel-in 0.22s var(--ease-spring);
+}
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.modal .panel-header {
+  padding: 14px 18px;
+}
+.modal .panel-header .topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.modal .panel-header .btn-ghost:hover {
+  background: var(--bg-4);
+}
+.modal .panel-body {
+  padding: 18px;
+}
 /* 좁은 화면에서 위쪽 80px 여백은 그만큼 모달이 쓸 세로 공간을 잡아먹는다. */
 @media (max-width: 640px) {
   .modal-backdrop { padding: 20px 12px; }

@@ -1,88 +1,64 @@
 /* ==========================================================================
-   Operational View — 대시보드. Recent Docs 를 없앤 뒤로 카드 섹션이 남는
-   세로 공간을 전부 채운다. 카드 내부 스크롤은 절대 만들지 않는다 — 화면이
-   좁아 다 안 들어가면 페이지 자체가 세로로 스크롤된다.
+   Dashboard — 통계 카드 줄 + 2단 그리드(본문/사이드바). 예전에는 데스크톱에서
+   세로 스크롤이 전혀 없도록 고정 높이로 눌러 담았는데, 카드가 늘면서(이번
+   주 활동 그래프 추가 등) 다른 목록 페이지(Documents, Repositories)처럼
+   자연스럽게 스크롤되는 쪽이 낫다고 판단해 바꿨다 — 카드 "안쪽"에서는
+   여전히 스크롤을 만들지 않는다(페이지 자체만 스크롤).
    ========================================================================== */
 .dash-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 20px 16px;
+  gap: 16px;
+  padding: 18px 22px 28px;
   overflow-y: auto;
   min-height: 0;
 }
 
-.dash-welcome {
-  font-size: 13px;
-  color: var(--text-2);
-  flex: none;
-}
-.dash-welcome b {
-  color: var(--text-0);
-  font-weight: 500;
-}
-
-/* 통계 + 사용량 + 실시간 처리량 + 공유 ID — 하나의 테두리 상자에 가두는 대신
-   개별 카드를 여백으로만 구분해 잇는다(선으로 나누지 않는다). Live Data
-   Throughput(파티클 시각화)을 시각적 중심으로 두고 나머지를 주변에 배치.
-   전체가 .dash-content 의 남는 세로 공간을 전부 채운다. */
-.dash-mega {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-}
-
-.dash-mega-stats {
+.dash-stats-row {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-  flex: none;
+  gap: 10px;
 }
-.dash-mega-stats .stat {
-  border: none;
+.dash-stat-card {
   background: var(--bg-2);
-  border-radius: var(--radius);
-  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 14px 14px;
+  min-width: 0;
 }
-.dash-mega-stats .stat-val {
-  font-size: 18px;
+.dash-stat-card .stat-val {
+  font-size: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.dash-mega-stats .stat-label {
-  margin-top: 4px;
+.dash-stat-card .stat-label {
+  margin-top: 5px;
 }
 
-.dash-mega-grid {
+.dash-grid {
   display: grid;
-  grid-template-columns: 0.8fr 1.4fr;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 16px;
+  align-items: start;
 }
-.dash-mega-col {
+.dash-main,
+.dash-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 0;
+  gap: 16px;
+  min-width: 0;
 }
+
 .dash-card {
   background: var(--bg-2);
   border: none;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  padding: 14px 16px;
+  padding: 16px 18px;
   min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
   /* 카드 내부 스크롤 금지 — 내용은 카드 크기에 맞춰 유연하게 그려진다. */
   overflow: hidden;
-}
-.dash-mega-storage,
-.dash-mega-share {
-  flex: 1;
-  justify-content: center;
 }
 .dash-mega-live-head {
   display: flex;
@@ -90,43 +66,63 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-}
-.dash-share-id {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 8px;
-  min-width: 0;
-  max-width: 100%;
-}
-.dash-share-id .label {
-  white-space: nowrap;
-}
-/* 대시보드에서는 전체 ID 를 다 보여줄 필요 없다 — 절반 두께의 짧은 칩으로.
-   폭은 vw 기반 상한을 둬 좁은 화면에서도 카드 밖으로 넘치지 않게 한다
-   (모바일에서 카드를 넘어가던 버그의 원인 — 고정 130px 이 줄어들 수 없었음). */
-.dash-share-id .code-block {
-  display: block !important;
-  width: min(130px, 34vw) !important;
-  padding: 3px 10px;
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.dash-share-id .stack {
-  flex-direction: row;
-  gap: 4px;
-}
-.dash-share-id .btn-sm {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 10.5px;
+  margin-bottom: 4px;
 }
 .cell-label {
   display: block;
-  margin-bottom: 8px;
-  flex: none;
+  margin-bottom: 10px;
+}
+
+/* ---- 이번 주 활동 막대그래프 ---- */
+.wk-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wk-chart-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.wk-chart-total {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-0);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.wk-chart-svg {
+  width: 100%;
+  height: 150px;
+  overflow: visible;
+}
+.wk-bar {
+  fill: var(--create);
+  transform-origin: bottom;
+  transition: opacity 0.15s ease;
+  animation: wk-bar-grow 0.4s var(--ease-spring) backwards;
+}
+@keyframes wk-bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.wk-bar-hitzone {
+  cursor: default;
+}
+.wk-bar-label {
+  fill: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 10px;
+}
+.wk-bar-label.today {
+  fill: var(--text-1);
+  font-weight: 600;
+}
+.wk-bar-value {
+  fill: var(--text-0);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
 }
 
 /* 네트워크 모니터 — 카드 폭 전체 사용, 벡터 파티클 캔버스 */
@@ -170,42 +166,78 @@
   color: var(--text-3);
 }
 
-/* 좁은 화면 — 통계/그리드를 세로로 쌓는다(페이지 스크롤로 대응) */
+/* 좁은 화면 — 통계/그리드를 세로로 쌓는다 */
 @media (max-width: 1024px) {
-  .dash-mega {
-    flex: none;
-  }
-  .dash-mega-stats {
+  .dash-stats-row {
     grid-template-columns: repeat(3, 1fr);
   }
-  .dash-mega-grid {
+  .dash-grid {
     grid-template-columns: 1fr;
-    flex: none;
-  }
-  .dash-mega-storage,
-  .dash-mega-share {
-    min-height: 170px;
-  }
-  .dash-mega-live {
-    min-height: 260px;
   }
 }
 @media (max-width: 640px) {
-  .dash-mega-stats {
+  .dash-content {
+    padding: 14px 14px 20px;
+  }
+  .dash-stats-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .wk-chart-svg {
+    height: 120px;
   }
 }
 
-/* ---- 다음 일정 ----
-   대시보드는 데스크톱에서 세로 스크롤이 없어야 하므로, 일정이 있을 때만
-   나타나는 얇은 한 줄로 둔다(없으면 컴포넌트가 아무것도 렌더하지 않는다). */
+/* ---- 다음 일정 — 세로 목록(사이드바 카드 안, variant="list") ---- */
+.dash-upnext-vlist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dash-upnext-vitem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--create);
+  border-radius: 4px;
+  background: var(--bg-3);
+  color: var(--text-1);
+  text-decoration: none;
+  transition: background 0.15s var(--ease-spring);
+}
+.dash-upnext-vitem:hover {
+  background: var(--bg-4);
+}
+.dash-upnext-vitem .dash-upnext-title {
+  font-size: 12.5px;
+  color: var(--text-0);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dash-upnext-vitem .dash-upnext-when {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.dash-upnext-vitem .dash-upnext-rsvp {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  padding: 0 5px;
+}
+
+/* ---- 다음 일정 — 가로 줄(variant="strip", 지금은 안 쓰지만 컴포넌트가
+   여전히 지원한다) ---- */
 .dash-upnext {
   display: flex;
   align-items: center;
   gap: 10px;
   flex: none;
   padding: 8px 12px;
-  margin-top: 10px;
   background: var(--bg-2);
   border: 1px solid var(--border-0);
   border-radius: var(--radius-lg);

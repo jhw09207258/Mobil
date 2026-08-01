@@ -614,7 +614,10 @@ function MonthView({
                 <button
                   key={occ.key}
                   className={`cal-pill ${occ.event.status === "cancelled" ? "cancelled" : ""}`}
-                  style={{ borderLeftColor: eventColor(occ) }}
+                  style={{
+                    borderLeftColor: eventColor(occ),
+                    background: `color-mix(in srgb, ${eventColor(occ)} 16%, var(--bg-3))`,
+                  }}
                   onClick={() => onOpen(occ)}
                   title={occ.event.title}
                 >
@@ -702,7 +705,10 @@ function TimeGridView({
                 <button
                   key={occ.key}
                   className="cal-pill"
-                  style={{ borderLeftColor: eventColor(occ) }}
+                  style={{
+                    borderLeftColor: eventColor(occ),
+                    background: `color-mix(in srgb, ${eventColor(occ)} 16%, var(--bg-3))`,
+                  }}
                   onClick={() => onOpen(occ)}
                 >
                   <span className="cal-pill-title">{occ.event.title}</span>

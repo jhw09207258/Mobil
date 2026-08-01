@@ -808,6 +808,10 @@ export interface Database {
         Args: Record<string, never>;
         Returns: { category: string; bytes: number; item_count: number }[];
       };
+      my_weekly_activity: {
+        Args: Record<string, never>;
+        Returns: { day: string; item_count: number }[];
+      };
       admin_user_overview: {
         Args: Record<string, never>;
         Returns: {

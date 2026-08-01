@@ -29,7 +29,16 @@ export type UpcomingRow = {
   exceptions: string[];
 };
 
-export function UpcomingStrip({ rows }: { rows: UpcomingRow[] }) {
+export function UpcomingStrip({
+  rows,
+  variant = "strip",
+}: {
+  rows: UpcomingRow[];
+  /** "strip" = 가로 스크롤 줄(예전 모양). "list" = 사이드바 카드 안의
+   * 세로 목록(새 대시보드 레이아웃, Toggl 참고 화면의 Goals/Favorites
+   * 패널과 같은 자리). */
+  variant?: "strip" | "list";
+}) {
   const next = useMemo(() => {
     const now = new Date();
     const until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -55,6 +64,42 @@ export function UpcomingStrip({ rows }: { rows: UpcomingRow[] }) {
     }
     return out.sort((a, b) => a.start.getTime() - b.start.getTime()).slice(0, 4);
   }, [rows]);
+
+  if (variant === "list") {
+    return (
+      <div className="dash-card">
+        <span className="label cell-label">UP NEXT</span>
+        {next.length === 0 ? (
+          <p className="dim" style={{ fontSize: 12.5, margin: 0 }}>
+            Nothing on your calendar in the next 7 days.
+          </p>
+        ) : (
+          <div className="dash-upnext-vlist">
+            {next.map(({ key, row, start }) => (
+              <Link
+                key={key}
+                href={`/calendar?event=${row.id}`}
+                className="dash-upnext-vitem"
+                style={{ borderLeftColor: row.color || row.calendar_color }}
+              >
+                <span className="dash-upnext-title">{row.title}</span>
+                <span className="dash-upnext-when">
+                  {row.all_day
+                    ? start.toLocaleDateString(undefined, { timeZone: "UTC", month: "short", day: "numeric" })
+                    : start.toLocaleString(undefined, {
+                        weekday: "short",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                </span>
+                {row.my_response === "needs_action" && <span className="dash-upnext-rsvp">RSVP</span>}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (next.length === 0) return null;
 
