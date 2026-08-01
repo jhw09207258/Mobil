@@ -3,10 +3,12 @@
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedUser as requireUser } from "@/lib/auth";
-import type { Json } from "@/lib/database.types";
+import type { Json, DocVisibility } from "@/lib/database.types";
 import { extractDocLinks } from "@/lib/ontology-links";
 import { extractTagsFromText, extractTiptapPlainText } from "@/lib/tags";
 import { syncObjectEmbedding } from "@/lib/embeddings";
+import { listContributors } from "../contributors/actions";
+import { listRepositories, getItemRepository } from "../repositories/actions";
 import {
   importFileToTiptapDoc,
   tiptapToPlainText,
@@ -75,7 +77,7 @@ export async function importDocument(
       title: data.title,
       content: data.content,
       initialYjsState: null,
-      isPublic: false,
+      visibility: "private" as DocVisibility,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
@@ -167,7 +169,7 @@ export async function createDocumentTab(): Promise<{
       title: data.title,
       content: data.content,
       initialYjsState: null,
-      isPublic: false,
+      visibility: "private" as DocVisibility,
       canEdit: true,
       isOwner: true,
       myShareId: user.id,
@@ -177,38 +179,63 @@ export async function createDocumentTab(): Promise<{
   };
 }
 
-/** 탭 시스템용: 문서 데이터 + 편집 가능 여부를 한 번에 조회. */
+/**
+ * 탭 시스템용: 문서 데이터 + 편집 가능 여부를 한 번에 조회.
+ *
+ * 에디터 상단바의 ContributorBadges/RepositoryPicker 는 원래 각자 마운트
+ * 시점에 스스로 불러왔다 — 문서 하나를 열 때마다 이 서버 왕복(문서 본문)
+ * 뒤에 클라이언트발 왕복이 두 번 더 따라붙는 셈이었다(기여자 목록, 저장소
+ * 목록+현재 배정). "문서를 열 때 필요한 것 대부분을 한 번에" 원칙에 따라
+ * 여기서 같이 가져와 그 두 번을 없앤다 — Promise.all 로 병렬화하므로 지연은
+ * 겹치고, 별도 요청 두 번이 사라지는 이득만 남는다.
+ */
 export async function getDocumentForTab(id: string) {
   const { userId, profile } = await requireUser();
   const supabase = await createClient();
 
   const { data: doc } = await supabase
     .from("documents")
-    .select("id, owner_id, title, content, is_public, updated_at, yjs_state")
+    .select("id, owner_id, title, content, visibility, updated_at, yjs_state")
     .eq("id", id)
     .single();
 
   if (!doc) return null;
 
-  let canEdit = doc.owner_id === userId || profile.role === "admin" || doc.is_public;
-  if (!canEdit) {
-    const { data: perm } = await supabase
-      .from("document_permissions")
-      .select("permission")
-      .eq("document_id", id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    canEdit = perm?.permission === "edit";
+  // documents_update RLS(0074)와 같은 모양으로 판정한다: 소유자는 언제나,
+  // 'owner' 단계가 아니면 공개거나 관리자거나 명시적 edit 공유를 받은 경우.
+  // 'owner' 단계는 소유자 본인 외에는 관리자를 포함해 누구도 편집할 수 없다.
+  let canEdit = doc.owner_id === userId;
+  if (!canEdit && doc.visibility !== "owner") {
+    canEdit = doc.visibility === "public" || profile.role === "admin";
   }
+  const needsPermCheck = !canEdit && doc.visibility !== "owner";
+
+  const [perm, contributors, repos, itemRepo] = await Promise.all([
+    needsPermCheck
+      ? supabase
+          .from("document_permissions")
+          .select("permission")
+          .eq("document_id", id)
+          .eq("user_id", userId)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { permission: string } | null }),
+    listContributors("document", id),
+    listRepositories(),
+    getItemRepository("document", id),
+  ]);
+  if (needsPermCheck) canEdit = perm.data?.permission === "edit";
 
   return {
     id: doc.id,
     title: doc.title,
     content: doc.content,
     initialYjsState: doc.yjs_state,
-    isPublic: doc.is_public,
+    visibility: doc.visibility,
     canEdit,
     isOwner: doc.owner_id === userId,
+    contributors,
+    repos,
+    currentRepositoryId: itemRepo?.repositoryId ?? null,
     myShareId: userId,
     myName: profile.display_name || profile.email,
     myAvatarUrl: profile.avatar_url,
@@ -338,16 +365,13 @@ export async function deleteDocument(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** 공개 여부 토글. */
-export async function setDocumentPublic(
+/** 프라이버시 레벨 변경 — owner(소유자만, 관리자도 못 봄) / private / public. */
+export async function setDocumentVisibility(
   id: string,
-  isPublic: boolean
+  visibility: DocVisibility
 ): Promise<ActionResult> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("documents")
-    .update({ is_public: isPublic })
-    .eq("id", id);
+  const { error } = await supabase.from("documents").update({ visibility }).eq("id", id);
   if (error) return { ok: false, error: "Update failed." };
   return { ok: true };
 }
@@ -371,6 +395,30 @@ export async function shareDocument(
   }
   if (id === user.id) {
     return { ok: false, error: "You can't share with yourself." };
+  }
+
+  // 팀 분리(0080) 이후 document_permissions_insert RLS 는 팀이 같은 상대에게만
+  // 행 삽입을 허용한다 — 여기서 미리 확인해 실패 시 "존재하지 않는 사용자"로
+  // 오해할 만한 일반 에러 대신 정확한 이유를 알려준다.
+  const { data: sameTeam } = await supabase.rpc("shares_active_team", { p_other: id });
+  if (!sameTeam) {
+    return { ok: false, error: "You can only share with members of your current team." };
+  }
+
+  // document_permissions_insert RLS(0074)는 소유자 본인이면 owner 단계 문서에도
+  // 행을 넣는 것 자체는 막지 않는다(무해하다 — documents_select 가 어차피 그
+  // 공유를 무시한다). 하지만 그러면 "공유했는데 상대가 못 본다"는 혼란스러운
+  // 결과만 남으므로, 여기서 미리 막아 이유를 알려준다.
+  const { data: target } = await supabase
+    .from("documents")
+    .select("visibility")
+    .eq("id", documentId)
+    .maybeSingle();
+  if (target?.visibility === "owner") {
+    return {
+      ok: false,
+      error: "Owner-only documents can't be shared — switch visibility first.",
+    };
   }
 
   const { error } = await supabase.from("document_permissions").upsert(

@@ -26,23 +26,12 @@ export type CodeRepoFile = {
 export async function listCodeRepositories(): Promise<CodeRepository[]> {
   await requireUser();
   const supabase = await createClient();
-  const { data: repos } = await supabase
-    .from("code_repositories")
-    .select("id, name, github_owner, github_repo, github_ref, imported_at, created_at")
-    .order("created_at", { ascending: false });
-  if (!repos?.length) return [];
-
-  // 저장소별 파일 수 — RLS 가 이미 볼 수 있는 것만 돌려주므로 단순 집계로 충분.
-  const { data: files } = await supabase
-    .from("code_files")
-    .select("code_repository_id")
-    .not("code_repository_id", "is", null);
-  const counts = new Map<string, number>();
-  for (const f of files ?? []) {
-    const key = f.code_repository_id as string;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return repos.map((r) => ({ ...r, file_count: counts.get(r.id) ?? 0 }));
+  // 저장소별 파일 수는 DB 안에서 집계한다(list_code_repositories, 0075) —
+  // 예전에는 파일 수를 세려고 code_files 의 code_repository_id 컬럼을 전체
+  // 행 긁어와 여기서 세었다. 파일이 수천 개면 숫자 하나 보려고 수천 행을
+  // 네트워크로 옮기는 셈이었다.
+  const { data } = await supabase.rpc("list_code_repositories");
+  return (data ?? []) as CodeRepository[];
 }
 
 export async function listCodeRepoFiles(repoId: string): Promise<CodeRepoFile[]> {

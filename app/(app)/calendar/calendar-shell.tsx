@@ -7,12 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { Copyable } from "@/components/copyable";
+import { ShimmeringText } from "@/components/ui/shimmering-text";
 import { expandOccurrences } from "@/lib/recurrence";
 import { useIsMobile } from "@/lib/use-media-query";
 import {
   IconChevronLeft,
   IconChevronRight,
   IconClose,
+  IconMore,
   IconPlus,
   IconRefresh,
 } from "../icons";
@@ -362,7 +364,7 @@ export function CalendarShell({
             <IconChevronRight size={13} />
           </button>
           <h1 className="cal-title">{rangeTitle(anchor, view)}</h1>
-          {loading && <span className="muted" style={{ fontSize: 11 }}>Loading…</span>}
+          {loading && <ShimmeringText text="Loading…" style={{ fontSize: 11 }} />}
         </div>
         <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
           <div className="cal-views">
@@ -436,7 +438,7 @@ export function CalendarShell({
                   aria-label={`Manage ${c.name}`}
                   title="Manage & share"
                 >
-                  ⋯
+                  <IconMore size={14} />
                 </button>
               )}
             </div>
@@ -455,6 +457,7 @@ export function CalendarShell({
         <div className="cal-main">
           {view === "month" && (
             <MonthView
+              maxPills={isMobile ? 2 : 3}
               anchor={anchor}
               dayOccurrences={dayOccurrences}
               eventColor={eventColor}
@@ -553,6 +556,7 @@ function MonthView({
   onPickDay,
   onOpen,
   onExpandDay,
+  maxPills,
 }: {
   anchor: Date;
   dayOccurrences: (d: Date) => Occurrence[];
@@ -560,6 +564,8 @@ function MonthView({
   onPickDay: (d: Date) => void;
   onOpen: (o: Occurrence) => void;
   onExpandDay: (d: Date) => void;
+  /** 한 칸에 보여 줄 일정 개수 — 좁은 화면에서는 칸이 낮아 더 적게 넣는다. */
+  maxPills: number;
 }) {
   const gridStart = startOfMonthGrid(anchor);
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
@@ -576,12 +582,17 @@ function MonthView({
         {days.map((day) => {
           const list = dayOccurrences(day);
           const outside = day.getMonth() !== anchor.getMonth();
-          const shown = list.slice(0, 3);
+          const shown = list.slice(0, maxPills);
           return (
             <div
               key={dayKey(day)}
               className={`cal-cell ${outside ? "outside" : ""} ${sameDay(day, today) ? "today" : ""}`}
-              onDoubleClick={() => onPickDay(day)}
+              onDoubleClick={(e) => {
+                // 알약이나 버튼을 더블클릭한 것이면 새 일정을 만들지 않는다 —
+                // 그러지 않으면 "일정 열기" 와 "새 일정" 이 동시에 뜬다.
+                if ((e.target as HTMLElement).closest("button")) return;
+                onPickDay(day);
+              }}
             >
               <div className="cal-cell-head">
                 <button
@@ -597,14 +608,17 @@ function MonthView({
                   aria-label={`Add an event on ${day.toDateString()}`}
                   title="Add an event"
                 >
-                  +
+                  <IconPlus size={12} />
                 </button>
               </div>
               {shown.map((occ) => (
                 <button
                   key={occ.key}
                   className={`cal-pill ${occ.event.status === "cancelled" ? "cancelled" : ""}`}
-                  style={{ borderLeftColor: eventColor(occ) }}
+                  style={{
+                    borderLeftColor: eventColor(occ),
+                    background: `color-mix(in srgb, ${eventColor(occ)} 16%, var(--bg-3))`,
+                  }}
                   onClick={() => onOpen(occ)}
                   title={occ.event.title}
                 >
@@ -654,8 +668,16 @@ function TimeGridView({
   }, []);
 
   return (
-    // 열 개수는 CSS 가 알 수 없다(주=7, 일=1) — 커스텀 속성으로 넘긴다.
-    <div className="cal-timegrid" style={{ ["--cal-days" as string]: days.length }}>
+    // 열 개수와 "이 격자가 필요로 하는 최소 폭" 은 CSS 가 알 수 없다(주=7,
+    // 일=1). 좁은 화면에서 한 열이 최소 84px 은 되도록 최소 폭을 함께 넘기고,
+    // CSS 는 그 값으로 가로 스크롤 여부를 스스로 정한다.
+    <div
+      className="cal-timegrid"
+      style={{
+        ["--cal-days" as string]: days.length,
+        ["--cal-min-width" as string]: `calc(var(--cal-gutter, 58px) + ${days.length} * 84px)`,
+      }}
+    >
       <div className="cal-tg-head">
         <div className="cal-tg-gutter" />
         {days.map((d) => (
@@ -675,13 +697,19 @@ function TimeGridView({
             <div
               key={dayKey(d)}
               className="cal-tg-allday-cell"
-              onDoubleClick={() => onPickAllDay(d)}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest(".cal-pill")) return;
+                onPickAllDay(d);
+              }}
             >
               {list.map((occ) => (
                 <button
                   key={occ.key}
                   className="cal-pill"
-                  style={{ borderLeftColor: eventColor(occ) }}
+                  style={{
+                    borderLeftColor: eventColor(occ),
+                    background: `color-mix(in srgb, ${eventColor(occ)} 16%, var(--bg-3))`,
+                  }}
                   onClick={() => onOpen(occ)}
                 >
                   <span className="cal-pill-title">{occ.event.title}</span>
@@ -708,7 +736,9 @@ function TimeGridView({
               <div
                 key={dayKey(d)}
                 className={`cal-tg-col ${sameDay(d, today) ? "today" : ""}`}
-                onDoubleClick={(e) => {
+                onClick={(e) => {
+                  // 일정 블록을 누른 것이면 그 일정을 여는 동작이므로 만들지 않는다.
+                  if ((e.target as HTMLElement).closest(".cal-block")) return;
                   const box = e.currentTarget.getBoundingClientRect();
                   const minutes = Math.floor(((e.clientY - box.top) / HOUR_PX) * 60 / 15) * 15;
                   const at = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -863,23 +893,38 @@ function AgendaView({
             })}
           </div>
           {list.map((occ) => (
-            <button key={occ.key} className="cal-agenda-row" onClick={() => onOpen(occ)}>
-              <span className="cal-dot" style={{ background: eventColor(occ) }} />
-              <span className="cal-agenda-when">
-                {occ.event.all_day ? "All day" : formatTime(occ.start)}
-              </span>
-              <span className="cal-agenda-title">{occ.event.title}</span>
-              <span className="cal-agenda-meta">
-                {[
-                  occ.event.location,
-                  occ.event.attendee_count > 1 ? `${occ.event.attendee_count} guests` : null,
-                  occ.event.link_count > 0 ? `${occ.event.link_count} attached` : null,
-                  occ.event.my_response === "needs_action" && occ.event.is_invited ? "Needs reply" : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </button>
+            <div key={occ.key} className="cal-agenda-item">
+              <button className="cal-agenda-row" onClick={() => onOpen(occ)}>
+                <span className="cal-dot" style={{ background: eventColor(occ) }} />
+                <span className="cal-agenda-when">
+                  {occ.event.all_day ? "All day" : formatTime(occ.start)}
+                </span>
+                <span className="cal-agenda-title">{occ.event.title}</span>
+                <span className="cal-agenda-meta">
+                  {[
+                    occ.event.location,
+                    occ.event.attendee_count > 1 ? `${occ.event.attendee_count} guests` : null,
+                    occ.event.link_count > 0 ? `${occ.event.link_count} attached` : null,
+                    occ.event.my_response === "needs_action" && occ.event.is_invited ? "Needs reply" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </button>
+              {/* 회의 직전에 목록에서 바로 들어갈 수 있어야 한다 — 일정을 열고
+                  링크를 찾는 단계가 있으면 아무도 안 쓴다. */}
+              {occ.event.conference_url && /^https?:\/\//i.test(occ.event.conference_url) && (
+                <a
+                  className="btn btn-sm cal-agenda-join"
+                  href={occ.event.conference_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Join
+                </a>
+              )}
+            </div>
           ))}
         </div>
       ))}
@@ -914,37 +959,63 @@ function CalendarDialog({
     listCalendarMembers(cal.id).then(setMembers, () => setMembers([]));
   }, [cal]);
 
+  // 서버 액션은 이제 던지지 않고 항상 {error}/결과로 응답한다(actions.ts 의
+  // try/catch). 그래도 브라우저↔서버 사이의 네트워크 순간 장애 등으로 이
+  // await 자체가 reject 할 수 있다 — 그런 경우까지 잡아 busy 를 반드시
+  // 풀어준다. 안 그러면 버튼이 "Saving…" 에서 영원히 멈춘다("달력 추가조차
+  // 안 된다" 로 보고된 증상).
   const save = async () => {
     setBusy(true);
     setError(null);
-    const res = isNew ? await createCalendar(name, color) : await renameCalendar(cal!.id, name, color);
-    setBusy(false);
-    if ("error" in res) setError(res.error);
-    else onChanged();
+    try {
+      const res = isNew
+        ? await createCalendar(name, color)
+        : await renameCalendar(cal!.id, name, color);
+      if ("error" in res) setError(res.error);
+      else onChanged();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const remove = async () => {
     if (!cal) return;
     if (!confirm(`Delete “${cal.name}”? Its ${cal.event_count} event(s) go with it.`)) return;
     setBusy(true);
-    const res = await deleteCalendar(cal.id);
-    setBusy(false);
-    if ("error" in res) setError(res.error);
-    else onChanged();
+    setError(null);
+    try {
+      const res = await deleteCalendar(cal.id);
+      if ("error" in res) setError(res.error);
+      else onChanged();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const share = async (userId: string, role: "viewer" | "editor") => {
     if (!cal) return;
-    const res = await shareCalendar(cal.id, userId, role);
-    if ("error" in res) setError(res.error);
-    else listCalendarMembers(cal.id).then(setMembers, () => {});
+    try {
+      const res = await shareCalendar(cal.id, userId, role);
+      if ("error" in res) setError(res.error);
+      else listCalendarMembers(cal.id).then(setMembers, () => {});
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   const unshare = async (userId: string) => {
     if (!cal) return;
-    const res = await unshareCalendar(cal.id, userId);
-    if ("error" in res) setError(res.error);
-    else setMembers((prev) => (prev ?? []).filter((m) => m.user_id !== userId));
+    try {
+      const res = await unshareCalendar(cal.id, userId);
+      if ("error" in res) setError(res.error);
+      else setMembers((prev) => (prev ?? []).filter((m) => m.user_id !== userId));
+    } catch {
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   const memberIds = new Set((members ?? []).map((m) => m.user_id));
@@ -1071,13 +1142,18 @@ function SubscribeDialog({
   const loadToken = useCallback(async (rotate: boolean) => {
     setBusy(true);
     setError(null);
-    const res = await getFeedToken(rotate);
-    setBusy(false);
-    if ("error" in res) {
-      setError(res.error);
-      return;
+    try {
+      const res = await getFeedToken(rotate);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setFeedUrl(`${window.location.origin}/api/calendar/feed?token=${res.token}`);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    setFeedUrl(`${window.location.origin}/api/calendar/feed?token=${res.token}`);
   }, []);
 
   useEffect(() => {
@@ -1096,22 +1172,27 @@ function SubscribeDialog({
     }
     setBusy(true);
     setError(null);
-    const text = await file.text();
-    const res = await importIcs(target, text);
-    setBusy(false);
-    if (fileRef.current) fileRef.current.value = "";
-    if ("error" in res) {
-      setError(res.error);
-      return;
+    try {
+      const text = await file.text();
+      const res = await importIcs(target, text);
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      onImported(
+        `Imported ${res.imported} event${res.imported === 1 ? "" : "s"}` +
+          (res.skipped > 0 ? ` — ${res.skipped} could not be read` : "") +
+          (res.truncated > 0
+            ? ` — ${res.truncated} left out (max ${res.imported + res.skipped} per import; run it again for the rest)`
+            : "") +
+          "."
+      );
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
-    onImported(
-      `Imported ${res.imported} event${res.imported === 1 ? "" : "s"}` +
-        (res.skipped > 0 ? ` — ${res.skipped} could not be read` : "") +
-        (res.truncated > 0
-          ? ` — ${res.truncated} left out (max ${res.imported + res.skipped} per import; run it again for the rest)`
-          : "") +
-        "."
-    );
   };
 
   return (

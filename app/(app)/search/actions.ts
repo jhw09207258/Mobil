@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { embedText, toVectorLiteral } from "@/lib/embeddings";
+import { measure } from "@/lib/observability";
 
 export type SearchResult = {
   kind: string;
@@ -19,6 +20,21 @@ export type LinkedObject = {
   link_source: string;
   depth: number;
   via_title: string | null;
+};
+
+export type Backlink = {
+  kind: string;
+  id: string;
+  title: string;
+  link_source: string;
+};
+
+export type LinkedEvent = {
+  id: string;
+  title: string;
+  starts_at: string;
+  all_day: boolean;
+  calendar_id: string;
 };
 
 export type SemanticResult = {
@@ -47,7 +63,9 @@ export async function searchOntology(query: string): Promise<SearchResult[]> {
     }));
   }
 
-  const { data, error } = await supabase.rpc("search_ontology", { p_query: q });
+  const { data, error } = await measure(supabase, "search.ontology", async () =>
+    supabase.rpc("search_ontology", { p_query: q })
+  );
   if (error || !data) return [];
   return data;
 }
@@ -82,4 +100,24 @@ export async function getLinkedObjects(kind: string, id: string): Promise<Linked
   });
   if (error || !data) return [];
   return data.map((r) => ({ ...r, title: r.title ?? "Untitled" }));
+}
+
+/** 백링크 — 이 항목을 가리키는(내가 아니라 남이 건) 링크만, 1단계
+ * (Obsidian 의 Backlinks 패널과 같은 개념. get_linked_objects 와 달리
+ * 방향을 하나로 좁힌다 — 본문을 읽어서는 알 수 없는 쪽이라 이 방향이 궁금하다). */
+export async function getBacklinks(kind: string, id: string): Promise<Backlink[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_backlinks", { p_kind: kind, p_id: id });
+  if (error || !data) return [];
+  return data.map((r) => ({ ...r, title: r.title ?? "Untitled" }));
+}
+
+/** 이 항목을 참조하는 캘린더 일정(get_object_events, 0078) — calendar_event_links
+ * 는 지금까지 일정 → 자료 방향으로만 조회됐다. 문서 에디터에 "관련 일정"을
+ * 보여주려면 반대 방향이 필요하다. */
+export async function getObjectEvents(kind: string, id: string): Promise<LinkedEvent[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_object_events", { p_kind: kind, p_id: id });
+  if (error || !data) return [];
+  return data;
 }

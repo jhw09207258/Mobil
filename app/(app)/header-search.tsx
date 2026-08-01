@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconSearch, IconChevronDown, IconChevronRight } from "./icons";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useWorkspace, type TabKind } from "./workspace/workspace-context";
 import {
   searchOntology,
@@ -207,15 +208,17 @@ export function HeaderSearch() {
 
   return (
     <div className={`hsearch ${mobileOpen ? "mobile-open" : ""}`} ref={rootRef}>
-      <button
-        type="button"
-        className="hsearch-icon-btn"
-        onClick={() => setMobileOpen((v) => !v)}
-        aria-label="Search"
-        aria-expanded={mobileOpen}
-      >
-        <IconSearch size={18} />
-      </button>
+      <Tooltip content="Search">
+        <button
+          type="button"
+          className="hsearch-icon-btn"
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="Search"
+          aria-expanded={mobileOpen}
+        >
+          <IconSearch size={18} />
+        </button>
+      </Tooltip>
       <input
         ref={inputRef}
         className="hsearch-input"

@@ -96,7 +96,7 @@ export default async function SettingsPage() {
           </div>
           <div className="panel-body">
             <p className="page-sub" style={{ margin: "0 0 12px" }}>
-              Others need this ID to share files, documents or maps with you.
+              Teammates need this ID to share files, documents or maps with you — sharing only works within the same team.
             </p>
             <Copyable value={userId} />
           </div>

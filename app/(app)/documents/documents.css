@@ -1,0 +1,31 @@
+/* Docs+ 목록 위 통계 카드 줄 — Toggl 참고 화면(Reports)의 stat-card 줄과 같은
+   자리에, 문서 개수 기준 지표를 얹는다. */
+.doc-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.doc-stat-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border-0);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 14px 14px;
+  min-width: 0;
+}
+.doc-stat-card .stat-val {
+  font-size: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-stat-card .stat-label {
+  margin-top: 5px;
+}
+
+@media (max-width: 640px) {
+  .doc-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

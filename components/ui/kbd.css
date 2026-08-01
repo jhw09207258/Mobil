@@ -1,0 +1,24 @@
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  padding: 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--text-1);
+  background: var(--bg-3);
+  border: 1px solid var(--border-1);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  box-shadow: 0 1px 0 var(--border-0);
+}
+.kbd-sm { font-size: 10px; min-width: 1.4em; line-height: 1.7; }
+.kbd-lg { font-size: 13px; min-width: 1.9em; line-height: 2.2; padding: 0 8px; }
+
+.shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}

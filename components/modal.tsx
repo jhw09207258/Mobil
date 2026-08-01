@@ -5,6 +5,20 @@ import { useEffect, useRef } from "react";
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * 열려 있는 모달들의 스택.
+ *
+ * 모달 위에 모달이 열리는 경우가 있다 — 일정 편집 중 "채팅으로 보내기",
+ * 파일 목록에서 미리보기를 열고 그 안에서 공유 같은 흐름이다. 각 모달이
+ * 독립적으로 처리하면 두 가지가 어긋난다.
+ *   * Escape 를 누르면 document 리스너가 전부 반응해 **두 개가 한꺼번에** 닫힌다.
+ *   * 안쪽 모달이 닫힐 때 body 스크롤 잠금을 풀어 버려, 바깥 모달이 아직
+ *     떠 있는데 뒤 배경이 스크롤되기 시작한다.
+ * 스택으로 "지금 맨 위" 를 알면 둘 다 사라진다.
+ */
+const modalStack: symbol[] = [];
+
+
 export function Modal({
   title,
   onClose,
@@ -28,6 +42,10 @@ export function Modal({
   });
 
   useEffect(() => {
+    const token = Symbol("modal");
+    modalStack.push(token);
+    const isTop = () => modalStack[modalStack.length - 1] === token;
+
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     // 닫기(✕) 버튼보다 본문의 첫 입력 요소에 우선 포커스한다.
@@ -38,6 +56,8 @@ export function Modal({
     (firstField ?? firstFocusable ?? panel)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
+      // 맨 위 모달만 반응한다 — 아니면 겹쳐 있는 모달이 한꺼번에 닫힌다.
+      if (!isTop()) return;
       if (e.key === "Escape") {
         onCloseRef.current();
         return;
@@ -63,7 +83,10 @@ export function Modal({
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      const at = modalStack.lastIndexOf(token);
+      if (at >= 0) modalStack.splice(at, 1);
+      // 마지막 모달이 닫힐 때만 배경 스크롤을 되돌린다.
+      if (modalStack.length === 0) document.body.style.overflow = "";
       previouslyFocused?.focus();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -134,7 +157,28 @@ const modalCss = `
   animation: modal-backdrop-in 0.2s ease;
 }
 @keyframes modal-backdrop-in { from { opacity: 0 } to { opacity: 1 } }
-.modal { width: 100%; }
+.modal {
+  width: 100%;
+  box-shadow: var(--shadow-pop);
+  animation: modal-panel-in 0.22s var(--ease-spring);
+}
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.modal .panel-header {
+  padding: 14px 18px;
+}
+.modal .panel-header .topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.modal .panel-header .btn-ghost:hover {
+  background: var(--bg-4);
+}
+.modal .panel-body {
+  padding: 18px;
+}
 /* 좁은 화면에서 위쪽 80px 여백은 그만큼 모달이 쓸 세로 공간을 잡아먹는다. */
 @media (max-width: 640px) {
   .modal-backdrop { padding: 20px 12px; }

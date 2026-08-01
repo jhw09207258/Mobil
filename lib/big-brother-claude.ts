@@ -136,7 +136,7 @@ export async function runBigBrotherClaude(opts: {
     if (Date.now() >= opts.deadline) {
       return {
         text: full,
-        error: full ? undefined : "Big Brother ran out of time before finishing.",
+        error: full ? undefined : "Sophia ran out of time before finishing.",
         inputTokens,
         outputTokens,
         totalTokens: inputTokens + outputTokens,
@@ -234,7 +234,7 @@ function claudeErrorMessage(detail: string): string {
     return "This Anthropic account has no credit, so Claude models can't run. Add a payment method at console.anthropic.com/settings/billing, or pick a Gemini model above.";
   }
   if (/authentication|invalid.*api.?key|401/i.test(detail)) {
-    return "Big Brother's Claude API key was rejected.";
+    return "Sophia's Claude API key was rejected.";
   }
   if (/rate.?limit|429/i.test(detail)) {
     return "Claude rate limit reached — try again shortly.";
@@ -242,5 +242,5 @@ function claudeErrorMessage(detail: string): string {
   if (/overloaded|529/i.test(detail)) {
     return "Claude is temporarily overloaded — try again shortly.";
   }
-  return `Big Brother's Claude request failed: ${detail.slice(0, 200)}`;
+  return `Sophia's Claude request failed: ${detail.slice(0, 200)}`;
 }

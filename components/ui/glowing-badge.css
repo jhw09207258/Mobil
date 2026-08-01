@@ -1,0 +1,41 @@
+.glow-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-3);
+  color: var(--text-2);
+}
+.glow-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.glow-badge-dot.pulse {
+  animation: glow-badge-pulse 1.8s ease-in-out infinite;
+}
+@keyframes glow-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  50% { box-shadow: 0 0 0 4px transparent; opacity: 0.7; }
+}
+
+.glow-badge-success { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--border-1)); background: color-mix(in srgb, var(--ok) 12%, var(--bg-3)); }
+.glow-badge-warning { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, var(--border-1)); background: color-mix(in srgb, var(--warn) 12%, var(--bg-3)); }
+.glow-badge-error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--border-1)); background: color-mix(in srgb, var(--danger) 12%, var(--bg-3)); }
+.glow-badge-info { color: var(--steel); border-color: color-mix(in srgb, var(--steel) 40%, var(--border-1)); background: color-mix(in srgb, var(--steel) 12%, var(--bg-3)); }
+.glow-badge-default,
+.glow-badge-neutral { color: var(--text-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-badge-dot.pulse {
+    animation: none;
+  }
+}

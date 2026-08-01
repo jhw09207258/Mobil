@@ -1,7 +1,11 @@
 import type { Json } from "@/lib/database.types";
 
-// "#단어" — 유니코드 문자/숫자/밑줄 1~40자. 공백/구두점은 태그에 포함하지 않는다.
-const TAG_RE = /#([\p{L}\p{N}_]{1,40})/gu;
+// "#단어" — 유니코드 문자/숫자/밑줄 1~40자 조각을 "/" 로 최대 5단(부모 포함)
+// 까지 이어 붙일 수 있다("#parent/child/grandchild") — Obsidian 의 중첩 태그와
+// 같은 단순 표기다. MediaWiki/Logseq 처럼 태그끼리 별도의 포함 관계를 선언하는
+// 구조는 아니다 — "/" 로 적은 경로 그 자체가 계층이다. 공백/구두점은 태그에
+// 포함하지 않는다.
+const TAG_RE = /#([\p{L}\p{N}_]{1,40}(?:\/[\p{L}\p{N}_]{1,40}){0,4})/gu;
 
 /** 임의 텍스트에서 "#word" 토큰을 뽑아 소문자로 정규화한다(중복 제거). */
 export function extractTagsFromText(text: string): string[] {

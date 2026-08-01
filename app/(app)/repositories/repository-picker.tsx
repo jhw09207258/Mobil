@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/modal";
 import {
   createRepository,
@@ -13,24 +13,35 @@ import {
 
 const NEW_SENTINEL = "__new__";
 
-/** 에디터 상단바용 저장소 선택 — 자기 데이터(현재 저장소·목록)를 스스로
- * 불러오는 자립형 컴포넌트라 4개 에디터에 프롭 드릴링 없이 꽂힌다. */
+/** 에디터 상단바용 저장소 선택 — 기본은 자기 데이터(현재 저장소·목록)를
+ * 스스로 불러오는 자립형 컴포넌트라 프롭 드릴링 없이 꽂힌다. 호출부가 이미
+ * 같은 왕복에서 이 데이터를 받아 왔다면(현재는 documents 만) initialRepos/
+ * initialRepositoryId 로 넘겨 마운트 시점의 중복 조회 두 번을 건너뛴다. */
 export function RepositoryPicker({
   kind,
   itemId,
   canEdit,
+  initialRepos,
+  initialRepositoryId,
 }: {
   kind: RepoItemKind;
   itemId: string;
   canEdit: boolean;
+  initialRepos?: Repository[];
+  initialRepositoryId?: string | null;
 }) {
-  const [repos, setRepos] = useState<Repository[] | null>(null);
-  const [current, setCurrent] = useState<string | null>(null);
+  const [repos, setRepos] = useState<Repository[] | null>(initialRepos ?? null);
+  const [current, setCurrent] = useState<string | null>(initialRepositoryId ?? null);
   const [busy, setBusy] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const skipNextFetch = useRef(initialRepos !== undefined);
 
   useEffect(() => {
+    if (skipNextFetch.current) {
+      skipNextFetch.current = false;
+      return;
+    }
     let cancelled = false;
     Promise.all([listRepositories(), getItemRepository(kind, itemId)]).then(
       ([list, item]) => {

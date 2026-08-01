@@ -1,5 +1,5 @@
 import "server-only";
-import webpush, { type PushSubscription as WebPushSubscription } from "web-push";
+import type { PushSubscription as WebPushSubscription } from "web-push";
 
 /**
  * 웹 푸시 발송 — 앱을 닫아 두어도 도착하는 알림.
@@ -40,18 +40,42 @@ export function vapidPublicKey(): string | null {
   return process.env.VAPID_PUBLIC_KEY || null;
 }
 
-let configured = false;
+type WebPushModule = typeof import("web-push");
 
-function ensureConfigured(): boolean {
-  if (configured) return true;
+let cached: WebPushModule | null = null;
+
+/**
+ * `web-push` 를 **필요할 때** 불러온다.
+ *
+ * 최상위 import 로 두면 이 모듈을 (직접이든 간접이든) 참조하는 모든 라우트의
+ * 서버 번들에 딸려 들어간다. 그 라이브러리가 어떤 배포 환경에서 로드에
+ * 실패하면, 알림과 아무 상관 없는 페이지의 렌더까지 통째로 죽는다 —
+ * 알림 라이브러리가 로그인 화면을 무너뜨릴 수 있어서는 안 된다.
+ *
+ * 동적 import 로 바꾸면 실패 범위가 "실제로 푸시를 보내는 순간" 으로 좁혀지고,
+ * 그때도 예외를 삼켜 발송만 조용히 건너뛴다.
+ */
+async function loadWebPush(): Promise<WebPushModule | null> {
+  if (cached) return cached;
   const publicKey = process.env.VAPID_PUBLIC_KEY;
   const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (!publicKey || !privateKey) return false;
-  // subject 는 푸시 서비스가 문제 발생 시 연락할 곳이다. mailto: 또는 https:.
-  const subject = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
-  webpush.setVapidDetails(subject, publicKey, privateKey);
-  configured = true;
-  return true;
+  if (!publicKey || !privateKey) return null;
+
+  try {
+    const mod = await import("web-push");
+    const webpush = (mod.default ?? mod) as WebPushModule;
+    // subject 는 푸시 서비스가 문제 발생 시 연락할 곳이다. mailto: 또는 https:.
+    const subject = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+    cached = webpush;
+    return webpush;
+  } catch (e) {
+    console.error(
+      "[push] web-push could not be loaded — notifications are off:",
+      e instanceof Error ? e.message : e
+    );
+    return null;
+  }
 }
 
 export type PushOutcome = {
@@ -75,7 +99,10 @@ export async function sendPush(
   payload: PushPayload
 ): Promise<PushOutcome> {
   const out: PushOutcome = { delivered: [], gone: [], alive: [] };
-  if (targets.length === 0 || !ensureConfigured()) return out;
+  if (targets.length === 0) return out;
+
+  const webpush = await loadWebPush();
+  if (!webpush) return out;
 
   const body = JSON.stringify(payload);
 

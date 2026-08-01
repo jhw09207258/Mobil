@@ -15,8 +15,15 @@ export async function updateSession(request: NextRequest) {
   // 한다(app/api/calendar/feed/route.ts). 여기서 막으면 캘린더 앱이 로그인
   // 화면 HTML 을 받아 가 구독이 통째로 실패한다.
   const isFeedRoute = pathname === "/api/calendar/feed";
+  // 진단 엔드포인트는 로그인 없이 열려야 한다 — 로그인 자체가 깨졌을 때
+  // 보는 창이기 때문이다. 값은 절대 싣지 않는다(app/api/health/route.ts).
+  const isHealthRoute = pathname === "/api/health";
   const isPublicRoute =
-    pathname === "/" || isAuthRoute || isFeedRoute || pathname.startsWith("/auth");
+    pathname === "/" ||
+    isAuthRoute ||
+    isFeedRoute ||
+    isHealthRoute ||
+    pathname.startsWith("/auth");
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

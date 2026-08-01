@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedUser as requireUser } from "@/lib/auth";
 import { sendChatMessage } from "../chat/actions";
+import { measure } from "@/lib/observability";
 
 /**
  * "자료를 공유한다" 를 한 곳에 모은다.
@@ -55,7 +56,9 @@ export async function getObjectCards(
   if (clean.length === 0) return [];
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_object_cards", { p_refs: clean });
+  const { data, error } = await measure(supabase, "sharing.cards", async () =>
+    supabase.rpc("get_object_cards", { p_refs: clean })
+  );
   if (error || !data) return [];
   return data as ObjectCard[];
 }
@@ -64,10 +67,9 @@ export async function getObjectCards(
 export async function listAttachables(query?: string): Promise<AttachableObject[]> {
   await requireUser();
   const supabase = await createClient();
-  const { data } = await supabase.rpc("list_attachable_objects", {
-    p_query: query?.trim() || null,
-    p_limit: 40,
-  });
+  const { data } = await measure(supabase, "sharing.attachable", async () =>
+    supabase.rpc("list_attachable_objects", { p_query: query?.trim() || null, p_limit: 40 })
+  );
   return (data ?? []) as AttachableObject[];
 }
 

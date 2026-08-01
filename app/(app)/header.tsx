@@ -8,17 +8,21 @@ import { useMobileNav } from "./mobile-nav-context";
 import { HeaderSearch } from "./header-search";
 import { GlobalChat } from "./chat/global-chat";
 import { SignOutOverlay } from "./sign-out-overlay";
+import { Tooltip } from "@/components/ui/tooltip";
+import { TeamSwitcher } from "./team-switcher";
 
 export function AppHeader({
   userId,
   displayName,
   email,
   avatarUrl,
+  activeTeamName,
 }: {
   userId: string;
   displayName: string;
   email: string;
   avatarUrl: string | null;
+  activeTeamName: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -58,17 +62,22 @@ export function AppHeader({
         (CSS -webkit-app-region 보다 신뢰성 높은 Tauri v2 네이티브 방식).
         브라우저에서는 무의미한 속성이라 무시된다. */}
     <header className="app-header" data-tauri-drag-region>
-      <button
-        type="button"
-        className="hamburger-btn"
-        onClick={mobileNav.toggle}
-        aria-label={mobileNav.open ? "Close menu" : "Open menu"}
-        aria-expanded={mobileNav.open}
-      >
-        <IconMenu size={20} />
-      </button>
-      {/* 좌측 균형용 스페이서 — 검색창을 헤더 정중앙에 두기 위함 */}
-      <div className="header-side header-side-left" data-tauri-drag-region />
+      <Tooltip content={mobileNav.open ? "Close menu" : "Open menu"} side="right">
+        <button
+          type="button"
+          className="hamburger-btn"
+          onClick={mobileNav.toggle}
+          aria-label={mobileNav.open ? "Close menu" : "Open menu"}
+          aria-expanded={mobileNav.open}
+        >
+          <IconMenu size={20} />
+        </button>
+      </Tooltip>
+      {/* 좌측: 팀 전환기 — 오른쪽 계정 메뉴와 폭이 비슷해 검색창이 대략
+          헤더 중앙에 온다(정확한 균형보다 팀 전환기 노출이 우선). */}
+      <div className="header-side header-side-left" data-tauri-drag-region>
+        <TeamSwitcher activeTeamName={activeTeamName} />
+      </div>
 
       <HeaderSearch />
 

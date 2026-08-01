@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireApprovedUser as requireUser } from "@/lib/auth";
+import { isNextControlFlowError } from "@/lib/next-control-flow";
 import { notifyChatMessage } from "@/lib/chat-notify";
 import type { Json } from "@/lib/database.types";
 
@@ -22,9 +23,7 @@ export type ChatReaction = { emoji: string; count: number; reacted_by_me: boolea
 
 export type ChatMessage = {
   id: string;
-  /** Big Brother 가 보낸 메시지는 보낸 사람이 없다(is_bot 이 true). */
-  sender_id: string | null;
-  is_bot?: boolean;
+  sender_id: string;
   sender_name: string;
   sender_avatar_url: string | null;
   content: string;
@@ -170,10 +169,14 @@ export async function startDm(
 ): Promise<{ id: string } | { error: string }> {
   await requireUser();
   const supabase = await createClient();
+  // start_chat_dm(0080)의 예외 문구는 전부 사용자에게 그대로 보여줄 수 있게
+  // 손으로 쓴 것이다(예: "You can only message people on your current team") —
+  // 그대로 통과시켜야 "대화를 시작할 수 없습니다" 같은 뭉뚱그린 메시지 대신
+  // 정확한 이유가 보인다.
   const { data, error } = await supabase.rpc("start_chat_dm", {
     p_other: otherUserId,
   });
-  if (error || !data) return { error: "Could not start the conversation." };
+  if (error || !data) return { error: error?.message || "Could not start the conversation." };
   return { id: data };
 }
 
@@ -189,7 +192,7 @@ export async function createGroup(
     p_title: title.trim(),
     p_members: memberIds,
   });
-  if (error || !data) return { error: "Could not create the group." };
+  if (error || !data) return { error: error?.message || "Could not create the group." };
   return { id: data };
 }
 
@@ -204,7 +207,7 @@ export async function addMembers(
     p_conversation: conversationId,
     p_members: memberIds,
   });
-  if (error) return { error: "Could not add members." };
+  if (error) return { error: error.message || "Could not add members." };
   return { ok: true };
 }
 
@@ -277,65 +280,22 @@ export async function getChatBootstrap(): Promise<{
 }
 
 export async function listChatContacts(): Promise<ChatContact[]> {
-  await requireUser();
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("list_coworkers");
-  return (data ?? []).map((c) => ({
-    id: c.id,
-    display_name: c.display_name,
-    email: c.email,
-    avatar_url: c.avatar_url,
-  }));
-}
-
-/** 메시지에 첨부할 수 있는 내 워크스페이스 항목(문서/코드/시트/마인드맵).
- * RLS 가 접근 가능 범위를 강제하므로 여기서는 최근 항목만 모은다. */
-export type AttachableItem = {
-  kind: "document" | "code" | "sheet" | "mindmap";
-  id: string;
-  title: string;
-};
-
-export async function listAttachableItems(): Promise<AttachableItem[]> {
-  await requireUser();
-  const supabase = await createClient();
-  const [docs, code, sheets, maps] = await Promise.all([
-    supabase.from("documents").select("id, title").order("updated_at", { ascending: false }).limit(25),
-    supabase.from("code_files").select("id, name").order("updated_at", { ascending: false }).limit(25),
-    supabase.from("sheets").select("id, title").order("updated_at", { ascending: false }).limit(25),
-    supabase.from("mind_maps").select("id, title").order("updated_at", { ascending: false }).limit(25),
-  ]);
-  const out: AttachableItem[] = [];
-  for (const d of docs.data ?? []) out.push({ kind: "document", id: d.id, title: d.title || "Untitled" });
-  for (const c of code.data ?? []) out.push({ kind: "code", id: c.id, title: c.name });
-  for (const s of sheets.data ?? []) out.push({ kind: "sheet", id: s.id, title: s.title || "Untitled" });
-  for (const m of maps.data ?? []) out.push({ kind: "mindmap", id: m.id, title: m.title || "Untitled" });
-  return out;
-}
-
-/** 이 대화에 Big Brother 가 들어와 있는지. */
-export async function getBigBrotherEnabled(conversationId: string): Promise<boolean> {
-  await requireUser();
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("chat_conversations")
-    .select("bigbrother_enabled")
-    .eq("id", conversationId)
-    .maybeSingle();
-  return !!data?.bigbrother_enabled;
-}
-
-/** 초대/해제 — 그 대화의 멤버만(SQL 쪽에서도 한 번 더 막는다). */
-export async function setBigBrother(
-  conversationId: string,
-  enabled: boolean
-): Promise<{ ok: true } | { error: string }> {
-  await requireUser();
-  const supabase = await createClient();
-  const { error } = await supabase.rpc("set_bigbrother", {
-    p_conversation: conversationId,
-    p_enabled: enabled,
-  });
-  if (error) return { error: "Could not change Big Brother for this chat." };
-  return { ok: true };
+  try {
+    await requireUser();
+    const supabase = await createClient();
+    const { data } = await supabase.rpc("list_coworkers");
+    return (data ?? []).map((c) => ({
+      id: c.id,
+      display_name: c.display_name,
+      email: c.email,
+      avatar_url: c.avatar_url,
+    }));
+  } catch (e) {
+    if (isNextControlFlowError(e)) throw e;
+    // 캘린더 페이지가 이 함수를 listCalendars() 와 Promise.all 로 함께
+    // 부른다(app/(app)/calendar/page.tsx) — 여기서 던지면 캘린더 페이지
+    // 전체가 렌더되지 않는다. 연락처는 부가 정보이므로 빈 목록으로 넘어간다.
+    console.error("[chat:listChatContacts] unexpected failure:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }

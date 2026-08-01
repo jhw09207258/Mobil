@@ -85,7 +85,7 @@ export function PluginBar({
 
       {plugins.length === 0 && conversationId && (
         <span className="plugin-hint">
-          Connect an item and Big Brother will work on it directly.
+          Connect an item and Sophia will work on it directly.
         </span>
       )}
 
@@ -184,7 +184,7 @@ function PluginPicker({
         )}
       </div>
       <p className="page-sub" style={{ marginTop: 10, fontSize: 11.5 }}>
-        Connected items are passed to Big Brother with their ids, so it edits exactly what
+        Connected items are passed to Sophia with their ids, so it edits exactly what
         you meant instead of searching for a match.
       </p>
     </Modal>

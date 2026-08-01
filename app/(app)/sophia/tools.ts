@@ -15,7 +15,7 @@ import { getDocumentForTab, saveDocument } from "../documents/actions";
 import { getCodeFileForTab, saveCodeFile } from "../code/actions";
 import { getSheetForTab, saveSheet } from "../sheets/actions";
 import { getMindMapForTab, saveMindMap } from "../mindmap/actions";
-import { searchBigBrother } from "../big-brother/actions";
+import { searchPapersAndCode } from "@/lib/paper-code-search";
 
 // ============================================================================
 // Sophia 도구 사용(function calling) — NVIDIA NIM 의 OpenAI 호환 tools API 로
@@ -142,7 +142,7 @@ export const SOPHIA_TOOLS = [
           code_space: {
             type: "string",
             description:
-              "Name of the Code Space to put this in. Created if it doesn't exist. Defaults to 'Big Brother'.",
+              "Name of the Code Space to put this in. Created if it doesn't exist. Defaults to 'Sophia'.",
           },
         },
         required: ["name", "content"],
@@ -285,7 +285,7 @@ export const SOPHIA_TOOLS = [
     type: "function",
     function: {
       name: "search_papers_and_code",
-      description: "Search external academic papers (OpenAlex, Semantic Scholar) and public GitHub code (Big Brother).",
+      description: "Search external academic papers (OpenAlex, Semantic Scholar) and public GitHub code.",
       parameters: {
         type: "object",
         properties: { query: { type: "string" } },
@@ -722,7 +722,7 @@ async function toolUpdateCodeFile(args: {
 async function toolSearchPapersAndCode(args: { query?: string }): Promise<ToolResult> {
   const query = String(args.query ?? "").trim();
   if (!query) return { error: "query is required." };
-  const res = await searchBigBrother(query);
+  const res = await searchPapersAndCode(query);
   return {
     openalex: res.openalex.slice(0, 3).map((p) => ({
       title: p.title,

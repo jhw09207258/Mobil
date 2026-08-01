@@ -5,6 +5,7 @@ import { DocumentsList } from "./documents-list";
 import { NewItemButton } from "../workspace/new-item-button";
 import { ImportItemButton } from "../workspace/import-item-button";
 import { listStarredIds } from "../starred-actions";
+import "./documents.css";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,14 @@ export default async function DocumentsPage() {
   const [{ data: docs }, starredIds] = await Promise.all([
     supabase
       .from("documents")
-      .select("id, owner_id, title, is_public, updated_at")
+      .select("id, owner_id, title, visibility, updated_at")
       .order("updated_at", { ascending: false }),
     listStarredIds("document"),
   ]);
+
+  const rows = docs ?? [];
+  const mineCount = rows.filter((d) => d.owner_id === userId).length;
+  const publicCount = rows.filter((d) => d.visibility === "public").length;
 
   return (
     <>
@@ -38,7 +43,26 @@ export default async function DocumentsPage() {
           </div>
         </div>
 
-        <DocumentsList docs={docs ?? []} userId={userId} starredIds={starredIds} />
+        <div className="doc-stats-row">
+          <div className="doc-stat-card">
+            <div className="stat-val">{rows.length}</div>
+            <div className="stat-label label">TOTAL</div>
+          </div>
+          <div className="doc-stat-card">
+            <div className="stat-val">{mineCount}</div>
+            <div className="stat-label label">MINE</div>
+          </div>
+          <div className="doc-stat-card">
+            <div className="stat-val">{rows.length - mineCount}</div>
+            <div className="stat-label label">SHARED WITH ME</div>
+          </div>
+          <div className="doc-stat-card">
+            <div className="stat-val">{publicCount}</div>
+            <div className="stat-label label">PUBLIC</div>
+          </div>
+        </div>
+
+        <DocumentsList docs={rows} userId={userId} starredIds={starredIds} />
       </div>
     </>
   );

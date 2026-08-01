@@ -24,13 +24,13 @@ import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import { ResizableImage } from "./resizable-image";
 import { SlashCommand } from "./slash-command";
-import type { Json } from "@/lib/database.types";
+import type { Json, DocVisibility } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/client";
 import { ShareDialog } from "@/components/share-dialog";
 import {
   saveDocument,
   deleteDocument,
-  setDocumentPublic,
+  setDocumentVisibility,
   shareDocument,
   revokeDocumentShare,
   listDocumentShares,
@@ -43,9 +43,13 @@ import { WorkspaceLink } from "./workspace-link";
 import { WorkspaceMention } from "./mention-command";
 import { FontSize, FONT_SIZES } from "./font-size";
 import { ContributorBadges } from "../../contributors/contributor-badges";
+import type { ContributorRow } from "../../contributors/actions";
 import { RepositoryPicker } from "../../repositories/repository-picker";
+import type { Repository } from "../../repositories/actions";
 import { ActivityPanel } from "./activity-panel";
+import { BacklinksPanel } from "./backlinks-panel";
 import { createMindmapFromDocument } from "../../convert-actions";
+import { getObjectCards } from "../../sharing/actions";
 import { usePresence } from "@/lib/use-presence";
 import { colorForUserId } from "@/lib/presence-color";
 import { PresenceAvatars } from "@/components/presence-avatars";
@@ -92,10 +96,13 @@ export function DocumentEditor({
   initialYjsState,
   canEdit,
   isOwner,
-  isPublic,
+  visibility,
   myShareId,
   myName,
   myAvatarUrl,
+  initialContributors,
+  initialRepos,
+  initialRepositoryId,
 }: {
   docId: string;
   initialTitle: string;
@@ -103,10 +110,13 @@ export function DocumentEditor({
   initialYjsState: string | null;
   canEdit: boolean;
   isOwner: boolean;
-  isPublic: boolean;
+  visibility: DocVisibility;
   myShareId: string;
   myName: string;
   myAvatarUrl: string | null;
+  initialContributors?: ContributorRow[];
+  initialRepos?: Repository[];
+  initialRepositoryId?: string | null;
 }) {
   const router = useRouter();
   const { renameTab, openTab, closeTab } = useWorkspace();
@@ -119,13 +129,14 @@ export function DocumentEditor({
     color: colorForUserId(myShareId),
   });
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [pub, setPub] = useState(isPublic);
+  const [vis, setVis] = useState<DocVisibility>(visibility);
   const [showShare, setShowShare] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [showBacklinks, setShowBacklinks] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [converting, setConverting] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -219,6 +230,46 @@ export function DocumentEditor({
     return connectYjsBroadcast(ydoc, `doc:${docId}`, isApplyingRemoteRef);
   }, [ydoc, docId]);
 
+  // Obsidian 의 [[위키링크]]는 대상 파일명이 바뀌면 다음 렌더링에서 다시 그
+  // 파일을 찾아 표시 텍스트가 같이 바뀐다(파일명이 곧 식별자라 가능한 방식).
+  // 이 에디터의 워크스페이스 링크 칩은 삽입 시점의 제목을 label 속성에 스냅샷
+  // 으로 박아 두므로(workspace-link.ts, refId 는 안정적인 UUID 라 링크 자체는
+  // 깨지지 않는다) 대상 문서 제목이 그 뒤 바뀌면 낡은 채로 남는다 — 문서를 열
+  // 때 한 번, 실제로 달라진 칩만 조용히 바로잡는다. 칩 개수만큼 조회하지
+  // 않도록 get_object_cards(0065)로 한 번에 묶어 가져온다.
+  const resolvedStaleLinks = useRef(false);
+  useEffect(() => {
+    if (!editor || resolvedStaleLinks.current) return;
+    resolvedStaleLinks.current = true;
+
+    const refs: { pos: number; kind: string; refId: string }[] = [];
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "workspaceLink" && node.attrs.kind && node.attrs.refId) {
+        refs.push({ pos, kind: node.attrs.kind, refId: node.attrs.refId });
+      }
+    });
+    if (refs.length === 0) return;
+
+    const unique = new Map<string, { kind: string; id: string }>();
+    for (const r of refs) unique.set(`${r.kind}:${r.refId}`, { kind: r.kind, id: r.refId });
+
+    getObjectCards([...unique.values()]).then((cards) => {
+      const byKey = new Map(cards.map((c) => [`${c.kind}:${c.id}`, c]));
+      const tr = editor.state.tr;
+      let changed = false;
+      for (const r of refs) {
+        const card = byKey.get(`${r.kind}:${r.refId}`);
+        if (!card || !card.object_exists || !card.title) continue;
+        const node = tr.doc.nodeAt(r.pos);
+        if (node && node.type.name === "workspaceLink" && node.attrs.label !== card.title) {
+          tr.setNodeAttribute(r.pos, "label", card.title);
+          changed = true;
+        }
+      }
+      if (changed) editor.view.dispatch(tr.setMeta("addToHistory", false));
+    });
+  }, [editor]);
+
   const persist = useCallback(
     async (nextTitle: string, ed: Editor | null) => {
       if (!ed) return;
@@ -300,12 +351,12 @@ export function DocumentEditor({
     if (canEdit) markDirty();
   };
 
-  const togglePublic = async () => {
-    const next = !pub;
-    setPub(next);
-    const res = await setDocumentPublic(docId, next);
+  const changeVisibility = async (next: DocVisibility) => {
+    const prev = vis;
+    setVis(next);
+    const res = await setDocumentVisibility(docId, next);
     if (!res.ok) {
-      setPub(!next);
+      setVis(prev);
       setError(res.error);
     }
   };
@@ -368,8 +419,19 @@ export function DocumentEditor({
         />
         <div className="row hscroll" style={{ gap: 10 }}>
           <PresenceAvatars users={presenceUsers} />
-          <RepositoryPicker kind="document" itemId={docId} canEdit={canEdit} />
-          <ContributorBadges kind="document" id={docId} refreshToken={saveState} />
+          <RepositoryPicker
+            kind="document"
+            itemId={docId}
+            canEdit={canEdit}
+            initialRepos={initialRepos}
+            initialRepositoryId={initialRepositoryId}
+          />
+          <ContributorBadges
+            kind="document"
+            id={docId}
+            refreshToken={saveState}
+            initial={initialContributors}
+          />
           <span
             className={`save-state ${
               saveState === "dirty" ? "dirty" : saveState === "saved" ? "saved" : ""
@@ -379,10 +441,30 @@ export function DocumentEditor({
           </span>
           {isOwner && (
             <>
-              <button className="btn btn-sm" onClick={togglePublic}>
-                {pub ? "Public" : "Private"}
-              </button>
-              <button className="btn btn-sm" onClick={() => setShowShare(true)}>
+              <select
+                className="select"
+                style={{ width: 118, height: 30 }}
+                value={vis}
+                onChange={(e) => changeVisibility(e.target.value as DocVisibility)}
+                aria-label="Document visibility"
+                title={
+                  vis === "owner"
+                    ? "Only you can see this — not even admins."
+                    : vis === "public"
+                      ? "Anyone signed in can see and edit this."
+                      : "Owner, admins, and anyone you share it with can see this."
+                }
+              >
+                <option value="owner">Owner only</option>
+                <option value="private">Private</option>
+                <option value="public">Public</option>
+              </select>
+              <button
+                className="btn btn-sm"
+                onClick={() => setShowShare(true)}
+                disabled={vis === "owner"}
+                title={vis === "owner" ? "Owner-only documents can't be shared." : undefined}
+              >
                 Share
               </button>
               <button className="btn btn-sm btn-danger" onClick={() => setShowDelete(true)}>
@@ -415,6 +497,13 @@ export function DocumentEditor({
               </div>
             )}
           </div>
+          <button
+            className={`btn btn-sm ${showBacklinks ? "chat-tool-active" : ""}`}
+            onClick={() => setShowBacklinks((v) => !v)}
+            title="Show what links here"
+          >
+            Backlinks
+          </button>
           <button
             className={`btn btn-sm ${showActivity ? "chat-tool-active" : ""}`}
             onClick={() => setShowActivity((v) => !v)}
@@ -452,6 +541,13 @@ export function DocumentEditor({
             <EditorContent editor={editor} />
           </div>
         </div>
+        <BacklinksPanel
+          kind="document"
+          id={docId}
+          open={showBacklinks}
+          onClose={() => setShowBacklinks(false)}
+          refreshToken={saveState}
+        />
         <ActivityPanel
           docId={docId}
           open={showActivity}

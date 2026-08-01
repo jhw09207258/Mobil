@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { formatBytes, formatDate } from "@/lib/format";
-import { getFileCategory, FILE_CATEGORY_LABEL, type FileCategory } from "@/lib/file-category";
+import { formatBytes } from "@/lib/format";
 import { startUploads, useUploads } from "../uploads/upload-store";
 import { ShareDialog } from "@/components/share-dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
@@ -13,20 +12,18 @@ import { StarButton } from "../star-button";
 import { SendToChatButton } from "../send-to-chat-button";
 import { getPreviewUrl } from "../sharing/actions";
 import { triggerDownload } from "@/lib/download-file";
-import { IconDocuments, IconCode, IconSheet, IconMindmap, IconFiles, IconDownload, IconChevronLeft, IconEye } from "../icons";
-
-const KIND_ICON = {
-  document: IconDocuments,
-  code: IconCode,
-  sheet: IconSheet,
-  mindmap: IconMindmap,
-} as const;
-const KIND_LABEL = {
-  document: "Doc",
-  code: "Code",
-  sheet: "Table",
-  mindmap: "Link Graph",
-} as const;
+import {
+  IconDocuments,
+  IconCode,
+  IconSheet,
+  IconMindmap,
+  IconFiles,
+  IconDownload,
+  IconChevronLeft,
+  IconChevronRight,
+  IconEye,
+} from "../icons";
+import { RepositoryGraph } from "../repositories/repository-graph";
 import {
   deleteFile,
   getSignedUrl,
@@ -41,14 +38,34 @@ import {
   createRepository,
   renameRepository,
   deleteRepository,
+  moveRepository,
   type Repository,
-  type RepositoryContents,
+  type RepositoryEntry,
+  type RepoEntryKind,
 } from "../repositories/actions";
 import { OpenItemButton } from "../workspace/open-item-button";
-import { useWorkspace } from "../workspace/workspace-context";
+import { useWorkspace, type TabKind } from "../workspace/workspace-context";
 import { createDocumentTab } from "../documents/actions";
 import { createSheetTab } from "../sheets/actions";
 import { createMindMapTab } from "../mindmap/actions";
+
+const KIND_ICON: Record<RepoEntryKind, (p: { size?: number }) => React.ReactElement> = {
+  folder: IconFiles,
+  document: IconDocuments,
+  code: IconCode,
+  sheet: IconSheet,
+  mindmap: IconMindmap,
+  file: IconFiles,
+};
+const KIND_LABEL: Record<RepoEntryKind, string> = {
+  folder: "Folder",
+  document: "Doc",
+  code: "Code",
+  sheet: "Table",
+  mindmap: "Link Graph",
+  file: "File",
+};
+const OPENABLE = new Set<RepoEntryKind>(["document", "code", "sheet", "mindmap"]);
 
 type FileRow = {
   id: string;
@@ -76,35 +93,30 @@ export function FilesClient({
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  // 업로드는 React 트리 밖의 upload-store 가 담당한다 — 화면을 옮겨도 계속
-  // 진행되고 진행률은 우측 상단 토스트가 보여준다.
   const { uploading, completedTick } = useUploads();
+  const { openTab } = useWorkspace();
   const [error, setError] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<FileRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileRow | null>(null);
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<FileCategory | "all">("all");
-  const [starredOnly, setStarredOnly] = useState(false);
   const [starredSet, setStarredSet] = useState(() => new Set(starredIds));
   const [dragOver, setDragOver] = useState(false);
-  // 저장소 뷰 — null 이면 랜딩(모든 저장소 카드), "null" 은 Null Repository
-  // 상세, 그 외는 해당 repo id 상세.
+  // 저장소/폴더 뷰 — null 이면 랜딩(최상위 저장소 카드), "null" 은 Null
+  // Repository 상세, 그 외는 해당 저장소/폴더 id 의 상세(중첩 가능).
   const [repoView, setRepoView] = useState<string | null>(null);
-  const [repoRows, setRepoRows] = useState<Map<string, string | null>>(
-    () => new Map(initialFiles.map((f) => [f.id, f.repository_id]))
-  );
-  const [repoContents, setRepoContents] = useState<RepositoryContents | null>(null);
-  const [unfiled, setUnfiled] = useState<RepositoryContents | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "graph">("list");
+  const [repoContents, setRepoContents] = useState<RepositoryEntry[] | null>(null);
   const [creating, setCreating] = useState(false);
-  // 저장소 생성/이름변경 다이얼로그(prompt 는 Tauri 웹뷰에서 동작하지 않으므로
-  // 모달 입력을 쓴다).
-  const [repoDialog, setRepoDialog] = useState<{ mode: "create" | "rename"; id?: string; name: string } | null>(null);
-  // 파일 이름변경 모달(prompt 는 Tauri 웹뷰에서 동작하지 않음).
+  const [repoDialog, setRepoDialog] = useState<
+    { mode: "create" | "rename"; id?: string; name: string; parentId?: string | null } | null
+  >(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
-  // 내려받지 않고 그 자리에서 보는 미리보기.
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
   const dragDepth = useRef(0);
   const [pending, start] = useTransition();
+
+  const filesById = useMemo(() => new Map(initialFiles.map((f) => [f.id, f])), [initialFiles]);
+  const reposById = useMemo(() => new Map(repositories.map((r) => [r.id, r])), [repositories]);
 
   const setStarred = (id: string, starred: boolean) => {
     setStarredSet((prev) => {
@@ -117,47 +129,32 @@ export function FilesClient({
 
   const onPick = () => inputRef.current?.click();
 
-  const categorized = useMemo(
-    () =>
-      initialFiles.map((f) => ({
-        file: f,
-        category: getFileCategory(f.file_name, f.mime_type),
-      })),
-    [initialFiles]
-  );
+  // 현재 폴더까지의 경로 — 이미 불러온 전체 저장소 목록(부모 포함)을 거슬러
+  // 올라가며 계산한다. 저장소 개수가 방대하지 않은 한(개인/팀 워크스페이스라
+  // 현실적으로 아니다) 레벨마다 서버를 왕복할 이유가 없다.
+  const breadcrumb = useMemo(() => {
+    if (repoView === null) return [];
+    if (repoView === "null") return [{ id: "null", name: "Null Repository" }];
+    const chain: { id: string; name: string }[] = [];
+    let cursor: string | null = repoView;
+    const guard = new Set<string>();
+    while (cursor && !guard.has(cursor)) {
+      guard.add(cursor);
+      const r = reposById.get(cursor);
+      if (!r) break;
+      chain.unshift({ id: r.id, name: r.name });
+      cursor = r.parentId;
+    }
+    return chain;
+  }, [repoView, reposById]);
 
-  const categoryCounts = useMemo(() => {
-    const counts = new Map<FileCategory, number>();
-    for (const { category: c } of categorized) counts.set(c, (counts.get(c) ?? 0) + 1);
-    return counts;
-  }, [categorized]);
+  const topLevel = useMemo(() => repositories.filter((r) => !r.parentId), [repositories]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return categorized
-      .filter(({ file: f }) => {
-        if (repoView === null) return false; // 랜딩에서는 파일 표를 쓰지 않는다
-        const rid = repoRows.get(f.id) ?? null;
-        return repoView === "null" ? rid === null : rid === repoView;
-      })
-      .filter(({ category: c }) => category === "all" || c === category)
-      .filter(({ file: f }) => !starredOnly || starredSet.has(f.id))
-      .filter(
-        ({ file: f }) =>
-          !q ||
-          f.file_name.toLowerCase().includes(q) ||
-          (f.mime_type ?? "").toLowerCase().includes(q)
-      )
-      .map(({ file }) => file);
-  }, [categorized, query, category, starredOnly, starredSet, repoView, repoRows]);
-
-  // 저장소 상세로 진입 — 해당 저장소의 문서/코드/시트/마인드맵 목록을 불러온다.
   const openRepo = (value: string) => {
     setRepoView(value);
+    setViewMode("list");
     setRepoContents(null);
     listRepositoryContents(value === "null" ? null : value).then(setRepoContents);
-    // 상세에서 "Unfiled 에서 추가" 픽커용 미분류 목록도 준비
-    if (value !== "null") listRepositoryContents(null).then(setUnfiled);
   };
   const backToLanding = () => {
     setRepoView(null);
@@ -170,7 +167,7 @@ export function FilesClient({
     if (!name) return;
     const res =
       repoDialog.mode === "create"
-        ? await createRepository(name)
+        ? await createRepository(name, repoDialog.parentId ?? null)
         : await renameRepository(repoDialog.id!, name);
     if ("error" in res) {
       setError(res.error);
@@ -178,24 +175,24 @@ export function FilesClient({
     }
     setRepoDialog(null);
     router.refresh();
+    if (repoDialog.mode === "create" && repoView !== null) reloadContents();
   };
-
-  const { openTab } = useWorkspace();
 
   const reloadContents = () => {
     if (repoView === null) return;
     listRepositoryContents(repoView === "null" ? null : repoView).then(setRepoContents);
-    if (repoView !== "null") listRepositoryContents(null).then(setUnfiled);
   };
 
   const onDeleteRepo = async (id: string, name: string) => {
-    if (!confirm(`Delete repository "${name}"? Items inside are NOT deleted — they return to the Null Repository.`)) return;
+    if (!confirm(`Delete "${name}"? Items inside are NOT deleted — they return to the Null Repository, and any sub-folders move up a level.`)) return;
     const res = await deleteRepository(id);
     if ("error" in res) setError(res.error);
-    else router.refresh();
+    else {
+      router.refresh();
+      reloadContents();
+    }
   };
 
-  // 이 저장소 안에서 새 Possion 아이템 생성 → 저장소 귀속 → 에디터 탭으로 열기
   const onNewItem = async (kind: "document" | "sheet" | "code" | "mindmap") => {
     if (creating) return;
     setCreating(true);
@@ -211,7 +208,6 @@ export function FilesClient({
         const r = await createSheetTab();
         id = r.id; title = r.title; seed = r.seed;
       } else if (kind === "code") {
-        // 코드 파일은 Code Space 없이 만들 수 없다(0055).
         setError("Code files live inside a Code Space — create one from Codespace.");
         return;
       } else {
@@ -230,28 +226,18 @@ export function FilesClient({
     }
   };
 
-  const removeItemFromRepo = async (kind: "document" | "sheet" | "code" | "mindmap", id: string) => {
-    const res = await setItemRepository(kind, id, null);
+  // 항목/폴더를 다른 저장소·폴더로 옮긴다. 대부분의 경우 옮긴 즉시 지금 보는
+  // 폴더에서는 사라지므로 목록을 다시 불러온다.
+  const moveEntry = async (row: RepositoryEntry, value: string) => {
+    const target = value === "" ? null : value;
+    const res =
+      row.kind === "folder"
+        ? await moveRepository(row.id, target)
+        : await setItemRepository(row.kind, row.id, target);
     if ("error" in res) setError(res.error);
-    else reloadContents();
-  };
-
-  const addUnfiledItem = async (value: string) => {
-    if (!value || !repoView || repoView === "null") return;
-    const [kind, id] = value.split(":") as ["document" | "sheet" | "code" | "mindmap", string];
-    const res = await setItemRepository(kind, id, repoView);
-    if ("error" in res) setError(res.error);
-    else reloadContents();
-  };
-
-  const moveFileRepo = async (fileId: string, value: string) => {
-    const next = value === "" ? null : value;
-    const prev = repoRows.get(fileId) ?? null;
-    setRepoRows((m) => new Map(m).set(fileId, next));
-    const res = await setItemRepository("file", fileId, next);
-    if ("error" in res) {
-      setRepoRows((m) => new Map(m).set(fileId, prev));
-      setError(res.error);
+    else {
+      reloadContents();
+      router.refresh();
     }
   };
 
@@ -259,8 +245,6 @@ export function FilesClient({
     const files = fileList ? Array.from(fileList) : [];
     if (files.length === 0) return;
     setError(null);
-    // 저장소 상세에서 업로드하면 그 저장소로 바로 귀속된다 — 업로드가 끝나기
-    // 전에 다른 화면으로 이동해도 시작 시점의 저장소가 그대로 적용되게 넘긴다.
     startUploads(files, {
       userId,
       repositoryId: repoView && repoView !== "null" ? repoView : null,
@@ -268,13 +252,14 @@ export function FilesClient({
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  // 배치가 전부 끝났을 때 한 번만 목록을 갱신한다 — 파일마다 refresh 를 걸면
-  // 업로드 도중 화면이 계속 새로고침돼 깜빡이고 조작이 끊긴다.
   useEffect(() => {
-    if (completedTick > 0 && !uploading) router.refresh();
+    if (completedTick > 0 && !uploading) {
+      router.refresh();
+      reloadContents();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completedTick, uploading, router]);
 
-  // ---- 드래그 앤 드롭 ----
   const onDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.types.includes("Files")) {
@@ -307,7 +292,7 @@ export function FilesClient({
   const openPreview = (f: FileRow) =>
     setPreviewTarget({ id: f.id, name: f.file_name, mime: f.mime_type, size: f.size_bytes });
 
-  const rename = (row: FileRow) => setRenameTarget({ id: row.id, name: row.file_name });
+  const rename = (row: RepositoryEntry) => setRenameTarget({ id: row.id, name: row.label });
 
   const submitRename = () => {
     if (!renameTarget) return;
@@ -318,13 +303,21 @@ export function FilesClient({
       if (!res.ok) setError(res.error);
       else {
         setRenameTarget(null);
+        reloadContents();
         router.refresh();
       }
     });
   };
 
-  // 삭제는 GitHub 처럼 파일 이름을 직접 입력해야 확정된다(DeleteConfirmDialog).
-  // 목록은 삭제 성공 후 router.refresh() 로 즉시 갱신한다.
+  // repoContents(kind/id/label 만 있는 요약)와 initialFiles(전체 메타데이터)
+  // 를 합쳐 file 종류 행에 미리보기/다운로드/공유에 필요한 정보를 채운다 —
+  // 목록 조회를 하나 더 하지 않고 이미 페이지 로드 때 받아 온 것을 쓴다.
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (repoContents ?? [])
+      .filter((r) => !q || r.label.toLowerCase().includes(q))
+      .map((r) => ({ ...r, file: r.kind === "file" ? filesById.get(r.id) : undefined }));
+  }, [repoContents, query, filesById]);
 
   return (
     <div
@@ -337,23 +330,26 @@ export function FilesClient({
       {error && <div className="notice notice-error">{error}</div>}
 
       {repoView === null ? (
-        /* ================= 랜딩 — 모든 저장소 카드 ================= */
+        /* ================= 랜딩 — 최상위 저장소 카드 ================= */
         <>
           <div className="page-head">
             <div>
               <h1 className="page-h">Repositories</h1>
               <p className="page-sub">
                 Docs, tables, code, link graphs and files — organized into
-                repositories. Open one to view, add or remove its items.
+                folders. Open one to view as a list or as a graph.
               </p>
             </div>
-            <button className="btn btn-primary" onClick={() => setRepoDialog({ mode: "create", name: "" })}>
+            <button
+              className="btn btn-primary"
+              onClick={() => setRepoDialog({ mode: "create", name: "", parentId: null })}
+            >
               + New repository
             </button>
           </div>
           <div className="panel">
             <div className="panel-header">
-              <span className="label">REPOSITORIES ({repositories.length + 1})</span>
+              <span className="label">REPOSITORIES ({topLevel.length + 1})</span>
             </div>
             <div className="table-scroll">
               <table className="table drive-table">
@@ -377,7 +373,7 @@ export function FilesClient({
                     </td>
                     <td></td>
                   </tr>
-                  {repositories.map((r) => (
+                  {topLevel.map((r) => (
                     <tr key={r.id} className="drive-row" onClick={() => openRepo(r.id)}>
                       <td>
                         <span className="drive-icon folder">
@@ -417,318 +413,238 @@ export function FilesClient({
           </div>
         </>
       ) : (
-        /* ================= 저장소 상세 ================= */
+        /* ================= 저장소/폴더 상세 ================= */
         <>
           <div className="page-head">
-            <div className="row" style={{ gap: 10, minWidth: 0 }}>
+            <div className="row" style={{ gap: 6, minWidth: 0, flexWrap: "wrap" }}>
               <button className="btn btn-sm" onClick={backToLanding}>
                 <IconChevronLeft size={13} /> Repositories
               </button>
-              <h1 className="page-h" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {repoView === "null"
-                  ? "Null Repository"
-                  : repositories.find((r) => r.id === repoView)?.name}
-              </h1>
+              {breadcrumb.map((b, i) => (
+                <span key={b.id} className="row" style={{ gap: 6, alignItems: "center" }}>
+                  <span className="dim"><IconChevronRight size={11} /></span>
+                  {i === breadcrumb.length - 1 ? (
+                    <span className="page-h" style={{ fontSize: 18 }}>{b.name}</span>
+                  ) : (
+                    <button className="btn btn-ghost btn-sm" onClick={() => openRepo(b.id)}>
+                      {b.name}
+                    </button>
+                  )}
+                </span>
+              ))}
             </div>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+              {repoView !== "null" && (
+                <div className="row" role="tablist" aria-label="View" style={{ gap: 2 }}>
+                  <button
+                    className={`btn btn-sm ${viewMode === "list" ? "chat-tool-active" : ""}`}
+                    onClick={() => setViewMode("list")}
+                  >
+                    List
+                  </button>
+                  <button
+                    className={`btn btn-sm ${viewMode === "graph" ? "chat-tool-active" : ""}`}
+                    onClick={() => setViewMode("graph")}
+                  >
+                    Graph
+                  </button>
+                </div>
+              )}
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("document")}>+ Doc</button>
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("sheet")}>+ Table</button>
-              {/* 코드는 Code Space 안에서만 만들 수 있다(0055) — Codespace 페이지로 보낸다. */}
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("mindmap")}>+ Link Graph</button>
               {repoView !== "null" && (
-                <select
-                  className="select repo-picker"
-                  value=""
-                  onChange={(e) => addUnfiledItem(e.target.value)}
-                  title="Add an unfiled item to this repository"
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setRepoDialog({ mode: "create", name: "", parentId: repoView })}
                 >
-                  <option value="">Add from Unfiled…</option>
-                  {unfiled?.documents.map((d) => (
-                    <option key={d.id} value={`document:${d.id}`}>[doc] {d.title}</option>
-                  ))}
-                  {unfiled?.sheets.map((sh) => (
-                    <option key={sh.id} value={`sheet:${sh.id}`}>[table] {sh.title}</option>
-                  ))}
-                  {unfiled?.code.map((c) => (
-                    <option key={c.id} value={`code:${c.id}`}>[code] {c.name}</option>
-                  ))}
-                  {unfiled?.mindmaps.map((m) => (
-                    <option key={m.id} value={`mindmap:${m.id}`}>[graph] {m.title}</option>
-                  ))}
-                </select>
+                  + Folder
+                </button>
               )}
-              <input
-                ref={inputRef}
-                type="file"
-                multiple
-                hidden
-                onChange={(e) => uploadFiles(e.target.files)}
-              />
+              <input ref={inputRef} type="file" multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
               <button className="btn btn-primary btn-sm" onClick={onPick} disabled={uploading}>
                 {uploading ? "Uploading…" : "Upload file"}
               </button>
             </div>
           </div>
 
-          {repoContents && (() => {
-            const items = [
-              ...repoContents.documents.map((d) => ({ id: d.id, label: d.title, kind: "document" as const })),
-              ...repoContents.sheets.map((sh) => ({ id: sh.id, label: sh.title, kind: "sheet" as const })),
-              ...repoContents.code.map((c) => ({ id: c.id, label: c.name, kind: "code" as const })),
-              ...repoContents.mindmaps.map((m) => ({ id: m.id, label: m.title, kind: "mindmap" as const })),
-            ];
-            return (
-              <div className="panel" style={{ marginBottom: 14 }}>
-                <div className="panel-header">
-                  <span className="label">ALL ITEMS ({items.length})</span>
+          {viewMode === "graph" && repoView !== "null" ? (
+            <RepositoryGraph
+              repositoryId={repoView}
+              onNavigateFolder={openRepo}
+              onOpenFile={(id) => {
+                const f = filesById.get(id);
+                if (f) openPreview(f);
+              }}
+            />
+          ) : (
+            <div className="panel">
+              <div className="panel-header">
+                <span className="label">
+                  ITEMS ({rows.length}
+                  {query ? ` / ${repoContents?.length ?? 0}` : ""})
+                </span>
+                <input
+                  className="input"
+                  style={{ width: 240, height: 30 }}
+                  placeholder="Search this folder…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+              {repoContents === null ? (
+                <div className="empty" style={{ padding: 20 }}>Loading…</div>
+              ) : rows.length === 0 ? (
+                <div className="empty">
+                  {query
+                    ? `No items match "${query}".`
+                    : "Empty — create something above, upload a file, or drag & drop."}
                 </div>
-                {items.length === 0 ? (
-                  <div className="empty">
-                    No docs, tables, code or link graphs yet — create one above, or add from Unfiled.
-                  </div>
-                ) : (
-                  <div className="table-scroll">
-                    <table className="table drive-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: 34 }}></th>
-                          <th>Name</th>
-                          <th style={{ width: 90 }}>Type</th>
-                          <th style={{ width: 150 }}></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((item) => {
-                          const Icon = KIND_ICON[item.kind];
-                          return (
-                            <tr key={`${item.kind}:${item.id}`} className="drive-row">
-                              <td>
-                                <span className={`drive-icon ${item.kind}`}>
+              ) : (
+                <div className="table-scroll">
+                  <table className="table drive-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 34 }}></th>
+                        <th>Name</th>
+                        <th style={{ width: 90 }}>Type</th>
+                        <th style={{ width: 90 }} className="col-hide-mobile">Size</th>
+                        <th style={{ width: 150 }} className="col-hide-mobile">Move to</th>
+                        <th style={{ width: 220 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => {
+                        const Icon = KIND_ICON[row.kind];
+                        const f = row.file;
+                        const owned = f ? f.owner_id === userId : true;
+                        return (
+                          <tr key={`${row.kind}:${row.id}`} className={row.kind === "folder" ? "drive-row clickable" : "drive-row"} onClick={row.kind === "folder" ? () => openRepo(row.id) : undefined}>
+                            <td>
+                              {row.kind === "file" ? (
+                                <StarButton
+                                  kind="file"
+                                  id={row.id}
+                                  initialStarred={starredSet.has(row.id)}
+                                  onChange={(v) => setStarred(row.id, v)}
+                                />
+                              ) : (
+                                <span className={`drive-icon ${row.kind}`}>
                                   <Icon size={16} />
                                 </span>
-                              </td>
-                              <td>
-                                <OpenItemButton kind={item.kind} id={item.id} title={item.label} className="link-btn">
-                                  {item.label || "Untitled"}
+                              )}
+                            </td>
+                            <td>
+                              {row.kind === "folder" ? (
+                                <span className="drive-name">{row.label}</span>
+                              ) : row.kind === "file" ? (
+                                previewMode(row.label, f?.mime_type ?? null) === "none" ? (
+                                  row.label
+                                ) : (
+                                  <button className="link-btn" onClick={() => f && openPreview(f)} title="Preview without downloading">
+                                    {row.label}
+                                  </button>
+                                )
+                              ) : (
+                                <OpenItemButton kind={row.kind as TabKind} id={row.id} title={row.label} className="link-btn">
+                                  {row.label || "Untitled"}
                                 </OpenItemButton>
-                              </td>
-                              <td>
-                                <span className="badge">{KIND_LABEL[item.kind]}</span>
-                              </td>
-                              <td>
-                                <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
-                                  <OpenItemButton kind={item.kind} id={item.id} title={item.label} className="btn btn-ghost btn-sm">
-                                    Open
-                                  </OpenItemButton>
-                                  <SendToChatButton
-                                    kind={item.kind}
-                                    id={item.id}
-                                    title={item.label || "Untitled"}
-                                    label="Chat"
-                                  />
-                                  {repoView !== "null" && (
-                                    <button
-                                      className="btn btn-ghost btn-sm"
-                                      title="Remove from this repository (moves to Null Repository)"
-                                      onClick={() => removeItemFromRepo(item.kind, item.id)}
-                                    >
-                                      Remove
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-      <div className="category-tabs">
-        <button
-          type="button"
-          className={`category-tab ${category === "all" ? "active" : ""}`}
-          onClick={() => setCategory("all")}
-        >
-          All ({initialFiles.length})
-        </button>
-        {(Object.keys(FILE_CATEGORY_LABEL) as FileCategory[])
-          .filter((c) => (categoryCounts.get(c) ?? 0) > 0)
-          .map((c) => (
-            <button
-              type="button"
-              key={c}
-              className={`category-tab ${category === c ? "active" : ""}`}
-              onClick={() => setCategory(c)}
-            >
-              {FILE_CATEGORY_LABEL[c]} ({categoryCounts.get(c)})
-            </button>
-          ))}
-      </div>
-
-      <div className="panel">
-        <div className="panel-header">
-          <span className="label">
-            FILES ({filtered.length}
-            {query || category !== "all" || starredOnly ? ` / ${initialFiles.length}` : ""})
-          </span>
-          <div className="row" style={{ gap: 8 }}>
-            <button
-              type="button"
-              className={`btn btn-ghost btn-sm filter-star ${starredOnly ? "active" : ""}`}
-              onClick={() => setStarredOnly((v) => !v)}
-              aria-pressed={starredOnly}
-            >
-              {starredOnly ? "★" : "☆"} Starred
-            </button>
-            <input
-              className="input"
-              style={{ width: 240, height: 30 }}
-              placeholder="Search name or type…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-        </div>
-        {initialFiles.length === 0 ? (
-          <div className="empty">
-            No files yet. Use “Upload” or drag & drop to get started.
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="empty">
-            {starredOnly && !query
-              ? "No starred files."
-              : `No files match${query ? ` “${query}”` : " this filter"}.`}
-          </div>
-        ) : (
-          <div className="table-scroll">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: 34 }}></th>
-                <th>Name</th>
-                <th style={{ width: 120 }} className="col-hide-mobile">Type</th>
-                <th style={{ width: 100 }}>Size</th>
-                <th style={{ width: 160 }} className="col-hide-mobile">Uploaded</th>
-                <th style={{ width: 60 }} className="col-hide-mobile">Owner</th>
-                <th style={{ width: 280 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((f) => {
-                const owned = f.owner_id === userId;
-                return (
-                  <tr key={f.id}>
-                    <td>
-                      <StarButton
-                        kind="file"
-                        id={f.id}
-                        initialStarred={starredSet.has(f.id)}
-                        onChange={(v) => setStarred(f.id, v)}
-                      />
-                    </td>
-                    <td>
-                      {previewMode(f.file_name, f.mime_type) === "none" ? (
-                        f.file_name
-                      ) : (
-                        <button
-                          className="link-btn"
-                          onClick={() => openPreview(f)}
-                          title="Preview without downloading"
-                        >
-                          {f.file_name}
-                        </button>
-                      )}
-                    </td>
-                    <td className="mono muted col-hide-mobile" style={{ fontSize: 12 }}>
-                      {f.mime_type || "—"}
-                    </td>
-                    <td className="mono muted">{formatBytes(f.size_bytes)}</td>
-                    <td className="mono muted col-hide-mobile" style={{ fontSize: 12 }}>
-                      {formatDate(f.created_at)}
-                    </td>
-                    <td className="col-hide-mobile">
-                      <span className="badge">{owned ? "Mine" : "Shared"}</span>
-                    </td>
-                    <td>
-                      <div className="row row-actions" style={{ gap: 4 }}>
-                        {owned && (
-                          <select
-                            className="select repo-picker"
-                            value={repoRows.get(f.id) ?? ""}
-                            onChange={(e) => moveFileRepo(f.id, e.target.value)}
-                            title="Repository"
-                            aria-label="Repository"
-                          >
-                            <option value="">Null Repository</option>
-                            {repositories.map((r) => (
-                              <option key={r.id} value={r.id}>{r.name}</option>
-                            ))}
-                          </select>
-                        )}
-                        {previewMode(f.file_name, f.mime_type) !== "none" && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => openPreview(f)}
-                            title="Preview without downloading"
-                          >
-                            <IconEye size={13} /> Preview
-                          </button>
-                        )}
-                        <SendToChatButton
-                          kind="file"
-                          id={f.id}
-                          title={f.file_name}
-                          canGrant={owned}
-                          label="Chat"
-                        />
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => download(f.id)}
-                          disabled={pending}
-                        >
-                          Download
-                        </button>
-                        {f.canEdit && (
-                          <>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => rename(f)}
-                              disabled={pending}
-                            >
-                              Rename
-                            </button>
-                            {owned && (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                onClick={() => setShareTarget(f)}
+                              )}
+                            </td>
+                            <td>
+                              <span className="badge">{KIND_LABEL[row.kind]}</span>
+                            </td>
+                            <td className="mono muted col-hide-mobile">
+                              {row.kind === "file" ? formatBytes(f?.size_bytes ?? null) : "—"}
+                            </td>
+                            <td className="col-hide-mobile" onClick={(e) => e.stopPropagation()}>
+                              <select
+                                className="select repo-picker"
+                                value=""
+                                onChange={(e) => {
+                                  if (!e.target.value) return;
+                                  moveEntry(row, e.target.value === "__null__" ? "" : e.target.value);
+                                }}
+                                title="Move to…"
+                                aria-label="Move to"
                               >
-                                Share
-                              </button>
-                            )}
-                            <button
-                              className="btn btn-ghost btn-sm btn-danger"
-                              onClick={() => setDeleteTarget(f)}
-                              disabled={pending}
-                            >
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        )}
-      </div>
+                                <option value="">Move to…</option>
+                                <option value="__null__">Null Repository</option>
+                                {repositories
+                                  .filter((r) => r.id !== row.id)
+                                  .map((r) => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                  ))}
+                              </select>
+                            </td>
+                            <td onClick={(e) => e.stopPropagation()}>
+                              <div className="row row-actions" style={{ gap: 4, justifyContent: "flex-end" }}>
+                                {row.kind === "folder" ? (
+                                  <>
+                                    <button className="btn btn-ghost btn-sm" onClick={() => setRepoDialog({ mode: "rename", id: row.id, name: row.label })}>
+                                      Rename
+                                    </button>
+                                    <button className="btn btn-ghost btn-sm btn-danger" onClick={() => onDeleteRepo(row.id, row.label)}>
+                                      Delete
+                                    </button>
+                                  </>
+                                ) : row.kind === "file" && f ? (
+                                  <>
+                                    {previewMode(f.file_name, f.mime_type) !== "none" && (
+                                      <button className="btn btn-ghost btn-sm" onClick={() => openPreview(f)} title="Preview without downloading">
+                                        <IconEye size={13} /> Preview
+                                      </button>
+                                    )}
+                                    <SendToChatButton kind="file" id={f.id} title={f.file_name} canGrant={owned} label="Chat" />
+                                    <button className="btn btn-ghost btn-sm" onClick={() => download(f.id)} disabled={pending}>
+                                      Download
+                                    </button>
+                                    {f.canEdit && (
+                                      <>
+                                        <button className="btn btn-ghost btn-sm" onClick={() => rename(row)} disabled={pending}>
+                                          Rename
+                                        </button>
+                                        {owned && (
+                                          <button className="btn btn-ghost btn-sm" onClick={() => setShareTarget(f)}>
+                                            Share
+                                          </button>
+                                        )}
+                                        <button className="btn btn-ghost btn-sm btn-danger" onClick={() => setDeleteTarget(f)} disabled={pending}>
+                                          Delete
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <OpenItemButton kind={row.kind as TabKind} id={row.id} title={row.label} className="btn btn-ghost btn-sm">
+                                      Open
+                                    </OpenItemButton>
+                                    <SendToChatButton kind={row.kind} id={row.id} title={row.label || "Untitled"} label="Chat" />
+                                    {repoView !== "null" && OPENABLE.has(row.kind) && (
+                                      <button
+                                        className="btn btn-ghost btn-sm"
+                                        title="Remove from this folder (moves to Null Repository)"
+                                        onClick={() => moveEntry(row, "")}
+                                      >
+                                        Remove
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {dragOver && (
         <div className="dropzone">
@@ -737,9 +653,6 @@ export function FilesClient({
             Drop to upload
           </div>
         </div>
-      )}
-
-        </>
       )}
 
       {shareTarget && (
@@ -758,7 +671,10 @@ export function FilesClient({
           itemKind="file"
           itemLabel={deleteTarget.file_name}
           onConfirm={() => deleteFile(deleteTarget.id)}
-          onDeleted={() => router.refresh()}
+          onDeleted={() => {
+            router.refresh();
+            reloadContents();
+          }}
           onClose={() => setDeleteTarget(null)}
         />
       )}
@@ -783,11 +699,7 @@ export function FilesClient({
             onKeyDown={(e) => e.key === "Enter" && submitRename()}
             style={{ marginBottom: 12 }}
           />
-          <button
-            className="btn btn-primary btn-block"
-            onClick={submitRename}
-            disabled={!renameTarget.name.trim() || pending}
-          >
+          <button className="btn btn-primary btn-block" onClick={submitRename} disabled={!renameTarget.name.trim() || pending}>
             {pending ? "Renaming…" : "Save"}
           </button>
         </Modal>
@@ -795,24 +707,26 @@ export function FilesClient({
 
       {repoDialog && (
         <Modal
-          title={repoDialog.mode === "create" ? "New repository" : "Rename repository"}
+          title={
+            repoDialog.mode === "rename"
+              ? "Rename"
+              : repoDialog.parentId
+                ? "New folder"
+                : "New repository"
+          }
           onClose={() => setRepoDialog(null)}
         >
           <input
             className="input"
             autoFocus
-            placeholder="Repository name"
+            placeholder="Name"
             value={repoDialog.name}
             maxLength={80}
             onChange={(e) => setRepoDialog((d) => (d ? { ...d, name: e.target.value } : d))}
             onKeyDown={(e) => e.key === "Enter" && submitRepoDialog()}
             style={{ marginBottom: 12 }}
           />
-          <button
-            className="btn btn-primary btn-block"
-            onClick={submitRepoDialog}
-            disabled={!repoDialog.name.trim()}
-          >
+          <button className="btn btn-primary btn-block" onClick={submitRepoDialog} disabled={!repoDialog.name.trim()}>
             {repoDialog.mode === "create" ? "Create" : "Save"}
           </button>
         </Modal>

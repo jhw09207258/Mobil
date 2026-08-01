@@ -547,6 +547,14 @@ img {
   color: var(--ok);
   border-color: #2f5a38;
 }
+.badge-warn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.badge-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
 
 /* 알림 */
 .notice {
@@ -779,6 +787,63 @@ html[data-theme="light"] .btn {
   gap: 4px;
 }
 
+/* 저장소 그래프 뷰(Obsidian 식 force-directed graph) */
+.repo-graph-wrap {
+  flex: 1;
+  min-height: 420px;
+  border: 1px solid var(--border-0);
+  border-radius: var(--radius-lg);
+  background: var(--bg-1);
+  overflow: hidden;
+}
+.repo-graph-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  user-select: none;
+  touch-action: none;
+}
+.repo-graph-edge-contain {
+  stroke: var(--border-2);
+  stroke-width: 1.4;
+}
+.repo-graph-edge-ref {
+  stroke: var(--create);
+  stroke-opacity: 0.45;
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+.repo-graph-node circle {
+  fill: var(--bg-3);
+  stroke: var(--border-2);
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: stroke 0.12s, fill 0.12s;
+}
+.repo-graph-node:hover circle {
+  stroke: var(--create);
+  fill: var(--bg-2);
+}
+.repo-graph-node-folder circle {
+  fill: var(--accent-ghost);
+  stroke: var(--accent-dim);
+}
+.repo-graph-node text {
+  fill: var(--text-3);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  pointer-events: none;
+}
+.repo-graph-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--text-1);
+  pointer-events: none;
+}
+
 /* 아이콘 인터랙션 — 부드러운 색/스케일 전환으로 살아있는 느낌을 준다. */
 .rail-link svg,
 .btn svg,
@@ -857,7 +922,7 @@ html[data-theme="light"] .btn {
 }
 
 /* ============================================================================
-   Thinking — Big Brother 가 작업 중임을 보이는 표시.
+   Thinking — Sophia 가 작업 중임을 보이는 표시.
    빈 말풍선만 떠 있으면 멈춘 것처럼 보인다. 파티클이 흐르는 동안 "살아 있다"가
    드러나고, 경과 초가 붙어 얼마나 기다렸는지도 알 수 있다.
    ============================================================================ */

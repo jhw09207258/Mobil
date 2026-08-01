@@ -186,14 +186,16 @@
   opacity: 0;
   width: 20px;
   height: 20px;
-  font-size: 14px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-2);
   background: none;
   border: 0;
   cursor: pointer;
-  transition: opacity 0.15s var(--ease-spring);
+  transition: opacity 0.15s var(--ease-spring), color 0.15s var(--ease-spring);
 }
+.cal-cell-add:hover { color: var(--text-0); }
 .cal-cell:hover .cal-cell-add { opacity: 1; }
 /* 터치 기기에는 hover 가 없다 — 상시 노출한다. */
 @media (pointer: coarse) {
@@ -212,12 +214,12 @@
   background: var(--bg-3);
   border: 0;
   border-left: 3px solid var(--create);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
-  transition: background 0.15s var(--ease-spring);
+  transition: background 0.15s var(--ease-spring), filter 0.15s var(--ease-spring);
 }
-.cal-pill:hover { background: var(--bg-4); }
+.cal-pill:hover { filter: brightness(1.12); }
 .cal-pill.cancelled .cal-pill-title { text-decoration: line-through; opacity: 0.6; }
 .cal-pill-time { font-size: 10px; color: var(--text-3); flex: none; }
 .cal-pill-title {
@@ -321,7 +323,7 @@
   color: var(--text-0);
   border: 1px solid var(--border-0);
   border-left: 3px solid var(--create);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
   display: flex;
@@ -499,9 +501,13 @@
 
 .cal-picker {
   margin-top: 8px;
-  border: 1px solid var(--border-0);
+  border: 1px solid var(--border-1);
   border-radius: var(--radius);
   padding: 8px;
+  background: var(--glass-3);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  animation: cal-pop 0.18s var(--ease-spring);
 }
 .cal-picker-list { max-height: 180px; overflow-y: auto; margin-top: 6px; }
 .cal-picker-row {
@@ -570,6 +576,7 @@
   .cal-side {
     display: none;
   }
+  /* 떠 있는 표면은 유리로 — 드롭다운/모달/토스트와 같은 규약(globals.css). */
   .cal-side.open {
     display: flex;
     position: fixed;
@@ -577,19 +584,34 @@
     z-index: 60;
     max-height: 70vh;
     overflow-y: auto;
+    background: var(--glass-2);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    box-shadow: var(--shadow-pop);
+    animation: cal-sheet-in 0.22s var(--ease-spring);
   }
 }
 
 @media (max-width: 640px) {
   .cal-title { font-size: 15px; margin: 0 2px; }
-  .cal-cell { min-height: 74px; padding: 2px; }
+  .cal-cell { min-height: 78px; padding: 2px; }
   .cal-cell-day { min-width: 20px; height: 20px; padding: 0 4px; font-size: 11px; }
   .cal-pill { font-size: 10.5px; padding: 1px 4px; }
   .cal-pill-time { display: none; }
   .cal-grid-2 { grid-template-columns: 1fr; gap: 0; }
   .cal-timegrid, .cal-agenda { max-height: calc(100vh - 260px); }
   .cal-timegrid { --cal-gutter: 42px; }
-  .cal-tg-gutter { font-size: 9px; }
+  /* 주 보기를 7열로 쑤셔 넣으면 한 칸이 45px 도 안 돼 제목을 한 글자도 못
+     읽는다. 열의 최소 폭을 지키고 격자 전체를 **한 덩어리로** 가로 스크롤한다
+     — 머리글·종일 줄·본문을 따로 스크롤하면 열이 어긋난다. 일 보기(1열)는
+     --cal-min-width 가 화면보다 좁아 스크롤이 생기지 않는다. */
+  .cal-timegrid { overflow-x: auto; }
+  .cal-tg-head,
+  .cal-tg-allday,
+  .cal-tg-body {
+    min-width: var(--cal-min-width, 0);
+  }
+  .cal-tg-scroll { overflow-x: visible; }
   .cal-agenda-when { width: 62px; font-size: 11px; }
   .cal-agenda-meta { display: none; }
 }
@@ -604,4 +626,84 @@
   background: var(--bg-1);
   border: 1px solid var(--border-1);
   border-radius: var(--radius);
+}
+
+
+/* ==========================================================================
+   모션 — 기존 규약(modal-pop / chat-toast-in)과 같은 성격으로 맞춘다.
+   화면이 바뀌었다는 사실만 짧게 알리고 끝낸다. 캘린더는 하루에도 여러 번
+   앞뒤로 넘기는 화면이라 전환이 길면 곧바로 방해가 된다.
+   ========================================================================== */
+.cal-main > * {
+  animation: cal-view-in 0.18s var(--ease-spring);
+}
+@keyframes cal-view-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cal-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cal-sheet-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cal-notice {
+  animation: cal-notice-in 0.2s var(--ease-spring);
+}
+@keyframes cal-notice-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 일정 블록/알약은 눌렀을 때 반응이 있어야 "누를 수 있는 것"으로 읽힌다. */
+.cal-pill:active,
+.cal-block:active {
+  transform: scale(0.985);
+}
+.cal-block {
+  transition: box-shadow 0.15s var(--ease-spring), transform 0.12s var(--ease-spring), filter 0.15s var(--ease-spring);
+}
+.cal-block:hover {
+  box-shadow: var(--shadow-card);
+  filter: brightness(1.1);
+}
+
+/* 아젠다의 Join 버튼 — 행 전체가 버튼이라 그 위에 겹쳐 놓는다. */
+.cal-agenda-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 14px;
+}
+.cal-agenda-item .cal-agenda-row { flex: 1; min-width: 0; }
+.cal-agenda-join { flex: none; }
+
+/* 붙인 자료 칩 — 이름이 길어도 줄을 무너뜨리지 않는다. */
+.cal-link-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.cal-link-chip.locked { border-style: dashed; opacity: 0.75; }
+
+/* 모션을 줄이도록 설정한 사용자에게는 전환을 없앤다 — 위치 이동이 어지러움을
+   유발하는 경우가 있어, 나타나는 사실만 남기고 움직임은 뺀다. */
+@media (prefers-reduced-motion: reduce) {
+  .cal-main > *,
+  .cal-side.open,
+  .cal-picker,
+  .cal-notice {
+    animation: none;
+  }
+  .cal-pill:active,
+  .cal-block:active {
+    transform: none;
+  }
 }

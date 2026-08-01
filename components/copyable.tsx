@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CopyButton } from "./ui/copy-button";
 
 const SCRAMBLE = "0123456789abcdef-";
 
@@ -14,12 +15,10 @@ export function Copyable({
   /** true 면 값을 ●●● 마스킹으로 숨기고, View ID 버튼을 눌렀을 때만 보여준다. */
   secret?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(!secret);
   // 디코딩 애니메이션 — ●●● 에서 무작위 글자를 거쳐 실제 값으로 수렴한다.
   const [display, setDisplay] = useState<string | null>(null);
   const animRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stopAnim = () => {
     if (animRef.current) clearInterval(animRef.current);
@@ -30,7 +29,6 @@ export function Copyable({
   useEffect(() => {
     return () => {
       if (animRef.current) clearInterval(animRef.current);
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     };
   }, []);
 
@@ -75,17 +73,6 @@ export function Copyable({
     }, 35);
   };
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-      copyTimerRef.current = setTimeout(() => setCopied(false), 1400);
-    } catch {
-      /* clipboard 권한 없음 — 조용히 무시 */
-    }
-  };
-
   return (
     <div>
       {label && <div className="label" style={{ marginBottom: 6 }}>{label}</div>}
@@ -115,9 +102,7 @@ export function Copyable({
               {revealed ? "Hide ID" : "View ID"}
             </button>
           )}
-          <button type="button" className="btn btn-sm" onClick={copy}>
-            {copied ? "Copied" : "Copy"}
-          </button>
+          <CopyButton content={value} label="Copy" />
         </div>
       </div>
     </div>

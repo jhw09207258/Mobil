@@ -1,6 +1,7 @@
 "use client";
 
 import { IconClose, IconRotate } from "../../icons";
+import { fetchJson } from "@/lib/fetch-json";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -51,7 +52,15 @@ export function AssistPanel({
     setBusy(true);
 
     try {
-      const res = await fetch("/api/code-agent", {
+      // 세션 만료 시 이 요청은 로그인 페이지 HTML 을 받아 온다 — fetchJson 이
+      // 그것을 걸러 "다시 로그인하세요" 로 바꿔 준다(원시 res.json() 은
+      // "Unexpected token '<'" 을 사용자에게 그대로 보여 준다).
+      const res = await fetchJson<{
+        text?: string;
+        content?: string;
+        changed?: boolean;
+        edits?: string[];
+      }>("/api/code-agent", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -61,17 +70,11 @@ export function AssistPanel({
           language,
         }),
       });
-      const json = (await res.json()) as {
-        text?: string;
-        content?: string;
-        changed?: boolean;
-        edits?: string[];
-        error?: string;
-      };
       if (!res.ok) {
-        setError(json.error || `Request failed (${res.status}).`);
+        setError(res.error);
         return;
       }
+      const json = res.data;
       // 파일이 바뀌었으면 즉시 에디터에 반영 — 저장은 기존 자동저장이 처리한다.
       if (json.changed && typeof json.content === "string") applyContent(json.content);
       setTurns((prev) => [

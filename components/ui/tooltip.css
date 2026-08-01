@@ -1,0 +1,50 @@
+.tt {
+  position: relative;
+  display: inline-flex;
+}
+.tt-bubble {
+  position: absolute;
+  z-index: 200;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  color: var(--text-0);
+  background: var(--bg-4);
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.12s var(--ease-spring), transform 0.12s var(--ease-spring);
+}
+.tt:hover .tt-bubble,
+.tt:focus-within .tt-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 0.3s;
+}
+
+.tt-bottom .tt-bubble { top: calc(100% + 7px); left: 50%; transform: translate(-50%, 2px); }
+.tt-bottom:hover .tt-bubble, .tt-bottom:focus-within .tt-bubble { transform: translate(-50%, 0); }
+
+.tt-top .tt-bubble { bottom: calc(100% + 7px); left: 50%; transform: translate(-50%, -2px); }
+.tt-top:hover .tt-bubble, .tt-top:focus-within .tt-bubble { transform: translate(-50%, 0); }
+
+.tt-left .tt-bubble { right: calc(100% + 7px); top: 50%; transform: translate(-2px, -50%); }
+.tt-left:hover .tt-bubble, .tt-left:focus-within .tt-bubble { transform: translate(0, -50%); }
+
+.tt-right .tt-bubble { left: calc(100% + 7px); top: 50%; transform: translate(2px, -50%); }
+.tt-right:hover .tt-bubble, .tt-right:focus-within .tt-bubble { transform: translate(0, -50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tt-bubble { transition: opacity 0.12s; }
+}
+/* 터치 기기에는 호버가 없다 — 탭 한 번으로 여는 대상이 이미 title/aria-label
+   로 뜻을 전하고 있으므로, 굳이 탭으로 여는 상호작용을 추가하지 않는다. */
+@media (pointer: coarse) {
+  .tt-bubble { display: none; }
+}

@@ -3,18 +3,18 @@ import type { Database } from "@/lib/database.types";
 
 /**
  * 코드 파일은 Code Space 없이는 존재할 수 없다(0055). 코드를 만들어내는 흐름
- * (GitHub 파일 임포트, Big Brother 도구 등)은 넣을 Space 가 필요하므로,
+ * (GitHub 파일 임포트, Sophia 의 코드 생성 도구 등)은 넣을 Space 가 필요하므로,
  * 이름으로 찾아보고 없으면 만들어 준다.
  *
- * 이름을 안 주면 "Big Brother" 로 모은다 — 에이전트가 만든 파일이 여기저기
+ * 이름을 안 주면 "Sophia" 로 모은다 — 에이전트가 만든 파일이 여기저기
  * 흩어지는 것보다 한곳에 쌓이는 편이 찾기 쉽다.
  */
 export async function ensureCodeSpace(
   supabase: SupabaseClient<Database>,
   userId: string,
-  name = "Big Brother"
+  name = "Sophia"
 ): Promise<string | null> {
-  const trimmed = name.trim().slice(0, 120) || "Big Brother";
+  const trimmed = name.trim().slice(0, 120) || "Sophia";
 
   const { data: existing } = await supabase
     .from("code_repositories")

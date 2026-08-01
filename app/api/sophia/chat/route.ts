@@ -35,7 +35,7 @@ const REQUEST_BUDGET_MS = 48_000;
 // 개별 NVIDIA 호출(연결+스트림 소비 전체)에 허용하는 최대 시간.
 const PER_CALL_TIMEOUT_MS = 30_000;
 
-const SYSTEM_PROMPT = `You are Big Brother, the research and intelligence assistant built into Possion (a workspace for documents, code, sheets, files and mind maps).
+const SYSTEM_PROMPT = `You are Sophia, the research and intelligence assistant built into Possion (a workspace for documents, code, sheets, files and mind maps).
 
 Write the way a subject-matter expert writes to a peer. Be precise, direct, and
 substantive. Lead with the answer, then the reasoning that supports it. Prefer
@@ -359,13 +359,13 @@ list if the user clearly asks you to.`
     const s = r.upstreamStatus;
     const d = r.detail || "no detail";
     if (d.includes("missing NVIDIA_API_KEY")) {
-      return "Big Brother isn't configured: no NVIDIA_API_KEY / NVIDIA_API_KEY_2 is set in this deployment's environment variables.";
+      return "Sophia isn't configured: no NVIDIA_API_KEY / NVIDIA_API_KEY_2 is set in this deployment's environment variables.";
     }
     if (d.includes("timed out")) {
-      return `Big Brother's request to NVIDIA timed out — the NVIDIA API isn't responding from the server (region icn1). This usually means the endpoint or key is wrong, or NVIDIA is unreachable from this deployment. Detail: ${d}`;
+      return `Sophia's request to NVIDIA timed out — the NVIDIA API isn't responding from the server (region icn1). This usually means the endpoint or key is wrong, or NVIDIA is unreachable from this deployment. Detail: ${d}`;
     }
     if (s === 401 || s === 403) {
-      return `Big Brother's NVIDIA API key was rejected (HTTP ${s}). The key is missing, invalid, or lacks access to the model. Detail: ${d}`;
+      return `Sophia's NVIDIA API key was rejected (HTTP ${s}). The key is missing, invalid, or lacks access to the model. Detail: ${d}`;
     }
     if (s === 404) {
       return `NVIDIA returned 404 — the model "${NVIDIA_MODEL}" isn't available to this key/endpoint. Detail: ${d}`;
@@ -373,7 +373,7 @@ list if the user clearly asks you to.`
     if (s === 429) {
       return `NVIDIA rate limit hit (HTTP 429). Try again shortly. Detail: ${d}`;
     }
-    return `Big Brother is unavailable right now (NVIDIA ${s ?? "network"}: ${d})`;
+    return `Sophia is unavailable right now (NVIDIA ${s ?? "network"}: ${d})`;
   };
 
   /** 실패 진단을 assistant 메시지로 남긴다 — 화면에도 남고, DB 로그로도
@@ -425,7 +425,7 @@ list if the user clearly asks you to.`
         } catch (e) {
           result = {
             text: "",
-            error: e instanceof Error ? e.message : "Big Brother failed.",
+            error: e instanceof Error ? e.message : "Sophia failed.",
             inputTokens: 0,
             outputTokens: 0,
             totalTokens: 0,
@@ -473,7 +473,7 @@ list if the user clearly asks you to.`
         } catch (e) {
           result = {
             text: "",
-            error: e instanceof Error ? e.message : "Big Brother failed.",
+            error: e instanceof Error ? e.message : "Sophia failed.",
             inputTokens: 0,
             outputTokens: 0,
             totalTokens: 0,
@@ -556,7 +556,7 @@ list if the user clearly asks you to.`
           if (!pending) {
             // 예산을 넘겼으면 더 부르지 않고, 지금까지 받은 답으로 마무리한다.
             if (Date.now() >= deadline) {
-              if (!full) failed = "Big Brother ran out of time before finishing (request budget exceeded).";
+              if (!full) failed = "Sophia ran out of time before finishing (request budget exceeded).";
               break;
             }
             // 마지막 허용 라운드거나 도구가 꺼졌으면 tools 없이 스트리밍으로

@@ -46,6 +46,10 @@ export function StorageBreakdownChart({ rows }: { rows: Row[] }) {
   const itemCount = rows.reduce((s, r) => s + r.item_count, 0);
 
   // 도넛 세그먼트 — 누적 dasharray offset 으로 원 둘레를 나눠 그린다.
+  // 세그먼트 사이에 작은 틈(GAP)을 두고 끝을 둥글려(strokeLinecap="round")
+  // bklit-ui 의 Ring 컴포넌트 느낌을 낸다 — 실제 비중(offset)은 틈 없는
+  // 값으로 누적하고, 그리는 길이만 틈만큼 줄여 자리 배분은 정확하게 유지한다.
+  const GAP = 3;
   let acc = 0;
   const segments = ORDER.map((cat) => {
     const bytes = byCat.get(cat)?.bytes ?? 0;
@@ -53,7 +57,11 @@ export function StorageBreakdownChart({ rows }: { rows: Row[] }) {
     const dash = pct * CIRC;
     const offset = acc;
     acc += dash;
-    return { cat, bytes, dash, offset };
+    // 아주 작은 비중이라도 링에서 아예 사라지지 않도록 최소 길이를 보장한다
+    // (틈 때문에 지워지면 범례엔 있는데 링엔 없는 항목이 생긴다).
+    const visibleDash = dash > 0 ? Math.max(1.5, dash - GAP) : 0;
+    const visibleOffset = offset + GAP / 2;
+    return { cat, bytes, dash: visibleDash, offset: visibleOffset };
   }).filter((s) => s.dash > 0);
 
   const hoverRow = hover ? byCat.get(hover) : null;
@@ -71,9 +79,11 @@ export function StorageBreakdownChart({ rows }: { rows: Row[] }) {
               r={R}
               stroke={META[s.cat].color}
               strokeWidth="14"
+              strokeLinecap="round"
               strokeDasharray={`${s.dash} ${CIRC - s.dash}`}
               strokeDashoffset={-s.offset}
               className={`stg-donut-seg ${hover && hover !== s.cat ? "dim" : ""}`}
+              style={hover === s.cat ? { filter: `drop-shadow(0 0 5px ${META[s.cat].color})` } : undefined}
               onMouseEnter={() => setHover(s.cat)}
               onMouseLeave={() => setHover(null)}
             />

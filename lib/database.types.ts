@@ -16,6 +16,8 @@ export type Json =
 export type Role = "user" | "admin";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type Permission = "view" | "edit";
+/** documents 전용 — owner 는 소유자 본인만(관리자도 못 봄), 나머지는 기존 그대로. */
+export type DocVisibility = "owner" | "private" | "public";
 export type TargetType = "document" | "file" | "code";
 export type AuditAction =
   | "view"
@@ -47,6 +49,7 @@ export interface Database {
           phone_public: boolean;
           email_chat_notifications: boolean;
           push_notifications: boolean;
+          active_team_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -71,6 +74,50 @@ export interface Database {
           phone_public?: boolean;
           email_chat_notifications?: boolean;
           push_notifications?: boolean;
+          active_team_id?: string | null;
+        };
+        Relationships: [];
+      };
+      // ---- 0080: 팀(워크스페이스) ----
+      teams: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          is_open: boolean;
+          leader_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          is_open?: boolean;
+          leader_id: string;
+        };
+        Update: {
+          name?: string;
+          description?: string | null;
+          is_open?: boolean;
+          leader_id?: string;
+        };
+        Relationships: [];
+      };
+      team_members: {
+        Row: {
+          team_id: string;
+          user_id: string;
+          status: "active" | "pending";
+          joined_at: string;
+        };
+        Insert: {
+          team_id: string;
+          user_id: string;
+          status?: "active" | "pending";
+        };
+        Update: {
+          status?: "active" | "pending";
         };
         Relationships: [];
       };
@@ -80,7 +127,7 @@ export interface Database {
           owner_id: string;
           title: string;
           content: Json;
-          is_public: boolean;
+          visibility: DocVisibility;
           created_at: string;
           updated_at: string;
           yjs_state: string | null;
@@ -91,13 +138,13 @@ export interface Database {
           owner_id: string;
           title?: string;
           content?: Json;
-          is_public?: boolean;
+          visibility?: DocVisibility;
           yjs_state?: string | null;
         };
         Update: {
           title?: string;
           content?: Json;
-          is_public?: boolean;
+          visibility?: DocVisibility;
           yjs_state?: string | null;
           repository_id?: string | null;
         };
@@ -408,49 +455,6 @@ export interface Database {
         };
         Relationships: [];
       };
-      agent_runs: {
-        Row: {
-          space_id: string;
-          owner_id: string;
-          lines: Json;
-          interaction_id: string | null;
-          environment_id: string | null;
-          model: string | null;
-          turns: number;
-          total_tokens: number;
-          input_tokens: number;
-          output_tokens: number;
-          status: string;
-          updated_at: string;
-        };
-        Insert: {
-          space_id: string;
-          owner_id: string;
-          lines?: Json;
-          interaction_id?: string | null;
-          environment_id?: string | null;
-          model?: string | null;
-          turns?: number;
-          total_tokens?: number;
-          input_tokens?: number;
-          output_tokens?: number;
-          status?: string;
-          updated_at?: string;
-        };
-        Update: {
-          lines?: Json;
-          interaction_id?: string | null;
-          environment_id?: string | null;
-          model?: string | null;
-          turns?: number;
-          total_tokens?: number;
-          input_tokens?: number;
-          output_tokens?: number;
-          status?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
       ai_conversation_plugins: {
         Row: {
           id: string;
@@ -507,7 +511,7 @@ export interface Database {
       chat_conversations: {
         Row: {
           id: string;
-          bigbrother_enabled: boolean;
+          team_id: string | null;
           kind: "dm" | "group";
           title: string | null;
           created_by: string;
@@ -584,15 +588,21 @@ export interface Database {
           id: string;
           owner_id: string;
           name: string;
+          parent_id: string | null;
+          team_id: string | null;
           created_at: string;
         };
         Insert: {
           id?: string;
           owner_id: string;
           name: string;
+          parent_id?: string | null;
+          team_id?: string | null;
         };
         Update: {
           name?: string;
+          parent_id?: string | null;
+          team_id?: string | null;
         };
         Relationships: [];
       };
@@ -752,6 +762,89 @@ export interface Database {
           created_at: string;
         }[];
       };
+      // ---- 0080: 팀(워크스페이스) ----
+      shares_active_team: {
+        Args: { p_other: string };
+        Returns: boolean;
+      };
+      create_team: {
+        Args: { p_name: string; p_description?: string | null; p_is_open?: boolean };
+        Returns: string;
+      };
+      request_join_team: {
+        Args: { p_team: string };
+        Returns: string;
+      };
+      approve_team_member: {
+        Args: { p_team: string; p_user: string };
+        Returns: undefined;
+      };
+      reject_team_member: {
+        Args: { p_team: string; p_user: string };
+        Returns: undefined;
+      };
+      remove_team_member: {
+        Args: { p_team: string; p_user: string };
+        Returns: undefined;
+      };
+      leave_team: {
+        Args: { p_team: string };
+        Returns: undefined;
+      };
+      transfer_team_leadership: {
+        Args: { p_team: string; p_new_leader: string };
+        Returns: undefined;
+      };
+      set_team_open: {
+        Args: { p_team: string; p_is_open: boolean };
+        Returns: undefined;
+      };
+      delete_team: {
+        Args: { p_team: string };
+        Returns: undefined;
+      };
+      set_active_team: {
+        Args: { p_team: string | null };
+        Returns: undefined;
+      };
+      search_teams: {
+        Args: { p_query?: string };
+        Returns: {
+          id: string;
+          name: string;
+          description: string | null;
+          is_open: boolean;
+          member_count: number;
+          leader_name: string;
+          my_status: "active" | "pending" | null;
+        }[];
+      };
+      list_my_teams: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          name: string;
+          description: string | null;
+          is_open: boolean;
+          member_count: number;
+          leader_id: string;
+          is_leader: boolean;
+          status: "active" | "pending";
+          is_active_team: boolean;
+        }[];
+      };
+      list_team_members: {
+        Args: { p_team: string };
+        Returns: {
+          id: string;
+          display_name: string | null;
+          email: string;
+          avatar_url: string | null;
+          status: "active" | "pending";
+          is_leader: boolean;
+          joined_at: string;
+        }[];
+      };
       sync_object_tags: {
         Args: { p_kind: string; p_id: string; p_tag_names: string[] | null };
         Returns: undefined;
@@ -803,6 +896,10 @@ export interface Database {
         Args: Record<string, never>;
         Returns: { category: string; bytes: number; item_count: number }[];
       };
+      my_weekly_activity: {
+        Args: Record<string, never>;
+        Returns: { day: string; item_count: number }[];
+      };
       admin_user_overview: {
         Args: Record<string, never>;
         Returns: {
@@ -837,6 +934,10 @@ export interface Database {
       get_linked_objects: {
         Args: { p_kind: string; p_id: string };
         Returns: { kind: string; id: string; title: string; link_source: string }[];
+      };
+      get_backlinks: {
+        Args: { p_kind: string; p_id: string };
+        Returns: { kind: string; id: string; title: string | null; link_source: string }[];
       };
       sync_object_links: {
         Args: {
@@ -908,8 +1009,7 @@ export interface Database {
         Args: { p_conversation: string; p_limit?: number };
         Returns: {
           id: string;
-          // 봇 메시지는 보낸 사람이 없다.
-          sender_id: string | null;
+          sender_id: string;
           sender_name: string;
           sender_avatar_url: string | null;
           content: string;
@@ -919,7 +1019,6 @@ export interface Database {
           reply_to_sender_name: string | null;
           reply_to_content: string | null;
           reactions: Json;
-          is_bot: boolean;
         }[];
       };
       toggle_chat_reaction: {
@@ -930,22 +1029,12 @@ export interface Database {
         Args: { p_kind: string; p_id: string };
         Returns: undefined;
       };
-      /** 에이전트가 고친 코드 파일을 열어 둔 편집기들에 증분 Yjs 업데이트로 밀어준다. */
-      /** 채팅에 Big Brother 를 넣거나 뺀다(그 대화 멤버만). */
-      set_bigbrother: {
-        Args: { p_conversation: string; p_enabled: boolean };
-        Returns: undefined;
-      };
-      /** 봇 답변을 채팅에 남긴다 — 사람 인증으로는 sender_id 없이 못 넣는다. */
-      post_bigbrother_message: {
-        Args: { p_conversation: string; p_content: string };
-        Returns: string;
-      };
       /** 대화에 연결된 항목 + 제목을 종류별 테이블에서 모아 준다. */
       list_conversation_plugins: {
         Args: { p_conversation_id: string };
         Returns: { kind: string; object_id: string; title: string; subtitle: string | null }[];
       };
+      /** 에이전트가 고친 코드 파일을 열어 둔 편집기들에 증분 Yjs 업데이트로 밀어준다. */
       broadcast_code_yupdate: {
         Args: { p_file_id: string; p_update: string };
         Returns: undefined;
@@ -1047,6 +1136,39 @@ export interface Database {
           title: string;
           subtitle: string | null;
           updated_at: string | null;
+        }[];
+      };
+
+      // ---- 0075: storage locality ----
+      list_code_repositories: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          name: string;
+          github_owner: string | null;
+          github_repo: string | null;
+          github_ref: string | null;
+          imported_at: string | null;
+          created_at: string;
+          file_count: number;
+        }[];
+      };
+      list_repository_contents: {
+        Args: { p_repository?: string | null };
+        Returns: { kind: string; id: string; label: string }[];
+      };
+      get_repository_graph: {
+        Args: { p_repository: string };
+        Returns: Json;
+      };
+      get_object_events: {
+        Args: { p_kind: string; p_id: string };
+        Returns: {
+          id: string;
+          title: string;
+          starts_at: string;
+          all_day: boolean;
+          calendar_id: string;
         }[];
       };
 
@@ -1272,6 +1394,24 @@ export interface Database {
           reminder_minutes: number | null;
           time_zone: string;
           exceptions: string[];
+        }[];
+      };
+      record_perf_sample: {
+        Args: { p_feature: string; p_ms: number };
+        Returns: void;
+      };
+      get_perf_percentiles: {
+        Args: { p_window_hours?: number };
+        Returns: {
+          feature: string;
+          n: number;
+          p50: number | null;
+          p90: number | null;
+          p95: number | null;
+          p99: number | null;
+          p999: number | null;
+          max_ms: number | null;
+          outlier_pct: number | null;
         }[];
       };
     };
