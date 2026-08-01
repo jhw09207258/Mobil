@@ -62,10 +62,13 @@
   margin-top: 2px;
 }
 
-/* legend */
+/* legend — auto-fit(not auto-fill): 채워진 항목 수만큼만 트랙을 만들어
+   fr 단위가 남는 폭으로 재분배되게 한다. auto-fill 은 항목이 적어도 폭에
+   맞는 트랙 수를 그대로 예약해 버려, 태블릿 폭(~900px)처럼 카드가 넓은데
+   카테고리가 2~3개뿐인 경우 오른쪽이 텅 비어 보이는 버그가 있었다. */
 .stg-legend {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px 16px;
   flex: 1;
   min-width: 0;
@@ -126,4 +129,14 @@
   background: #3987e5;
   min-width: 2px;
   transition: width 0.3s;
+}
+
+/* MY STORAGE USAGE / SHARE OF PLATFORM TOTAL / MY SHARE ID 를 하나의
+   STORAGE 카드로 합칠 때 각 구획을 구분선으로만 나눈다(카드 자체를
+   늘리지 않기 위해). */
+.stg-share-inline,
+.stg-shareid-inline {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-0);
 }

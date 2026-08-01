@@ -4,8 +4,8 @@ import { requireUser } from "@/lib/auth";
 
 // ============================================================================
 // 코드 어시스트 — 에디터에서 선택한 코드에 대해 설명/리팩터/버그 수정/테스트를
-// 요청한다. Sophia 가 쓰는 NVIDIA 엔드포인트는 Vercel(icn1)에서 계속
-// 실패하므로(docs/ASSESSMENT.md 5.1) 이 화면만큼은 Anthropic 을 직접 호출한다.
+// 요청한다. NVIDIA NIM 엔드포인트는 Vercel(icn1)에서 계속 실패하므로
+// (docs/ASSESSMENT.md 5.1) 이 화면만큼은 Anthropic 을 직접 호출한다.
 // ============================================================================
 
 export const maxDuration = 60;

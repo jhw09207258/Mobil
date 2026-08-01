@@ -8,7 +8,9 @@ import { isLangKey, type LangKey } from "@/lib/languages";
 import { Modal } from "@/components/modal";
 import {
   IconEdit, IconTrash, IconClose, IconMore, IconChevronRight, IconChevronDown, IconChevronLeft,
+  IconRefresh, IconPlus,
 } from "../../../icons";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/lib/use-media-query";
 import {
   addCodeFileToRepo,
@@ -480,12 +482,21 @@ export function CodeSpaceWorkspace({
               <button className="btn btn-sm" onClick={() => setDialog({ kind: "new" })}>
                 New file
               </button>
-              <button className="btn btn-sm" onClick={() => uploadRef.current?.click()} disabled={uploading}>
-                {uploading ? "Adding…" : "Add files"}
-              </button>
-              <button className="btn btn-sm" onClick={onFilesChanged} title="Reload files changed by the agent">
-                Refresh
-              </button>
+              <Tooltip content={uploading ? "Adding…" : "Add files"}>
+                <button
+                  className="btn btn-sm btn-icon"
+                  onClick={() => uploadRef.current?.click()}
+                  disabled={uploading}
+                  aria-label={uploading ? "Adding…" : "Add files"}
+                >
+                  <IconPlus size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip content="Reload files changed by the agent">
+                <button className="btn btn-sm btn-icon" onClick={onFilesChanged} aria-label="Refresh">
+                  <IconRefresh size={14} />
+                </button>
+              </Tooltip>
               <button className="btn btn-sm" onClick={() => setDialog({ kind: "github" })}>
                 Push to GitHub
               </button>

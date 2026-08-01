@@ -149,10 +149,6 @@ export function StorageShareBar({
           style={{ width: `${Math.min(100, Math.max(pct > 0 ? 1.5 : 0, pct))}%` }}
         />
       </div>
-      <p className="page-sub" style={{ margin: "10px 0 0" }}>
-        You are using <strong style={{ color: "var(--text-0)" }}>{formatBytes(myBytes)}</strong> of
-        the shared Possion storage pool.
-      </p>
       <p className="card-source">
         Source · Supabase Storage — project-wide bucket usage (files, documents,
         code, tables, link graphs and media), refreshed on each dashboard load.

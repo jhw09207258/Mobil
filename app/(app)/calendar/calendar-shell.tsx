@@ -8,6 +8,7 @@ import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { Copyable } from "@/components/copyable";
 import { ShimmeringText } from "@/components/ui/shimmering-text";
+import { Tooltip } from "@/components/ui/tooltip";
 import { expandOccurrences } from "@/lib/recurrence";
 import { useIsMobile } from "@/lib/use-media-query";
 import {
@@ -391,7 +392,7 @@ export function CalendarShell({
       {notice && (
         <div className="notice notice-info cal-notice">
           <span>{notice}</span>
-          <button className="btn btn-ghost btn-sm" onClick={() => setNotice(null)} aria-label="Dismiss">
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={() => setNotice(null)} aria-label="Dismiss">
             <IconClose size={11} />
           </button>
         </div>
@@ -408,7 +409,7 @@ export function CalendarShell({
           <div className="cal-side-head">
             <span className="label">MY CALENDARS</span>
             <button
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-sm btn-icon"
               onClick={() => setCalendarDialog("new")}
               title="New calendar"
               aria-label="New calendar"
@@ -1212,9 +1213,16 @@ function SubscribeDialog({
           <div className="empty">{busy ? "Creating…" : "—"}</div>
         )}
         <div className="row" style={{ gap: 6, marginTop: 8 }}>
-          <button className="btn btn-sm" disabled={busy} onClick={() => loadToken(true)}>
-            <IconRefresh size={13} /> Reset link
-          </button>
+          <Tooltip content="Reset link">
+            <button
+              className="btn btn-sm btn-icon"
+              disabled={busy}
+              onClick={() => loadToken(true)}
+              aria-label="Reset link"
+            >
+              <IconRefresh size={13} />
+            </button>
+          </Tooltip>
           <span className="muted" style={{ fontSize: 11 }}>
             Resetting stops any calendar app already using the old link.
           </span>

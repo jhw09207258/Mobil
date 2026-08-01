@@ -102,22 +102,22 @@ export function SheetList({
                     onChange={(v) => setStarred(s.id, v)}
                   />
                 </td>
-                <td>
+                <td className="table-cell-title">
                   <OpenItemButton kind="sheet" id={s.id} title={s.title || "Untitled sheet"} className="link-btn">
                     {s.title || "Untitled sheet"}
                   </OpenItemButton>
                 </td>
-                <td>
+                <td data-label="Visibility">
                   {s.is_public ? (
                     <span className="badge badge-ok">public</span>
                   ) : (
                     <span className="badge">private</span>
                   )}
                 </td>
-                <td>
+                <td data-label="Owner">
                   <span className="badge">{s.owner_id === userId ? "Mine" : "Shared"}</span>
                 </td>
-                <td className="mono muted" style={{ fontSize: 12 }}>
+                <td className="mono muted" data-label="Updated" style={{ fontSize: 12 }}>
                   {formatDate(s.updated_at)}
                 </td>
                 <td>

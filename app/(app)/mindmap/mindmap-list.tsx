@@ -59,22 +59,22 @@ export function MindMapList({ maps, userId }: { maps: MapRow[]; userId: string }
           <tbody>
             {filtered.map((m) => (
               <tr key={m.id}>
-                <td>
+                <td className="table-cell-title">
                   <OpenItemButton kind="mindmap" id={m.id} title={m.title || "Untitled map"} className="link-btn">
                     {m.title || "Untitled map"}
                   </OpenItemButton>
                 </td>
-                <td>
+                <td data-label="Visibility">
                   {m.is_public ? (
                     <span className="badge badge-ok">public</span>
                   ) : (
                     <span className="badge">private</span>
                   )}
                 </td>
-                <td>
+                <td data-label="Owner">
                   <span className="badge">{m.owner_id === userId ? "Mine" : "Shared"}</span>
                 </td>
-                <td className="mono muted" style={{ fontSize: 12 }}>
+                <td className="mono muted" data-label="Updated" style={{ fontSize: 12 }}>
                   {formatDate(m.updated_at)}
                 </td>
                 <td>

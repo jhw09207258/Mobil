@@ -13,6 +13,7 @@ import {
 } from "../sharing/actions";
 import { OpenItemButton } from "../workspace/open-item-button";
 import { SendToChatButton } from "../send-to-chat-button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { IconClose } from "../icons";
 import {
   deleteEvent,
@@ -59,6 +60,21 @@ const KIND_LABEL: Record<string, string> = {
   event: "Event",
 };
 
+// 이벤트 색 프리셋 — 캘린더 생성창의 CALENDAR_COLORS(calendar-shell.tsx)와
+// 같은 팔레트에 의미(태그)를 붙인 것. null(첫 항목)이면 색을 지정하지 않고
+// 캘린더 자체 색을 그대로 물려받는다(색이 nullable 인 이유가 이것).
+const EVENT_COLOR_PRESETS: { value: string | null; label: string }[] = [
+  { value: null, label: "Calendar default" },
+  { value: "#3b82f6", label: "Work" },
+  { value: "#8b5cf6", label: "Meeting" },
+  { value: "#ef4444", label: "Urgent" },
+  { value: "#f59e0b", label: "Deadline" },
+  { value: "#10b981", label: "Personal" },
+  { value: "#14b8a6", label: "Travel" },
+  { value: "#ec4899", label: "Social" },
+  { value: "#6b7280", label: "Other" },
+];
+
 export function EventDialog({
   mode,
   calendars,
@@ -104,6 +120,7 @@ export function EventDialog({
         : toLocalInput(mode.seed.end)
       : ""
   );
+  const [color, setColor] = useState<string | null>(null);
   const [location, setLocation] = useState("");
   const [conferenceUrl, setConferenceUrl] = useState("");
   const [description, setDescription] = useState("");
@@ -149,6 +166,7 @@ export function EventDialog({
         const e = new Date(d.ends_at);
         setStartInput(d.all_day ? toDateInputUtc(s) : toLocalInput(s));
         setEndInput(d.all_day ? toDateInputUtc(e) : toLocalInput(e));
+        setColor(d.color);
         setLocation(d.location ?? "");
         setConferenceUrl(d.conference_url ?? "");
         setDescription(d.description ?? "");
@@ -310,6 +328,7 @@ export function EventDialog({
         endsAt: end.toISOString(),
         allDay,
         description,
+        color,
         location,
         conferenceUrl,
         // 반복 일정이 시차를 넘어도 원래 의도를 알 수 있게 만든 사람의 시간대를 남긴다.
@@ -516,6 +535,24 @@ export function EventDialog({
             disabled={!editable}
             onChange={(e) => setEndInput(e.target.value)}
           />
+        </div>
+      </div>
+
+      <div className="field">
+        <label className="label">COLOUR</label>
+        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+          {EVENT_COLOR_PRESETS.map((p) => (
+            <Tooltip key={p.label} content={p.label}>
+              <button
+                type="button"
+                className={`cal-color ${color === p.value ? "on" : ""} ${p.value === null ? "cal-color-inherit" : ""}`}
+                style={p.value ? { background: p.value } : undefined}
+                disabled={!editable}
+                onClick={() => setColor(p.value)}
+                aria-label={`Colour: ${p.label}`}
+              />
+            </Tooltip>
+          ))}
         </div>
       </div>
 

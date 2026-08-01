@@ -1,12 +1,108 @@
-# Possion (H-1 Prototype, beta v1.6.18)
+# Possion (H-1 Prototype, beta v1.6.20)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in August 1, v1.6.18 by Haewon Jeong
+Last Update in August 1, v1.6.20 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## 대시보드 재구성 · 저장소 그래프 SNA · 모바일 리스트 · 캘린더 색상 (v1.6.20)
+
+**요청**: 여덟 가지. (1) Refresh/Add new 류의 "아이콘+텍스트" 알약 버튼을
+앱 전반에서 아이콘만 있는 원형으로 바꾸되(단, "Manage all Possion users"
+류의 의미 있는 라벨 버튼은 유지), (2) 대시보드 LIVE 배지 제거 + 태블릿
+폭에서 저장공간 카드 우측이 비는 버그 수정 + 데스크톱에서 세로 스크롤 없이
+한 화면에 들어오게, (3) Repository 의 List/Graph 를 Switch 형 토글로 분리하고
+그래프에 클릭/스크롤/확대(팬·줌) 지원 + 실제 연결관계(object_links)를 SNA
+알고리즘(Brandes 매개 중심성, Louvain 커뮤니티 탐지)으로 시각화, (4) 문서
+목록류(Docs/Sheets/Link Graph/Code Space/Files/Trash)의 모바일 좌우 스크롤을
+없애고 세로 카드로, (5) 캘린더 인터페이스 보완, (6) PC/모바일 인터페이스를
+사용 방식에 맞게 다르게 설계, (7) 캘린더 일정에 색상+의미(태그) 지정 기능
+추가(채팅 공유는 이미 있음). 마지막으로 기능 검증과 PC 레이아웃 스크린샷을
+요청.
+
+### 아이콘 전용 원형 버튼
+
+`app/globals.css` 에 `.btn-icon`(정사각형 → `border-radius:999px`, 기존
+`.btn`/`.btn-sm`/`.btn-primary`/`.btn-ghost` 와 조합) 을 추가하고
+Refresh(`refresh-button.tsx`), 각 페이지의 "+ New"/"Add files" 류 버튼,
+저장소의 Upload File(원형 `+`, `.btn-group-sep` 구분선으로 나머지
++Doc/+Table 묶음과 분리), 캘린더 "New calendar"/"Reset link" 등을
+전환했다. 이미 아이콘만 있었지만 원형이 아니었던 Undo/Redo/닫기 버튼들도
+같은 클래스를 입혀 통일했다. 터치 기기(`@media (pointer: coarse)`)에서는
+시각 크기는 그대로 두고 히트 영역만 WCAG 권장치(~44px)에 가깝게 키웠다.
+
+### 대시보드 — 스크롤 없이 한 화면
+
+LIVE 배지(`GlowingBadge`) 제거, 그래프 높이 축소(150px→110px), UP NEXT
+목록을 3~4개로 캡(`max-height` + 내부 스크롤), 사이드바의 MY STORAGE
+USAGE/SHARE OF PLATFORM TOTAL/MY SHARE ID 세 카드를 STORAGE 카드 하나로
+병합(구분선만으로 구획). 저장공간 범례가 태블릿 폭에서 오른쪽이 비어
+보이던 버그는 `.stg-legend` 의 `grid-template-columns` 가
+`auto-fill`(항목 수와 무관하게 폭에 맞는 트랙을 예약) 이었던 게 원인 —
+`auto-fit`(빈 트랙을 접어 채워진 항목이 남는 폭으로 재분배)으로 고쳤다.
+
+### 저장소 그래프 — 팬/줌 + SNA
+
+List/Graph 탭 버튼을 `Switch` 하나로(라벨 클릭 또는 드래그로 토글).
+그래프 SVG 에 휠/핀치 확대·배경 드래그로 팬·리셋 버튼을 추가했다(이전엔
+클릭 내비게이션과 노드 드래그만 가능했다). 그래프 자체는 이미
+`get_repository_graph`(0078)로 실제 `object_links`/폴더 포함관계/캘린더
+연결을 그리고 있었다 — 여기에 SNA 두 지표를 얹었다: 노드 반지름은 Brandes
+매개 중심성(다리 역할을 하는 노드일수록 큼), 테두리 색은 Louvain
+커뮤니티(같은 색 = 촘촘히 엮인 군집). 두 알고리즘은
+`lib/graph-sna.ts`(순수 함수) + `lib/graph-sna.test.mjs`(다리/별/완전
+그래프로 매개 중심성을, 두 삼각형이 다리 하나로 이어진 그래프로 커뮤니티
+분리를 검증)로 독립적으로 테스트했다.
+
+### 모바일 리스트 — 카드로 펼치기
+
+`.table` 이 640px 이하에서 각 `<tr>` 을 세로 카드로 펼치도록
+`app/globals.css` 에 규칙을 추가했다 — 헤더 행은 숨기고(`data-label`
+속성이 그 역할을 대신한다), 제목 칸(`.table-cell-title`)은 카드 제목처럼
+크게, 값이 있는 칸은 `라벨 · 값` 형태로 양쪽 정렬. Documents/Sheets/Link
+Graph/Files/Trash 각 리스트의 `<td>` 에 `data-label` 을 달았고, 이전엔
+모바일에서 `.col-hide-mobile` 로 통째로 숨기던 열(Code Space 의 Source,
+Files 의 Size/Move to, Trash 의 Type)도 이제 라벨 붙은 줄로 보여준다 —
+정보를 숨기는 대신 세로로 펼치는 쪽을 택했다.
+
+### 캘린더 — 일정별 색상(태그)
+
+`calendar_events.color`(nullable — null 이면 캘린더 자체 색 상속)와
+`save_calendar_event` RPC 는 이미 색을 받고 있었고, 월/주/일/아젠다
+렌더링도 `eventColor()` 로 이미 그 값을 읽고 있었다 — 다만 일정
+편집창에 색을 고르는 UI 자체가 없었다. 캘린더 생성창의 원형 스와치
+(`.cal-color`)를 재사용해 이름이 붙은 프리셋(Work/Meeting/Urgent/
+Deadline/Personal/Travel/Social/Other + "Calendar default")을 추가했다
+— 색마다 의미가 고정돼 있어야 "태깅"의 의미가 생기므로, 자유 색상 선택
+대신 이름 있는 팔레트로 설계했다. 채팅으로 일정 공유는 이미
+`SendToChatButton` 으로 되어 있었다.
+
+### Sophia 삭제 (v1.6.19)
+
+0082 는 Big Brother 만 지우고 Sophia(`/sophia`, 개인 AI 채팅)는 남겨
+뒀는데, 이번엔 그 기능 자체가 필요 없다는 요청으로 코드를 통째로
+지웠다. `app/(app)/sophia/`, `app/api/sophia/`,
+`lib/big-brother-*.ts`(Big Brother 삭제 때 놓친 잔재), `lib/bb-attachments*.ts`,
+`lib/paper-code-search.ts`, `lib/code-space.ts`, `components/thinking-indicator.tsx`
+삭제. `code-agent`/`code-assist`(별개의 실제 기능, GEMINI/CLAUDE 키를
+공유할 뿐)와 `lib/embeddings.ts`(헤더 검색의 RAG 파이프라인, Sophia 와
+무관하게 계속 쓰임)는 감사 후 남겼다. 마이그레이션 0083 이 `ai_conversations`/
+`ai_messages`/`ai_conversation_plugins` 세 테이블과 `list_conversation_plugins()`
+를 지운다.
+
+### 검증
+
+`npx tsc --noEmit`, `npm run build`, `node --test`(18개, `graph-sna.test.mjs`
+신규) 모두 통과. 라이브 Supabase 프로젝트나 `.env.local` 이 이 작업 환경에
+없어 실제 인증된 화면을 띄워 볼 수는 없었다 — 대신 실제 프로젝트 CSS를
+그대로 복사해 정적 HTML로 재현하고 Playwright(사전 설치된 Chromium)로
+여러 뷰포트(1440/1280/900/390px)에서 스크린샷을 찍어 레이아웃을
+검증했다(대시보드 태블릿 폭 버그 재현/수정 확인, 모바일 카드 스택,
+그래프 팬·줌 CSS, 터치 히트 영역 실측 포함). 이 방식이 실제 앱 코드가
+아니라 그 복제본을 그린 것이라는 한계는 있다.
 
 ## 팀(워크스페이스) 시스템 + Big Brother 삭제 (v1.6.18)
 
@@ -211,7 +307,7 @@ ShimmeringText, Switch, ThemeSwitch, CopyButton, RefreshButton)를 붙여넣고,
 | `CopyButton` | `components/ui/copy-button.tsx` | `components/copyable.tsx` 내부 — 예전엔 Copyable 이 복사 상태/타이머를 직접 들고 있었는데, 그 로직을 통째로 이 프리미티브로 옮겨 중복을 줄였다(공유 ID 카드 등 7곳 호출부는 그대로) |
 | `RefreshButton` | `components/ui/refresh-button.tsx` | 대시보드/`admin/observability` 페이지 헤더 — 둘 다 `force-dynamic` 서버 컴포넌트라 새로고침 말고는 다시 불러올 방법이 없었다. `router.refresh()` 호출 |
 | `Tooltip` | `components/ui/tooltip.tsx` | 헤더의 햄버거 메뉴 버튼 + 모바일 검색 아이콘 버튼 — 아이콘만 있고 `aria-label` 뿐이던 자리에 순수 CSS 호버/포커스 툴팁(위치 계산 라이브러리 없음) |
-| `ShimmeringText` | `components/ui/shimmering-text.tsx` | 캘린더 상단 "Loading…" — Sophia 의 파티클 캔버스 `ThinkingIndicator`(무거운 연산용)와는 다르게, 한 줄짜리 짧은 대기 문구용 |
+| `ShimmeringText` | `components/ui/shimmering-text.tsx` | 캘린더 상단 "Loading…" — 한 줄짜리 짧은 대기 문구용, CSS 그라디언트만 쓰고 무거운 연산은 없다 |
 
 **적용 위치를 고를 때의 원칙**: 이미 같은 역할을 하는 게 있으면 새로 안
 얹었다(CommandMenu/ThemeSwitch). 로직을 새로 만들어야 하면 만들지 않고
@@ -1448,8 +1544,7 @@ party 위젯이라 자체 터치 최적화 여부를 보장할 수 없어 `.sh-p
 | 설정 | 표시 이름 변경, 이메일·권한·공유 ID 확인 |
 | 감사 | 주요 작업을 `audit_logs` 에 기록, 관리자 콘솔에서 조회 |
 | 온톨로지 검색 | 헤더 통합 검색 — 문서·코드·시트·마인드맵·파일을 한 번에 검색하고, 결과별로 연결된 다른 항목을 펼쳐서 확인 |
-| Sophia | 대화형 인텔리전스 어시스턴트(`/sophia`) — 온톨로지 검색·RAG(시맨틱 검색)·워크스페이스 읽기/쓰기·외부 논문/GitHub 검색(`search_papers_and_code` 도구)을 쓰는 LLM 챗 |
-| 시맨틱 검색(RAG) | 헤더 검색에 의미 기반 결과 병행 표시(마이그레이션 0041, pgvector + NVIDIA nv-embedqa-e5-v5) — 저장 시 내용 해시가 바뀐 경우에만 임베딩 재계산(`lib/embeddings.ts`), 어휘(tsvector)+의미 하이브리드, RLS(can_view_object) 동일 적용, 임베딩 API 장애 시 어휘 검색만으로 우아하게 강등. Sophia 에도 `semantic_search` 도구 추가(의미 검색→읽기→종합 = RAG). 연결 항목 펼침은 온톨로지 그래프 2단계 탐색(`get_linked_objects_deep`, 재귀 CTE, "via X" 표시) |
+| 시맨틱 검색(RAG) | 헤더 검색에 의미 기반 결과 병행 표시(마이그레이션 0041, pgvector + NVIDIA nv-embedqa-e5-v5) — 저장 시 내용 해시가 바뀐 경우에만 임베딩 재계산(`lib/embeddings.ts`), 어휘(tsvector)+의미 하이브리드, RLS(can_view_object) 동일 적용, 임베딩 API 장애 시 어휘 검색만으로 우아하게 강등. 연결 항목 펼침은 온톨로지 그래프 2단계 탐색(`get_linked_objects_deep`, 재귀 CTE, "via X" 표시) |
 | Comms(팀 채팅) | 사용자 간 DM·그룹 채팅(`/chat`, 마이그레이션 0040) — Supabase Realtime Broadcast(private 채널, 멤버만 수신/발신) 실시간 전달, 안 읽음 배지, 그룹 멤버 추가/나가기. 메시지에 문서/코드/시트/마인드맵을 첨부(⛓)하면 칩으로 표시되고 클릭 시 워크스페이스 탭으로 바로 열린다 — 채팅이 콘텐츠 도구와 한 몸으로 동작. 라이브 기능(0042): 앱 어디서나 쓰는 우하단 플로팅 채팅(버블↔패널, 확대/최소화), 새 메시지 인스타풍 토스트 알림(DB 트리거가 각 멤버의 개인 `user:<id>` topic 으로 fanout), 타이핑 표시("X is typing…"), 읽음 확인(내 마지막 메시지에 Sent/Read/Read by N). 메시지 서식(경량 마크다운, `markdown-parse.ts`): **굵게**·*기울임*·__밑줄__·~~취소선~~·`인라인 코드`·코드 블록·[링크](URL)·URL 자동 링크·번호/글머리표 목록·들여쓰기·@멘션 — Aa 토글 서식 툴바 + 이모지/멘션 메뉴. 플로팅 위젯은 /chat 페이지에서는 숨김. 긴 메시지 접기/펼치기(Show more), 프로필 사진 전면 연동(0043 — 대화 목록·메시지·토스트·멘션/연락처), 스플릿 뷰에 채팅 탭("Open as tab" — 한쪽엔 채팅, 한쪽엔 문서/코드) |
 | 테마 | 라이트/다크 두 모드(설정에서 선택, `lib/theme.ts` → `<html data-theme>`) — 팔레트는 globals.css CSS 변수(:root=다크, [data-theme=light])가 담당. 주요 버튼 액센트는 블루(구 그린 교체, `--ok` 상태 초록은 유지). localStorage + 루트 인라인 스크립트로 첫 페인트 전 적용(FOUC 없음). 알려진 한계: 코드미러/시트 에디터 캔버스는 아직 다크 고정, 마인드맵은 열 때의 모드를 따름 |
 | 저장소(Repositories) | 문서·코드·시트·마인드맵·파일을 저장소 단위로 묶는다(0044). NULL = "Null Repository". /files 는 **Google Drive 풍 목록 테이블**(타입 아이콘 + 이름 + 액션)로, 랜딩은 저장소 목록·상세는 그 저장소의 Possion 항목·파일 목록. 생성/이름변경은 모달 입력(Tauri 웹뷰에서 prompt 가 동작하지 않는 문제 시정). 각 에디터 상단바 저장소 선택으로도 이동/생성 |

@@ -54,6 +54,7 @@ import {
   type ObjectCard,
 } from "../sharing/actions";
 import { FilePreview, type PreviewTarget } from "@/components/file-preview";
+import { Tooltip } from "@/components/ui/tooltip";
 import { getSignedUrl } from "../files/actions";
 import { triggerDownload } from "@/lib/download-file";
 import { formatBytes } from "@/lib/format";
@@ -1166,9 +1167,15 @@ export function ChatShell({
         <div className="chat-list">
           <div className="chat-list-head">
             <span className="label">CONVERSATIONS</span>
-            <button className="btn btn-sm btn-primary" onClick={() => setDialog("new")}>
-              + New
-            </button>
+            <Tooltip content="New conversation">
+              <button
+                className="btn btn-sm btn-primary btn-icon"
+                onClick={() => setDialog("new")}
+                aria-label="New conversation"
+              >
+                <IconPlus size={15} />
+              </button>
+            </Tooltip>
           </div>
           <div className="chat-conv-list">
             {conversations.length === 0 && (

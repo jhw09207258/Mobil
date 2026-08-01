@@ -22,7 +22,10 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconEye,
+  IconPlus,
 } from "../icons";
+import { Tooltip } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import { RepositoryGraph } from "../repositories/repository-graph";
 import {
   deleteFile,
@@ -340,12 +343,15 @@ export function FilesClient({
                 folders. Open one to view as a list or as a graph.
               </p>
             </div>
-            <button
-              className="btn btn-primary"
-              onClick={() => setRepoDialog({ mode: "create", name: "", parentId: null })}
-            >
-              + New repository
-            </button>
+            <Tooltip content="New repository">
+              <button
+                className="btn btn-primary btn-icon"
+                onClick={() => setRepoDialog({ mode: "create", name: "", parentId: null })}
+                aria-label="New repository"
+              >
+                <IconPlus size={16} />
+              </button>
+            </Tooltip>
           </div>
           <div className="panel">
             <div className="panel-header">
@@ -367,7 +373,7 @@ export function FilesClient({
                         <IconFiles size={16} />
                       </span>
                     </td>
-                    <td>
+                    <td className="table-cell-title">
                       <span className="drive-name">Null Repository</span>
                       <span className="drive-sub">Unfiled items</span>
                     </td>
@@ -380,7 +386,7 @@ export function FilesClient({
                           <IconFiles size={16} />
                         </span>
                       </td>
-                      <td>
+                      <td className="table-cell-title">
                         <span className="drive-name">{r.name}</span>
                       </td>
                       <td>
@@ -435,19 +441,23 @@ export function FilesClient({
             </div>
             <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
               {repoView !== "null" && (
-                <div className="row" role="tablist" aria-label="View" style={{ gap: 2 }}>
-                  <button
-                    className={`btn btn-sm ${viewMode === "list" ? "chat-tool-active" : ""}`}
+                <div className="view-switch" role="group" aria-label="View">
+                  <span
+                    className={`view-switch-label ${viewMode === "list" ? "active" : ""}`}
                     onClick={() => setViewMode("list")}
                   >
                     List
-                  </button>
-                  <button
-                    className={`btn btn-sm ${viewMode === "graph" ? "chat-tool-active" : ""}`}
+                  </span>
+                  <Switch
+                    checked={viewMode === "graph"}
+                    onCheckedChange={(v) => setViewMode(v ? "graph" : "list")}
+                  />
+                  <span
+                    className={`view-switch-label ${viewMode === "graph" ? "active" : ""}`}
                     onClick={() => setViewMode("graph")}
                   >
                     Graph
-                  </button>
+                  </span>
                 </div>
               )}
               <button className="btn btn-sm" disabled={creating} onClick={() => onNewItem("document")}>+ Doc</button>
@@ -462,9 +472,17 @@ export function FilesClient({
                 </button>
               )}
               <input ref={inputRef} type="file" multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
-              <button className="btn btn-primary btn-sm" onClick={onPick} disabled={uploading}>
-                {uploading ? "Uploading…" : "Upload file"}
-              </button>
+              <span className="btn-group-sep" aria-hidden="true" />
+              <Tooltip content={uploading ? "Uploading…" : "Upload file"}>
+                <button
+                  className="btn btn-primary btn-sm btn-icon"
+                  onClick={onPick}
+                  disabled={uploading}
+                  aria-label={uploading ? "Uploading…" : "Upload file"}
+                >
+                  <IconPlus size={15} />
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -508,8 +526,8 @@ export function FilesClient({
                         <th style={{ width: 34 }}></th>
                         <th>Name</th>
                         <th style={{ width: 90 }}>Type</th>
-                        <th style={{ width: 90 }} className="col-hide-mobile">Size</th>
-                        <th style={{ width: 150 }} className="col-hide-mobile">Move to</th>
+                        <th style={{ width: 90 }}>Size</th>
+                        <th style={{ width: 150 }}>Move to</th>
                         <th style={{ width: 220 }}></th>
                       </tr>
                     </thead>
@@ -534,7 +552,7 @@ export function FilesClient({
                                 </span>
                               )}
                             </td>
-                            <td>
+                            <td className="table-cell-title">
                               {row.kind === "folder" ? (
                                 <span className="drive-name">{row.label}</span>
                               ) : row.kind === "file" ? (
@@ -551,13 +569,13 @@ export function FilesClient({
                                 </OpenItemButton>
                               )}
                             </td>
-                            <td>
+                            <td data-label="Type">
                               <span className="badge">{KIND_LABEL[row.kind]}</span>
                             </td>
-                            <td className="mono muted col-hide-mobile">
+                            <td className="mono muted" data-label="Size">
                               {row.kind === "file" ? formatBytes(f?.size_bytes ?? null) : "—"}
                             </td>
-                            <td className="col-hide-mobile" onClick={(e) => e.stopPropagation()}>
+                            <td data-label="Move to" onClick={(e) => e.stopPropagation()}>
                               <select
                                 className="select repo-picker"
                                 value=""
