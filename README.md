@@ -1,12 +1,64 @@
-# Possion (H-1 Prototype, beta v1.6.16)
+# Possion (H-1 Prototype, beta v1.6.17)
 
 Schema Tool for Users. Orchestrate Intelligence.
 
-Last Update in August 1, v1.6.16 by Haewon Jeong
+Last Update in August 1, v1.6.17 by Haewon Jeong
 Co-development with Yegrina Haute Group Infrastructrue.
 more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
+
+## UI 프리미티브 7종 — unlumen-ui 참고 (v1.6.17)
+
+**요청**: [unlumen-ui](https://github.com/leovvx/unlumen-ui-docs) 문서 사이트의
+데모 코드 9개(CommandMenu, FloatingTooltip, GlowingBadge, Kbd/Shortcut,
+ShimmeringText, Switch, ThemeSwitch, CopyButton, RefreshButton)를 붙여넣고,
+"내용/틀만 따오고 우리가 적용할 수 있는 부분에 적용"해 달라는 요청. 이
+데모들은 Tailwind + lucide-react + motion(Framer Motion) 위에 그려져 있는데,
+이 프로젝트는 셋 다 쓰지 않는다(순수 CSS 커스텀 프로퍼티 + 자체 SVG 아이콘
+세트 `app/(app)/icons.tsx`) — 그대로 옮기지 않고 각 컴포넌트의 **동작
+패턴**만 뽑아 `components/ui/` 밑에 Possion 토큰으로 새로 그렸다.
+
+### 일부러 만들지 않은 것
+
+- **CommandMenu(⌘K 팔레트)** — 이미 `app/(app)/header-search.tsx` 가 어휘
+  검색 + 의미 검색을 동시에 돌리는 상시 노출 검색창이고, `app/(app)/
+  shortcuts.tsx` 가 `g h`/`g d`/`g c` 같은 프리픽스 이동과 `?` 도움말을
+  이미 제공한다. 팔레트를 새로 얹으면 같은 일을 하는 UI 가 두 개가 되고,
+  단축키 충돌(브라우저 자체 ⌘K/Ctrl+K 와 겹침) 위험만 남는다.
+- **ThemeSwitch** — Settings 의 `ThemePicker` 가 이미 라이트/다크 전환을
+  맡고 있다. 헤더에 아이콘 하나를 더 얹는 대신, v1.6.2 감사에서 정한
+  미니멀리즘 원칙을 지켰다.
+
+### 만든 프리미티브와 적용한 자리
+
+| 컴포넌트 | 파일 | 적용한 곳 |
+| --- | --- | --- |
+| `Kbd` / `Shortcut` | `components/ui/kbd.tsx` | `shortcuts.tsx` 도움말 모달 — 예전엔 "g h" 를 배지 하나에 통째로 넣었는데, 키마다 따로 도드라진 키캡으로 |
+| `Switch` | `components/ui/switch.tsx` | `settings/notification-toggle.tsx` — 네이티브 체크박스를 시각적으로만 교체(로직·접근성은 실제 `<input type=checkbox>` 그대로) |
+| `GlowingBadge` | `components/ui/glowing-badge.tsx` | 대시보드 "LIVE DATA THROUGHPUT" 카드 — 실제로 실시간(PerformanceObserver 1초 주기)인 위젯이라 자연스러운 자리 |
+| `CopyButton` | `components/ui/copy-button.tsx` | `components/copyable.tsx` 내부 — 예전엔 Copyable 이 복사 상태/타이머를 직접 들고 있었는데, 그 로직을 통째로 이 프리미티브로 옮겨 중복을 줄였다(공유 ID 카드 등 7곳 호출부는 그대로) |
+| `RefreshButton` | `components/ui/refresh-button.tsx` | 대시보드/`admin/observability` 페이지 헤더 — 둘 다 `force-dynamic` 서버 컴포넌트라 새로고침 말고는 다시 불러올 방법이 없었다. `router.refresh()` 호출 |
+| `Tooltip` | `components/ui/tooltip.tsx` | 헤더의 햄버거 메뉴 버튼 + 모바일 검색 아이콘 버튼 — 아이콘만 있고 `aria-label` 뿐이던 자리에 순수 CSS 호버/포커스 툴팁(위치 계산 라이브러리 없음) |
+| `ShimmeringText` | `components/ui/shimmering-text.tsx` | 캘린더 상단 "Loading…" — Big Brother 의 파티클 캔버스 `ThinkingIndicator`(무거운 연산용)와는 다르게, 한 줄짜리 짧은 대기 문구용 |
+
+**적용 위치를 고를 때의 원칙**: 이미 같은 역할을 하는 게 있으면 새로 안
+얹었다(CommandMenu/ThemeSwitch). 로직을 새로 만들어야 하면 만들지 않고
+기존 로직을 프리미티브로 옮겨 담기만 했다(CopyButton — Copyable 의 복사
+동작은 그대로, 코드만 한 곳으로 모았다). Tooltip 은 `overflow: hidden` 인
+카드/패널 안에서 쓰면 말풍선이 잘린다는 걸 검증 과정에서 확인해서,
+`overflow` 가 없는 헤더 안에만 적용했다.
+
+### 검증
+
+- `npx tsc --noEmit`, `npm run build` — 전부 경고 없이 통과
+- `node --test` — 기존 단위 테스트 19개 그대로 통과(회귀 없음)
+- 정적 HTML 하네스(실제 프로젝트 CSS 그대로 링크) + Playwright Chromium 으로
+  320~768px 폭에서 7개 프리미티브를 전부 렌더링해 확인. `scrollWidth`
+  점검에서 새 오탐 하나가 잡혔는데(Tooltip 을 `overflow:hidden` 카드
+  안에 넣은 하네스 데모 박스 — 실제 제품 코드에는 그런 배치가 없다),
+  실제 적용 위치(`.app-header`, `.hsearch`)는 둘 다 `overflow` 속성이
+  없어 말풍선이 잘리지 않는 것을 스타일시트를 직접 확인해 검증했다.
 
 ## 대시보드/캘린더/모달/문서 목록 시각 리디자인 — bklit-ui + Toggl 참고 (v1.6.16)
 

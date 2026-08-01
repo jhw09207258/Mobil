@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { setChatEmailNotifications } from "./actions";
+import { Switch } from "@/components/ui/switch";
 
 /**
  * 새 채팅 메시지가 오면 가입한 이메일로 알린다.
@@ -29,13 +30,7 @@ export function NotificationToggle({ initial }: { initial: boolean }) {
   return (
     <div className="field">
       <label className="row" style={{ gap: 10, alignItems: "flex-start" }}>
-        <input
-          type="checkbox"
-          checked={on}
-          disabled={pending}
-          onChange={(e) => toggle(e.target.checked)}
-          style={{ marginTop: 3 }}
-        />
+        <Switch checked={on} onCheckedChange={toggle} disabled={pending} />
         <span>
           <span style={{ color: "var(--text-1)" }}>Email me about new chat messages</span>
           <span className="page-sub" style={{ display: "block", fontSize: 12, marginTop: 3 }}>

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { Copyable } from "@/components/copyable";
+import { GlowingBadge } from "@/components/ui/glowing-badge";
+import { RefreshButton } from "@/components/ui/refresh-button";
 import { StorageBreakdownChart, StorageShareBar } from "./storage-chart";
 import { WeeklyActivityChart } from "./weekly-activity-chart";
 import { NetMonitor } from "./net-monitor";
@@ -59,11 +61,14 @@ export default async function DashboardPage() {
           <h1 className="page-h">Dashboard</h1>
           <p className="page-sub">Welcome back, {name}.</p>
         </div>
-        {profile.role === "admin" && (
-          <Link href="/admin/users" className="btn btn-sm">
-            Manage all Possion users →
-          </Link>
-        )}
+        <div className="row" style={{ gap: 8 }}>
+          <RefreshButton label="Refresh" />
+          {profile.role === "admin" && (
+            <Link href="/admin/users" className="btn btn-sm">
+              Manage all Possion users →
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="dash-stats-row">
@@ -103,6 +108,7 @@ export default async function DashboardPage() {
           <div className="dash-card dash-mega-live">
             <div className="dash-mega-live-head">
               <span className="label cell-label">LIVE DATA THROUGHPUT</span>
+              <GlowingBadge variant="success">Live</GlowingBadge>
             </div>
             <NetMonitor />
           </div>

@@ -1,0 +1,9 @@
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.copy-btn.copied {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--border-1));
+}

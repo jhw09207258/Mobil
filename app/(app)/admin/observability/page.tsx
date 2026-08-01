@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth";
 import { SLO, type SloFeature } from "@/lib/slo";
+import { RefreshButton } from "@/components/ui/refresh-button";
 
 export const dynamic = "force-dynamic";
 
@@ -59,9 +60,12 @@ export default async function ObservabilityPage({
             기능별 응답시간 백분위(p50/p90/p99/p999). 산술평균은 쓰지 않는다.
           </p>
         </div>
-        <Link href="/admin" className="btn btn-ghost btn-sm">
-          ← Admin console
-        </Link>
+        <div className="row" style={{ gap: 8 }}>
+          <RefreshButton label="Refresh" />
+          <Link href="/admin" className="btn btn-ghost btn-sm">
+            ← Admin console
+          </Link>
+        </div>
       </div>
 
       <div className="row" style={{ gap: 6, marginBottom: 16 }}>

@@ -8,6 +8,7 @@ import { useMobileNav } from "./mobile-nav-context";
 import { HeaderSearch } from "./header-search";
 import { GlobalChat } from "./chat/global-chat";
 import { SignOutOverlay } from "./sign-out-overlay";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export function AppHeader({
   userId,
@@ -58,15 +59,17 @@ export function AppHeader({
         (CSS -webkit-app-region 보다 신뢰성 높은 Tauri v2 네이티브 방식).
         브라우저에서는 무의미한 속성이라 무시된다. */}
     <header className="app-header" data-tauri-drag-region>
-      <button
-        type="button"
-        className="hamburger-btn"
-        onClick={mobileNav.toggle}
-        aria-label={mobileNav.open ? "Close menu" : "Open menu"}
-        aria-expanded={mobileNav.open}
-      >
-        <IconMenu size={20} />
-      </button>
+      <Tooltip content={mobileNav.open ? "Close menu" : "Open menu"} side="right">
+        <button
+          type="button"
+          className="hamburger-btn"
+          onClick={mobileNav.toggle}
+          aria-label={mobileNav.open ? "Close menu" : "Open menu"}
+          aria-expanded={mobileNav.open}
+        >
+          <IconMenu size={20} />
+        </button>
+      </Tooltip>
       {/* 좌측 균형용 스페이서 — 검색창을 헤더 정중앙에 두기 위함 */}
       <div className="header-side header-side-left" data-tauri-drag-region />
 

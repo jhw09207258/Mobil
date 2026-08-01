@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/modal";
 import { UserAvatar } from "@/components/user-avatar";
 import { Copyable } from "@/components/copyable";
+import { ShimmeringText } from "@/components/ui/shimmering-text";
 import { expandOccurrences } from "@/lib/recurrence";
 import { useIsMobile } from "@/lib/use-media-query";
 import {
@@ -363,7 +364,7 @@ export function CalendarShell({
             <IconChevronRight size={13} />
           </button>
           <h1 className="cal-title">{rangeTitle(anchor, view)}</h1>
-          {loading && <span className="muted" style={{ fontSize: 11 }}>Loading…</span>}
+          {loading && <ShimmeringText text="Loading…" style={{ fontSize: 11 }} />}
         </div>
         <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
           <div className="cal-views">

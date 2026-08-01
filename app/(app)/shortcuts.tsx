@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/modal";
+import { Shortcut } from "@/components/ui/kbd";
 
 const NAV: Record<string, string> = {
   h: "/dashboard",
@@ -100,9 +101,7 @@ export function Shortcuts() {
           {HELP.map(([k, d]) => (
             <tr key={k}>
               <td style={{ width: 120 }}>
-                <span className="badge" style={{ minWidth: 0 }}>
-                  {k}
-                </span>
+                <Shortcut keys={k.split(" ")} size="sm" />
               </td>
               <td>{d}</td>
             </tr>
