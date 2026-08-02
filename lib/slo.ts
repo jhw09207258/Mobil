@@ -30,7 +30,12 @@ export type SloTarget = {
   note: string;
 };
 
-export const SLO: Record<string, SloTarget> = {
+// `: Record<string, SloTarget>` 가 아니라 `satisfies` 인 이유 — 애노테이션을
+// 붙이면 키 타입이 string 으로 넓어져 아래 SloFeature 가 사실상 string 이 되고,
+// measure("clanedar.upcoming", …) 같은 오타가 타입 검사를 그냥 통과한다(그러고는
+// 런타임에 목표치를 못 찾고, measure 가 실패를 삼켜 조용히 사라진다).
+// satisfies 는 값의 형태는 똑같이 검사하면서 키는 리터럴로 남긴다.
+export const SLO = {
   "auth.login": {
     label: "로그인",
     p99TargetMs: 800,
@@ -80,6 +85,6 @@ export const SLO: Record<string, SloTarget> = {
     sampleRate: 0.2,
     note: "v1.6.4 감사 시점 기준 최적화 후 가장 느린 기능(로컬 p999 13.4ms) — 다음으로 손볼 후보.",
   },
-};
+} satisfies Record<string, SloTarget>;
 
 export type SloFeature = keyof typeof SLO;
