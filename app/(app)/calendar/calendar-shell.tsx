@@ -219,7 +219,10 @@ export function CalendarShell({
         for (let i = 0; i < 60; i += 1) {
           push(dayKey(cursor), occ);
           const next = addDays(cursor, 1);
-          if (next.getTime() > occ.end.getTime()) break;
+          // >= 인 이유: 다음 날 0시에 "끝나는" 일정은 그 다음 날을 차지하지
+          // 않는다. > 로 두면 22시~자정 회의가 다음 날 칸에도 유령처럼 하나 더
+          // 걸렸다(종일 일정은 끝을 23:59:59 로 저장해 이 경계에 걸리지 않는다).
+          if (next.getTime() >= occ.end.getTime()) break;
           cursor = next;
         }
       }
