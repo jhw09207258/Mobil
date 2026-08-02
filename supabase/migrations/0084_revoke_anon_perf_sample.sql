@@ -1,0 +1,30 @@
+-- ============================================================================
+-- record_perf_sample 에서 anon 실행 권한 회수.
+-- ----------------------------------------------------------------------------
+-- 이 프로젝트의 public 스키마에는 pg_default_acl 이 걸려 있어, 새로 만든 함수
+-- 마다 anon/authenticated/service_role 에 EXECUTE 가 자동으로 붙는다(0071 이후
+-- 여러 번 겪은 것과 같은 문제). record_perf_sample 은 그 자동 부여를 되돌리는
+-- revoke 를 빠뜨렸다.
+--
+-- 무엇이 문제였나: 이 함수는 SECURITY DEFINER 인데 안에 인증 검사가 전혀 없다
+-- (feature 이름 길이와 ms 범위만 본다). perf_samples 테이블 자체는 RLS 로 완전히
+-- 잠겨 있어(정책 qual = false) 직접 INSERT 는 불가능하지만, 이 함수가 바로 그
+-- 잠금을 우회하는 유일한 통로다. 즉 로그인하지 않은 누구나
+-- /rest/v1/rpc/record_perf_sample 을 호출해 관측 데이터를 원하는 만큼 지어낼 수
+-- 있었다 — 관리자 화면의 p99/p999 수치가 통째로 믿을 수 없게 되고, 테이블도
+-- 무한정 부풀릴 수 있다.
+--
+-- 실제 호출부(lib/observability.ts 의 measure())는 요청의 Supabase 클라이언트를
+-- 그대로 쓰므로 로그인한 사용자는 authenticated 로 호출한다 — anon 은 필요 없다.
+-- 유일하게 잃는 것은 "로그인/가입에 **실패한**" 요청의 표본이다(성공하면 응답
+-- 전에 세션 쿠키가 붙어 after() 안에서는 이미 authenticated 다). 실패한 로그인의
+-- 지연을 못 재게 되는 대신 나머지 전체 수치의 신뢰를 얻는 편이 낫다고 봤다 —
+-- 오염된 데이터셋은 성공 로그인 수치까지 같이 못 믿게 만든다.
+--
+-- 나머지 anon 실행 가능 함수 네 개(get_calendar_feed,
+-- claim_due_event_reminders, set_next_reminder_by_token,
+-- prune_push_subscription_by_token)는 의도된 것이다 — 전부 공유 비밀 토큰을
+-- 인자로 받아 스스로 검사하고, 호출자(캘린더 앱 구독, 외부 cron)가 세션 쿠키를
+-- 가질 수 없는 경로다. 그래서 건드리지 않는다.
+-- ============================================================================
+revoke execute on function public.record_perf_sample(text, real) from anon;

@@ -15,8 +15,8 @@ export default async function CodePage() {
         <div>
           <h1 className="page-h">Codespace</h1>
           <p className="page-sub">
-            Each Code Space is a project the agent can work across. Build one with Big
-            Brother, or import a repository from GitHub.
+            Each Code Space is a project the agent can work across. Build one from
+            scratch, or import a repository from GitHub.
           </p>
         </div>
       </div>
