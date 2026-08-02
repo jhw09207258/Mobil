@@ -156,14 +156,24 @@ export function RepositoryGraph({
 
   // ---- SNA: 매개 중심성(Brandes) + 커뮤니티(Louvain) — 노드/간선 집합이
   // 바뀔 때만(새 저장소를 열 때) 다시 계산한다, 시뮬레이션 tick 마다가 아니라.
-  const sna = useMemo(() => {
+  // useMemo(렌더 중 동기 계산)가 아니라 이펙트에서 계산한다 — 큰 저장소(노드
+  // 수백 개)에서는 O(V·E) 계산이 몇십 ms 걸릴 수 있는데, 렌더를 막으면 그만큼
+  // 그래프가 뜨는 게 늦어진다. 이펙트로 미루면 노드는 즉시(기본 반지름/색으로)
+  // 그려지고, SNA 값은 계산되는 대로 곧이어 반영된다 — 화면이 먼저 반응한다.
+  const [sna, setSna] = useState<{
+    centrality: Map<string, number>;
+    community: Map<string, number>;
+    maxCentrality: number;
+  }>({ centrality: new Map(), community: new Map(), maxCentrality: 0 });
+
+  useEffect(() => {
+    if (nodes.length === 0) return;
     const nodeIds = nodes.map((n) => `${n.kind}:${n.id}`);
     const edges = links.map((l) => ({ a: l.source, b: l.target }));
     const centrality = brandesBetweenness(nodeIds, edges);
     const community = louvainCommunities(nodeIds, edges);
     const maxCentrality = Math.max(0, ...Array.from(centrality.values()));
-    return { centrality, community, maxCentrality };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setSna({ centrality, community, maxCentrality });
   }, [nodes, links]);
 
   const drawLinks = useMemo(() => {
