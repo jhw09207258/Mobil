@@ -71,8 +71,26 @@
   --glass-2: color-mix(in srgb, var(--bg-2) 80%, transparent);
   --glass-3: color-mix(in srgb, var(--bg-3) 78%, transparent);
   --glass-blur: saturate(1.7) blur(30px);
-  /* 애플식 부드러운 모션 커브 */
+
+  /* ---- 모션 ----------------------------------------------------------
+     애플의 모션은 "커브 하나 + 상황별 길이"로 정리된다. 커브를 여기서
+     이름으로 묶어 두면 화면마다 제각각인 전환 대신 앱 전체가 같은 리듬을
+     갖는다.
+       --ease-spring : 시트/패널이 제자리를 찾아 들어오는 감속 커브
+                       (애플의 시트 표현 커브와 같은 모양). 나타나는 것에.
+       --ease-out    : 더 급하게 감속 — 짧고 확실한 피드백(툴팁, 배지)에.
+       --ease-in-out : 양끝이 모두 부드러움 — 이동/변형(레이아웃, 뷰 전환)에.
+     길이는 세 단계뿐이다. 고를 게 많으면 결국 안 지켜진다.
+       fast   : 눌림/hover 처럼 손가락에 즉시 붙어야 하는 것
+       base   : 요소 하나가 나타나거나 사라지는 기본값
+       slow   : 화면 전체가 바뀌는 큰 전환(시트, 드로어)
+     ------------------------------------------------------------------- */
   --ease-spring: cubic-bezier(0.32, 0.72, 0.25, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 0.14s;
+  --dur-base: 0.24s;
+  --dur-slow: 0.38s;
 
   color-scheme: dark;
 }
@@ -327,9 +345,13 @@ img {
   border-radius: var(--radius);
   cursor: pointer;
   white-space: nowrap;
-  /* 애플식 부드러운 전환 + 누를 때 살짝 눌리는 모션 */
-  transition: background 0.18s var(--ease-spring), border-color 0.18s var(--ease-spring),
-    transform 0.12s var(--ease-spring), box-shadow 0.18s var(--ease-spring);
+  /* 애플식 부드러운 전환 + 누를 때 살짝 눌리는 모션.
+     누름(transform)만 --dur-fast 로 더 빠르게 둔다 — 색은 천천히 번져도
+     괜찮지만 "눌렸다"는 감각은 손가락 속도를 따라가야 한다. */
+  transition: background var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out),
+    transform var(--dur-fast) var(--ease-spring),
+    box-shadow var(--dur-base) var(--ease-out);
 }
 .btn:hover {
   background: var(--bg-4);
@@ -337,7 +359,7 @@ img {
 }
 .btn:active {
   background: var(--bg-2);
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 .btn:disabled {
   opacity: 0.5;
@@ -364,6 +386,24 @@ img {
 .btn-ghost:hover {
   background: var(--bg-3);
   color: var(--text-1);
+}
+/* 틴트 버튼 — 애플의 2순위 액션(iOS/macOS 의 "tinted" 스타일).
+   채운 버튼(.btn-primary)만큼 강하게 주장하지는 않지만 보통 버튼보다는
+   분명히 "이쪽이 하려는 일"이라고 말한다. 테두리 없이 옅은 액션색 배경 +
+   액션색 글자. 한 화면에 채운 버튼이 이미 있는데 두 번째 액션도 눈에
+   띄어야 할 때 쓴다(예: 대화 시작 / 파일 첨부). */
+.btn-tinted {
+  background: var(--create-ghost);
+  border-color: transparent;
+  color: var(--create-hover);
+}
+.btn-tinted:hover {
+  background: color-mix(in srgb, var(--create) 22%, transparent);
+  border-color: transparent;
+  color: var(--create-hover);
+}
+.btn-tinted:active {
+  background: color-mix(in srgb, var(--create) 30%, transparent);
 }
 .btn-danger {
   color: #e7a79d;
@@ -1209,4 +1249,121 @@ svg {
   height: 1px;
   background: var(--border-0);
   margin: 18px 0;
+}
+
+/* =========================================================================
+   그룹 카드 — 애플의 "grouped inset list"(macOS 시스템 설정 / iOS 설정).
+
+   관련된 항목 여러 개를 각각 카드로 흩어 놓는 대신, 둥근 상자 하나에 담고
+   그 안을 얇은 선으로만 나눈다. 카드가 늘어날수록 화면이 조각나 보이는
+   문제를 해결하면서, "이것들은 한 묶음"이라는 관계도 같이 드러난다.
+
+   구분선은 행의 왼쪽 안쪽 여백에서 시작한다(edge-to-edge 가 아니라). 애플이
+   이렇게 하는 이유는 선이 상자의 둥근 모서리까지 닿지 않게 해서 목록이
+   가로로 잘린 것처럼 보이지 않게 하려는 것이다 — 첫 행 위와 마지막 행 아래엔
+   선이 없다.
+
+     <div class="card-group">
+       <div class="card-row"><span class="card-row-label">…</span> …</div>
+       <div class="card-row"> … </div>
+     </div>
+   ========================================================================= */
+.card-group {
+  background: var(--bg-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.card-group-title {
+  display: block;
+  margin: 0 0 8px 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  /* 애플의 목록 행 최소 높이(44pt)와 같은 감각 — 손가락으로도 편하고,
+     마우스로도 조밀해 보이지 않는다. */
+  min-height: 44px;
+  padding: 10px 16px;
+  position: relative;
+}
+/* 행 사이 얇은 선 — ::before 로 그려 왼쪽만 안쪽으로 들여 놓는다. */
+.card-row + .card-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--border-0);
+}
+/* 누를 수 있는 행 — 행 전체가 버튼/링크인 경우. */
+.card-row.tappable {
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.card-row.tappable:hover {
+  background: var(--bg-3);
+}
+.card-row.tappable:active {
+  background: var(--bg-4);
+}
+.card-row-label {
+  min-width: 0;
+  color: var(--text-1);
+}
+.card-row-value {
+  flex: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+  text-align: right;
+}
+/* 라벨 아래 한 줄 설명이 붙는 행 — 위아래 정렬을 위로 맞춘다. */
+.card-row.stacked {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-row-desc {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+/* =========================================================================
+   모션 축소 설정 존중 — 앱 전역 안전망.
+
+   개별 화면(캘린더, 문서 에디터)에는 이미 각자의 reduced-motion 블록이
+   있었지만, 이 파일(전역)에는 없어서 나머지 대부분의 전환/애니메이션은
+   설정을 무시하고 그대로 움직였다. 전정기관이 예민한 사용자에게 움직임은
+   단순한 취향이 아니라 어지러움·메스꺼움의 원인이라, 여기서 한 번에 막는다.
+
+   완전히 0 이 아니라 1ms 로 두는 이유: transitionend/animationend 를 기다리는
+   코드(로그아웃 오버레이 등)가 이벤트를 못 받고 멈추지 않도록 — 사람 눈에는
+   즉시지만 브라우저는 정상적으로 완료 이벤트를 쏜다.
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* 위치가 튀는 것만 없애고 색/투명도 전환은 그대로 둔다 — 색 변화는
+     어지러움을 유발하지 않으면서 "지금 눌렸다"는 피드백은 남겨 준다. */
+  .btn:active,
+  .cal-pill:active,
+  .cal-block:active,
+  .repo-card:hover {
+    transform: none !important;
+  }
 }

@@ -38,7 +38,7 @@
   margin-bottom: 2px;
   cursor: pointer;
   border-radius: 10px;
-  transition: background 0.12s;
+  transition: background var(--dur-fast) var(--ease-out);
 }
 .chat-conv-item:hover {
   background: var(--bg-2);
@@ -753,7 +753,7 @@
   gap: 2px;
   opacity: 0;
   align-self: center;
-  transition: opacity 0.12s;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
 .chat-msg-wrap:hover .chat-msg-actions,
 .chat-msg-actions.force-visible {
@@ -985,7 +985,7 @@
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
   cursor: pointer;
   text-align: left;
-  animation: chat-toast-in 0.18s ease-out;
+  animation: chat-toast-in var(--dur-base) var(--ease-out);
 }
 .chat-toast:hover {
   background: var(--bg-3);
@@ -1053,7 +1053,9 @@
   border: 1px solid var(--border-0);
   border-radius: 999px;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 .chat-header-btn:hover,
 .chat-header-btn.active {
@@ -1111,8 +1113,8 @@
   border-radius: var(--radius-lg) 0 0 var(--radius-lg);
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.35), -32px 0 80px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  animation: chat-slide-in 0.25s cubic-bezier(0.32, 0.72, 0.25, 1);
-  transition: width 0.25s cubic-bezier(0.32, 0.72, 0.25, 1);
+  animation: chat-slide-in var(--dur-base) var(--ease-spring);
+  transition: width var(--dur-base) var(--ease-spring);
 }
 /* 닫힐 때 슬라이드아웃 — forwards 로 마지막 프레임(화면 밖)을 유지한다. */
 .chat-float-panel.closing {
