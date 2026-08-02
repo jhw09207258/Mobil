@@ -33,6 +33,10 @@ const DEFAULT_R = 11;
 const MAX_CENTRALITY_BOOST = 7;
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 4;
+// 탭(터치)은 손가락이 미세하게 떨려도 pointermove 가 최소 한 번은 온다 —
+// 문턱값 없이 "움직이면 곧 드래그"로 보면 모바일에서 노드를 절대 열 수
+// 없다. 이 거리(px) 안의 움직임은 여전히 탭으로 본다.
+const DRAG_THRESHOLD = 4;
 
 // 커뮤니티(Louvain) 팔레트 — dataviz 스킬의 검증된 인접-쌍 CVD 안전 팔레트와
 // 같은 톤(storage-chart.tsx 와 동일 계열)을 재사용해 앱 전체 색 언어를 맞춘다.
@@ -77,7 +81,7 @@ export function RepositoryGraph({
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, k: 1 });
   const simRef = useRef<Simulation<SimNode, SimLink> | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragging = useRef<{ id: string; moved: boolean } | null>(null);
+  const dragging = useRef<{ id: string; moved: boolean; startX: number; startY: number } | null>(null);
   const panning = useRef<{ x: number; y: number; startTx: number; startTy: number } | null>(null);
   const pinch = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinchDist = useRef<number | undefined>(undefined);
@@ -182,7 +186,7 @@ export function RepositoryGraph({
   const onPointerDown = (n: SimNode) => (e: React.PointerEvent) => {
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
-    dragging.current = { id: `${n.kind}:${n.id}`, moved: false };
+    dragging.current = { id: `${n.kind}:${n.id}`, moved: false, startX: e.clientX, startY: e.clientY };
     n.fx = n.x;
     n.fy = n.y;
     simRef.current?.alphaTarget(0.3).restart();
@@ -226,7 +230,8 @@ export function RepositoryGraph({
     if (dragging.current && svgRef.current) {
       const n = nodes.find((x) => `${x.kind}:${x.id}` === dragging.current!.id);
       if (!n) return;
-      dragging.current.moved = true;
+      const dist = Math.hypot(e.clientX - dragging.current.startX, e.clientY - dragging.current.startY);
+      if (dist > DRAG_THRESHOLD) dragging.current.moved = true;
       const world = toWorld(e.clientX, e.clientY);
       n.fx = world.x;
       n.fy = world.y;

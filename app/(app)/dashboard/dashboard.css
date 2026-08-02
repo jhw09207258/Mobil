@@ -93,9 +93,15 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.wk-chart-svg {
+.wk-chart-svg-wrap {
   width: 100%;
   height: 110px;
+  overflow: visible;
+}
+.wk-chart-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 .wk-bar {
@@ -184,7 +190,7 @@
   .dash-stats-row {
     grid-template-columns: repeat(2, 1fr);
   }
-  .wk-chart-svg {
+  .wk-chart-svg-wrap {
     height: 120px;
   }
 }
