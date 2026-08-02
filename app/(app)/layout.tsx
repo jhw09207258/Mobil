@@ -19,12 +19,18 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { userId, email, profile } = await requireUser();
+  const { userId, email, profile, profileMissing } = await requireUser();
 
   // 팀 선택은 가입 시점의 절차라 관리자 승인보다 먼저 강제한다 — 승인을
   // 기다리는 동안에도 팀은 이미 고를 수 있어야 한다(0080). 팀이 삭제돼
   // active_team_id 가 사라진 드문 경우에도 여기로 다시 보낸다.
-  if (!profile.active_team_id) {
+  //
+  // 단, 프로필을 아예 못 읽은 경우(profileMissing)는 제외한다. 그때
+  // active_team_id 는 "팀이 없다"가 아니라 "모른다"이고, 이미 팀에 속한
+  // 사람을 팀 선택 화면으로 보내면 멀쩡한 팀이 있는데 새로 만들라고 권하는
+  // 꼴이 된다. 아래 승인 검사가 대기 화면으로 보내 준다 — 임시 프로필이
+  // approval_status 를 "pending" 으로 두는 것도 원래 그 뜻이다.
+  if (!profile.active_team_id && !profileMissing) {
     redirect("/choose-team");
   }
 
@@ -35,12 +41,13 @@ export default async function AppLayout({
     redirect("/pending-approval");
   }
 
+  // active_team_id 는 위 가드를 지나면 거의 항상 있지만, 프로필을 못 읽은
+  // 경우엔 null 인 채로 여기 올 수 있다(그땐 승인 검사가 이미 내보낸 뒤다).
+  // 이름을 못 찾으면 헤더의 팀 전환기가 "Choose a team" 으로 뜬다.
   const supabase = await createClient();
-  const { data: activeTeam } = await supabase
-    .from("teams")
-    .select("name")
-    .eq("id", profile.active_team_id)
-    .single();
+  const { data: activeTeam } = profile.active_team_id
+    ? await supabase.from("teams").select("name").eq("id", profile.active_team_id).single()
+    : { data: null };
 
   return (
     <MobileNavProvider>
