@@ -134,6 +134,11 @@ export function EventDialog({
   const [repeatInterval, setRepeatInterval] = useState(1);
   const [repeatDays, setRepeatDays] = useState<Set<number>>(new Set());
   const [repeatUntil, setRepeatUntil] = useState("");
+  // COUNT("N번 반복") — 이 창에는 편집 UI 가 없다(끝을 정할 땐 종료일을 쓴다).
+  // 하지만 ICS 로 가져온 일정에는 COUNT 가 들어 있을 수 있고, 규칙을 다시
+  // 만들 때 그냥 버리면 "10번만" 이던 일정이 저장 한 번에 영원히 반복되는
+  // 일정으로 바뀐다. 편집하지는 않되 원래 값은 그대로 실어 보낸다.
+  const [repeatCount, setRepeatCount] = useState<number | null>(null);
 
   // 붙어 있는 자료. id 만으로는 사용자가 무엇인지 알 수 없으므로 제목까지
   // 받아 온다 — "회의 전에 읽을 것을 그 자리에 둔다" 가 이 기능의 목적인데,
@@ -181,6 +186,7 @@ export function EventDialog({
           setRepeatFreq(rule.freq);
           setRepeatInterval(rule.interval);
           setRepeatDays(new Set(rule.byDay));
+          setRepeatCount(rule.count);
         }
         if (d.recurrence_until) setRepeatUntil(toDateInputUtc(new Date(d.recurrence_until)));
       },
@@ -235,9 +241,9 @@ export function EventDialog({
       freq: repeatFreq,
       interval: Math.max(1, repeatInterval),
       byDay: repeatFreq === "WEEKLY" ? [...repeatDays].sort((a, b) => a - b) : [],
-      count: null,
+      count: repeatCount,
     });
-  }, [repeatFreq, repeatInterval, repeatDays]);
+  }, [repeatFreq, repeatInterval, repeatDays, repeatCount]);
 
   const toggleAttendee = (id: string) =>
     setAttendees((prev) => {
@@ -282,12 +288,24 @@ export function EventDialog({
   const occurrenceStart = mode.kind === "existing" ? mode.occurrenceStart : undefined;
   /** 반복 일정의 특정 발생을 눌러서 연 경우에만 범위를 물어볼 수 있다. */
   const canScope = !!detail?.recurrence && !!occurrenceStart && editable;
-  /** 반복 규칙 자체를 고쳤다면 "이 일정만" 은 말이 안 된다 — 늘 전체다. */
+  /** 반복 규칙 자체를 고쳤다면 "이 일정만" 은 말이 안 된다 — 늘 전체다.
+   *
+   * 종료일은 문자열이 아니라 **시각**으로 비교한다. Date.toISOString() 은
+   * "…T23:59:59.000Z" 를, PostgREST 의 timestamptz 는 "…T23:59:59+00:00" 을
+   * 준다 — 같은 순간인데도 문자열로는 절대 같아지지 않아서, 종료일이 있는
+   * 반복 일정은 아무것도 안 고쳐도 늘 "규칙이 바뀐 것"으로 판정됐다. 그러면
+   * 위의 범위 안내와 "이 일정만 저장" 버튼이 통째로 사라져, 반복 중 하루만
+   * 고치는 일이 아예 불가능했다. */
+  const untilChanged = (() => {
+    if (!detail) return false;
+    const nextMs = repeatUntil ? (fromDateInputUtc(repeatUntil, true)?.getTime() ?? null) : null;
+    const prevRaw = detail.recurrence_until ? new Date(detail.recurrence_until).getTime() : null;
+    const prevMs = prevRaw !== null && Number.isFinite(prevRaw) ? prevRaw : null;
+    return nextMs !== prevMs;
+  })();
   const ruleChanged =
     !!detail &&
-    ((recurrenceString ?? null) !== (detail.recurrence ?? null) ||
-      (repeatUntil ? fromDateInputUtc(repeatUntil, true)?.toISOString() : null) !==
-        (detail.recurrence_until ?? null));
+    ((recurrenceString ?? null) !== (detail.recurrence ?? null) || untilChanged);
 
   const onSave = async (scope: OccurrenceScope = "all") => {
     if (busy) return;
