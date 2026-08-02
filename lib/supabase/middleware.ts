@@ -18,11 +18,19 @@ export async function updateSession(request: NextRequest) {
   // 진단 엔드포인트는 로그인 없이 열려야 한다 — 로그인 자체가 깨졌을 때
   // 보는 창이기 때문이다. 값은 절대 싣지 않는다(app/api/health/route.ts).
   const isHealthRoute = pathname === "/api/health";
+  // 알림 발송기도 로그인 없이 열려야 한다 — 이 라우트를 두드리는 쪽은 외부
+  // 스케줄러(Vercel Cron, Supabase pg_cron/pg_net)라 세션 쿠키가 없다. 여기서
+  // 막으면 로그인 화면으로 307 리다이렉트돼 라우트 안의 CRON_SECRET 검사에
+  // 닿지도 못하고, 결국 "앱 창이 열려 있을 때만 알림이 나가는" 상태가 된다.
+  // 인증은 라우트가 직접 한다 — NOTIFY_DISPATCH_TOKEN/VAPID 미설정이면 503,
+  // CRON_SECRET 헤더도 세션도 없으면 401 (feed 라우트와 같은 원칙).
+  const isDispatchRoute = pathname === "/api/push/dispatch";
   const isPublicRoute =
     pathname === "/" ||
     isAuthRoute ||
     isFeedRoute ||
     isHealthRoute ||
+    isDispatchRoute ||
     pathname.startsWith("/auth");
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
