@@ -357,6 +357,17 @@ export function nextReminderAt(
 /**
  * rangeStart 앞에 확실히 놓이는 주기 수 — 건너뛰어도 발생을 놓치지 않는
  * 보수적인 하한이다(한 주기 여유를 두고 깎는다).
+ *
+ * 여기서 쓰는 주기 길이는 반드시 **최댓값**이어야 한다. 건너뛸 개수는
+ * gap ÷ 주기길이 인데, 주기를 짧게 잡으면 몫이 커져 **더 많이** 건너뛰고,
+ * 그만큼의 발생이 조용히 사라진다. (예전엔 달을 28일 — 최솟값 — 로 잡아
+ * 실제 평균 30.44일 대비 매달 8.7% 씩 앞질러 셌다. -1 의 여유는 약 1년치
+ * 오차만 흡수하므로, 그보다 오래된 매월 반복 일정은 캘린더·대시보드에서
+ * 아예 안 보이고 알림도 끊겼다 — 3년 된 일정은 두 번 중 한 번이, 6년 된
+ * 일정은 전부 사라지는 것을 재현했다.)
+ *
+ * 최댓값(달 31일, 해 366일)을 쓰면 몫이 실제보다 작아져 늘 덜 건너뛴다 —
+ * 남는 후보 몇 개는 아래 루프가 범위 검사로 그냥 흘려보내므로 안전하다.
  */
 function periodsBefore(rule: RecurrenceRule, base: Date, rangeStart: Date): number {
   const gapMs = rangeStart.getTime() - base.getTime();
@@ -367,8 +378,8 @@ function periodsBefore(rule: RecurrenceRule, base: Date, rangeStart: Date): numb
       : rule.freq === "WEEKLY"
         ? DAY_MS * 7 * rule.interval
         : rule.freq === "MONTHLY"
-          ? DAY_MS * 28 * rule.interval // 달의 최소 길이 — 넘겨 세지 않기 위해
-          : DAY_MS * 365 * rule.interval;
+          ? DAY_MS * 31 * rule.interval // 달의 최대 길이
+          : DAY_MS * 366 * rule.interval; // 해의 최대 길이(윤년)
   return Math.max(0, Math.floor(gapMs / per) - 1);
 }
 

@@ -253,7 +253,13 @@ export function DocumentEditor({
     const unique = new Map<string, { kind: string; id: string }>();
     for (const r of refs) unique.set(`${r.kind}:${r.refId}`, { kind: r.kind, id: r.refId });
 
+    // 서버 왕복이 끝나기 전에 탭을 닫으면(에디터 언마운트) 아래 콜백이 이미
+    // 파괴된 ProseMirror 뷰에 dispatch 하게 된다. 문서를 열자마자 다른 탭으로
+    // 옮기면 실제로 일어나는 순서다 — 취소 플래그와 isDestroyed 로 둘 다 막는다.
+    let cancelled = false;
+
     getObjectCards([...unique.values()]).then((cards) => {
+      if (cancelled || editor.isDestroyed) return;
       const byKey = new Map(cards.map((c) => [`${c.kind}:${c.id}`, c]));
       const tr = editor.state.tr;
       let changed = false;
@@ -268,6 +274,10 @@ export function DocumentEditor({
       }
       if (changed) editor.view.dispatch(tr.setMeta("addToHistory", false));
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [editor]);
 
   const persist = useCallback(

@@ -1,4 +1,10 @@
 // 간결한 라인 아이콘 (currentColor, 18px). 사이드바/헤더 공용.
+//
+// 획 두께는 1.6 — 애플 SF Symbols 의 Regular 웨이트가 24 격자에서 갖는
+// 비율에 맞춘 값이다. 1.7 은 18px 로 줄었을 때 아주 살짝 뭉툭해 보였다.
+// 더 얇게(1.4~1.5) 가면 저해상도 화면에서 획이 흐려지므로 여기가 하한이다.
+// 끝/모서리는 항상 둥글게 — SF Symbols 의 가장 큰 특징이고, 앱 전체의
+// 넉넉한 곡률(--radius)과도 결이 맞는다.
 type P = { size?: number };
 const base = (size = 18) => ({
   width: size,
@@ -6,7 +12,7 @@ const base = (size = 18) => ({
   viewBox: "0 0 24 24",
   fill: "none",
   stroke: "currentColor",
-  strokeWidth: 1.7,
+  strokeWidth: 1.6,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
 });
@@ -14,10 +20,10 @@ const base = (size = 18) => ({
 export function IconDashboard({ size }: P) {
   return (
     <svg {...base(size)}>
-      <rect x="3" y="3" width="7" height="9" rx="1" />
-      <rect x="14" y="3" width="7" height="5" rx="1" />
-      <rect x="14" y="12" width="7" height="9" rx="1" />
-      <rect x="3" y="16" width="7" height="5" rx="1" />
+      <rect x="3" y="3" width="7" height="9" rx="1.8" />
+      <rect x="14" y="3" width="7" height="5" rx="1.8" />
+      <rect x="14" y="12" width="7" height="9" rx="1.8" />
+      <rect x="3" y="16" width="7" height="5" rx="1.8" />
     </svg>
   );
 }
@@ -47,7 +53,7 @@ export function IconCode({ size }: P) {
 export function IconSheet({ size }: P) {
   return (
     <svg {...base(size)}>
-      <rect x="3" y="3" width="18" height="18" rx="1.5" />
+      <rect x="3" y="3" width="18" height="18" rx="2.5" />
       <path d="M3 9h18M3 15h18M9 3v18M15 3v18" />
     </svg>
   );
@@ -125,7 +131,7 @@ export function IconChat({ size }: P) {
 export function IconCalendar({ size }: P) {
   return (
     <svg {...base(size)}>
-      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <rect x="3" y="5" width="18" height="16" rx="3" />
       <path d="M3 10h18M8 3v4M16 3v4" />
     </svg>
   );
@@ -156,7 +162,7 @@ export function IconSmile({ size }: P) {
 export function IconImage({ size }: P) {
   return (
     <svg {...base(size)}>
-      <rect x="3" y="4" width="18" height="16" rx="1.5" />
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
       <circle cx="8.5" cy="9.5" r="1.8" />
       <path d="M3 17l5.5-5 4 3.5L17 11l4 4" />
     </svg>
@@ -295,7 +301,7 @@ export function IconCollapse({ size }: P) {
 export function IconSplit({ size }: P) {
   return (
     <svg {...base(size)}>
-      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2.6" />
       <path d="M12 4.5v15" />
     </svg>
   );

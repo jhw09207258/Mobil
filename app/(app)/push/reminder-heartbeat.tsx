@@ -19,13 +19,23 @@ import { useEffect } from "react";
  */
 
 const INTERVAL_MS = 5 * 60 * 1000;
+/** 어떤 이유로 불리든 발송기를 이 간격보다 자주 두드리지 않는다. */
+const MIN_GAP_MS = 60 * 1000;
 
 export function ReminderHeartbeat() {
   useEffect(() => {
     let stopped = false;
+    let lastPingAt = 0;
 
     const ping = () => {
       if (stopped || document.visibilityState !== "visible") return;
+      // visibilitychange 로도 부르기 때문에 최소 간격을 둔다 — 창을 이리저리
+      // 오갈 때마다 발송기를 두드리면(탭 전환 한 번에 한 번씩) 5분 주기와
+      // 무관하게 요청이 쌓인다. 알림 회수는 원자적이라 중복 발송이 나지는
+      // 않지만, 서버가 할 필요 없는 일을 하는 건 마찬가지다.
+      const now = Date.now();
+      if (now - lastPingAt < MIN_GAP_MS) return;
+      lastPingAt = now;
       // 실패는 조용히 넘긴다 — 설정이 안 된 서버에서는 503 이 정상 응답이다.
       fetch("/api/push/dispatch", { method: "POST", cache: "no-store" }).catch(() => {});
     };

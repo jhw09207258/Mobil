@@ -234,6 +234,29 @@
   transition: background 0.15s var(--ease-spring), filter 0.15s var(--ease-spring);
 }
 .cal-pill:hover { filter: brightness(1.12); }
+
+/* ---- 여러 날에 걸친 일정 ----
+   날짜 칸마다 알약이 하나씩 생기므로, 아무 표시가 없으면 사흘짜리 일정이
+   서로 무관한 일정 세 개처럼 보인다. 이어지는 쪽 모서리를 각지게 만들고
+   왼쪽 색 띠를 첫 칸에만 남겨, 한 덩어리가 칸 경계에서 잘린 것처럼 읽히게
+   한다(칸 사이에 실제 간격이 있어 완전히 붙일 수는 없다). */
+.cal-pill.cont-from {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  /* 시작 칸이 아니면 색 띠를 반복하지 않는다 — 매 칸마다 띠가 있으면 각각이
+     따로 시작하는 일정처럼 보인다. */
+  border-left-color: transparent;
+}
+.cal-pill.cont-to {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.cal-pill-cont {
+  flex: none;
+  font-size: 8px;
+  line-height: 1;
+  opacity: 0.75;
+}
 .cal-pill.cancelled .cal-pill-title { text-decoration: line-through; opacity: 0.6; }
 .cal-pill-time { font-size: 10px; color: var(--text-3); flex: none; }
 .cal-pill-title {

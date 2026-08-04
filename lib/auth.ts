@@ -27,6 +27,10 @@ export const requireUser = cache(async function requireUser(): Promise<{
   userId: string;
   email: string;
   profile: Profile;
+  /** 프로필 행을 실제로 못 읽어 아래의 임시값을 지어낸 경우 true.
+   *  이때 profile 의 필드들은 "모른다"는 뜻이지 사실이 아니다 — 그 값으로
+   *  사용자를 어딘가로 보내기 전에 반드시 확인할 것. */
+  profileMissing: boolean;
 }> {
   let supabase;
   let user;
@@ -69,6 +73,7 @@ export const requireUser = cache(async function requireUser(): Promise<{
   return {
     userId: user.id,
     email: user.email ?? "",
+    profileMissing: !profile,
     profile:
       profile ??
       ({

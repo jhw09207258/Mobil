@@ -6,7 +6,7 @@ const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * 열려 있는 모달들의 스택.
+ * 열려 있는 모달들 — "지금 맨 위" 를 안다.
  *
  * 모달 위에 모달이 열리는 경우가 있다 — 일정 편집 중 "채팅으로 보내기",
  * 파일 목록에서 미리보기를 열고 그 안에서 공유 같은 흐름이다. 각 모달이
@@ -14,10 +14,16 @@ const FOCUSABLE_SELECTOR =
  *   * Escape 를 누르면 document 리스너가 전부 반응해 **두 개가 한꺼번에** 닫힌다.
  *   * 안쪽 모달이 닫힐 때 body 스크롤 잠금을 풀어 버려, 바깥 모달이 아직
  *     떠 있는데 뒤 배경이 스크롤되기 시작한다.
- * 스택으로 "지금 맨 위" 를 알면 둘 다 사라진다.
+ *
+ * 순서는 effect 가 아니라 render 시점에 매긴다 — React 는 effect(useEffect)를
+ * 자식이 부모보다 먼저 커밋하므로, 부모/자식 모달이 같은 커밋에서 함께
+ * 마운트되면(예: 이미 열려 있는 상태로 초기화되는 중첩 모달) effect 순서로
+ * 스택을 쌓을 경우 자식이 먼저 들어가 버려 "맨 위" 판정이 뒤집힌다. render
+ * 는 항상 부모 → 자식 순으로 실행되므로, 그 시점에 매긴 순번은 중첩 깊이를
+ * 정확히 반영한다.
  */
-const modalStack: symbol[] = [];
-
+let nextModalOrder = 0;
+const openModals = new Map<symbol, number>();
 
 export function Modal({
   title,
@@ -41,10 +47,29 @@ export function Modal({
     onCloseRef.current = onClose;
   });
 
+  // render 시점에 한 번만 순번을 매긴다(useRef 지연 초기화) — 부모가 먼저
+  // 렌더되므로 부모 모달은 항상 자식보다 작은 순번을 받는다.
+  const tokenRef = useRef<symbol | null>(null);
+  const orderRef = useRef<number | null>(null);
+  if (tokenRef.current === null) {
+    tokenRef.current = Symbol("modal");
+    orderRef.current = nextModalOrder++;
+  }
+
   useEffect(() => {
-    const token = Symbol("modal");
-    modalStack.push(token);
-    const isTop = () => modalStack[modalStack.length - 1] === token;
+    const token = tokenRef.current!;
+    openModals.set(token, orderRef.current!);
+    const isTop = () => {
+      let topToken: symbol | null = null;
+      let topOrder = -1;
+      for (const [t, o] of openModals) {
+        if (o > topOrder) {
+          topOrder = o;
+          topToken = t;
+        }
+      }
+      return topToken === token;
+    };
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
@@ -83,10 +108,9 @@ export function Modal({
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      const at = modalStack.lastIndexOf(token);
-      if (at >= 0) modalStack.splice(at, 1);
+      openModals.delete(token);
       // 마지막 모달이 닫힐 때만 배경 스크롤을 되돌린다.
-      if (modalStack.length === 0) document.body.style.overflow = "";
+      if (openModals.size === 0) document.body.style.overflow = "";
       previouslyFocused?.focus();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

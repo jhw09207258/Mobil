@@ -14,7 +14,7 @@ import {
   type MyTeamRow,
   type TeamSearchRow,
 } from "./team/actions";
-import { IconChevronDown } from "./icons";
+import { IconChevronDown, IconGroup } from "./icons";
 
 /**
  * 헤더의 팀(워크스페이스) 전환기 — 현재 팀 이름을 누르면 내가 속한 팀 목록
@@ -102,6 +102,7 @@ export function TeamSwitcher({ activeTeamName }: { activeTeamName: string | null
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
+        <IconGroup size={14} />
         <span className="team-switcher-name">{activeTeamName ?? "Choose a team"}</span>
         <IconChevronDown size={13} />
       </button>

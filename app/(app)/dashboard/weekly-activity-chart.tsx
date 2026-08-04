@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Row = { day: string; item_count: number };
 
@@ -29,19 +29,40 @@ function topRoundedBarPath(x: number, y: number, w: number, h: number, r: number
  * 가져왔다 — visx/motion 의존성 없이 순수 SVG + CSS 애니메이션으로 다시
  * 구현했다(이 프로젝트는 지금까지 그래프를 전부 이런 식으로 직접 그려 왔다,
  * repository-graph.tsx 도 같은 원칙).
+ *
+ * viewBox 는 실측 픽셀 크기를 그대로 쓴다(repository-graph.tsx 의
+ * ResizeObserver 패턴과 동일) — 카드 폭은 제각각인데 예전엔 고정
+ * 420×150 좌표계를 preserveAspectRatio="none" 으로 억지로 늘려 채웠다.
+ * 실제 렌더 종횡비와 viewBox 종횡비가 다르면 x/y 가 다른 배율로 늘어나
+ * 막대 위 둥근 모서리가 타원으로, 요일 글자가 옆으로 눌려 보였다 —
+ * viewBox 를 실제 픽셀과 맞추면 늘어날 이유 자체가 없어진다.
  */
 export function WeeklyActivityChart({ rows }: { rows: Row[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 420, h: 110 });
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setSize({ w: width, h: height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const max = Math.max(1, ...rows.map((r) => r.item_count));
   const total = rows.reduce((s, r) => s + r.item_count, 0);
 
-  const W = 420;
-  const H = 150;
+  const W = size.w;
+  const H = size.h;
   const padTop = 8;
   const padBottom = 22;
-  const chartH = H - padTop - padBottom;
+  const chartH = Math.max(1, H - padTop - padBottom);
   const gap = 10;
-  const barW = (W - gap * (rows.length - 1)) / rows.length;
+  const barW = Math.max(1, (W - gap * (rows.length - 1)) / rows.length);
 
   return (
     <div className="wk-chart">
@@ -51,48 +72,50 @@ export function WeeklyActivityChart({ rows }: { rows: Row[] }) {
           item{total === 1 ? "" : "s"} added or edited this week
         </span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="wk-chart-svg" preserveAspectRatio="none">
-        {rows.map((r, i) => {
-          const x = i * (barW + gap);
-          const h = r.item_count > 0 ? Math.max(4, (r.item_count / max) * chartH) : 0;
-          const y = padTop + (chartH - h);
-          const d = new Date(`${r.day}T00:00:00`);
-          const isToday = i === rows.length - 1;
-          const faded = hover !== null && hover !== i;
-          return (
-            <g
-              key={r.day}
-              className="wk-bar-group"
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-            >
-              <rect
-                x={x}
-                y={padTop}
-                width={barW}
-                height={chartH}
-                fill="transparent"
-                className="wk-bar-hitzone"
-              />
-              {h > 0 && (
-                <path
-                  d={topRoundedBarPath(x, y, barW, h, 6)}
-                  className="wk-bar"
-                  style={{ animationDelay: `${i * 45}ms`, opacity: faded ? 0.35 : 1 }}
+      <div className="wk-chart-svg-wrap" ref={wrapRef}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="wk-chart-svg">
+          {rows.map((r, i) => {
+            const x = i * (barW + gap);
+            const h = r.item_count > 0 ? Math.max(4, (r.item_count / max) * chartH) : 0;
+            const y = padTop + (chartH - h);
+            const d = new Date(`${r.day}T00:00:00`);
+            const isToday = i === rows.length - 1;
+            const faded = hover !== null && hover !== i;
+            return (
+              <g
+                key={r.day}
+                className="wk-bar-group"
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(null)}
+              >
+                <rect
+                  x={x}
+                  y={padTop}
+                  width={barW}
+                  height={chartH}
+                  fill="transparent"
+                  className="wk-bar-hitzone"
                 />
-              )}
-              <text x={x + barW / 2} y={H - 6} textAnchor="middle" className={`wk-bar-label ${isToday ? "today" : ""}`}>
-                {WEEKDAY[d.getDay()]}
-              </text>
-              {hover === i && (
-                <text x={x + barW / 2} y={y - 6} textAnchor="middle" className="wk-bar-value">
-                  {r.item_count}
+                {h > 0 && (
+                  <path
+                    d={topRoundedBarPath(x, y, barW, h, 6)}
+                    className="wk-bar"
+                    style={{ animationDelay: `${i * 45}ms`, opacity: faded ? 0.35 : 1 }}
+                  />
+                )}
+                <text x={x + barW / 2} y={H - 6} textAnchor="middle" className={`wk-bar-label ${isToday ? "today" : ""}`}>
+                  {WEEKDAY[d.getDay()]}
                 </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
+                {hover === i && (
+                  <text x={x + barW / 2} y={y - 6} textAnchor="middle" className="wk-bar-value">
+                    {r.item_count}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </div>
   );
 }

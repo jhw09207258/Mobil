@@ -13,28 +13,34 @@
   cursor: pointer;
   z-index: 1;
 }
+/* 트랙은 눌려 들어간 홈, 손잡이는 그 위에 올라앉은 알갱이 — 뉴모피즘이
+   가장 자연스럽게 맞는 컨트롤이다(실제 스위치의 생김새 그대로다). */
 .switch-track {
   display: inline-flex;
   align-items: center;
   width: 38px;
   height: 22px;
   padding: 2px;
-  background: var(--bg-4);
-  border: 1px solid var(--border-1);
+  background: var(--bg-1);
+  border: none;
   border-radius: 999px;
-  transition: background 0.15s var(--ease-spring), border-color 0.15s var(--ease-spring);
+  box-shadow: var(--shadow-neo-inset);
+  transition: background var(--dur-base) var(--ease-spring),
+    box-shadow var(--dur-base) var(--ease-spring);
 }
 .switch-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
   background: var(--text-2);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: transform 0.18s var(--ease-spring), background 0.15s var(--ease-spring);
+  /* 홈 위로 올라앉은 느낌 — 트랙의 눌림(inset)과 반대 방향 그림자. */
+  box-shadow: var(--shadow-neo-sm);
+  transition: transform 0.18s var(--ease-spring), background var(--dur-base) var(--ease-spring);
 }
 .switch input:checked + .switch-track {
   background: var(--create);
-  border-color: var(--create-dim);
+  /* 켜지면 홈이 액션색으로 차오른 것처럼 — 눌림 그림자는 유지하되 옅게. */
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.32);
 }
 .switch input:checked + .switch-track .switch-thumb {
   transform: translateX(16px);

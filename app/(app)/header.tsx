@@ -8,7 +8,6 @@ import { useMobileNav } from "./mobile-nav-context";
 import { HeaderSearch } from "./header-search";
 import { GlobalChat } from "./chat/global-chat";
 import { SignOutOverlay } from "./sign-out-overlay";
-import { Tooltip } from "@/components/ui/tooltip";
 import { TeamSwitcher } from "./team-switcher";
 
 export function AppHeader({
@@ -62,17 +61,20 @@ export function AppHeader({
         (CSS -webkit-app-region 보다 신뢰성 높은 Tauri v2 네이티브 방식).
         브라우저에서는 무의미한 속성이라 무시된다. */}
     <header className="app-header" data-tauri-drag-region>
-      <Tooltip content={mobileNav.open ? "Close menu" : "Open menu"} side="right">
-        <button
-          type="button"
-          className="hamburger-btn"
-          onClick={mobileNav.toggle}
-          aria-label={mobileNav.open ? "Close menu" : "Open menu"}
-          aria-expanded={mobileNav.open}
-        >
-          <IconMenu size={20} />
-        </button>
-      </Tooltip>
+      {/* Tooltip으로 감싸지 않는다 — 이 버튼은 모바일(터치)에서만 보이는데
+          (app.css, ≤640px 에서만 display:flex), Tooltip 래퍼 span은
+          display:none 인 자식과 무관하게 그 자체로 늘 하나의 flex item 이라
+          데스크톱 헤더에 유령 gap(12px)이 생겨 팀 전환기/검색창이 오른쪽으로
+          밀렸다. 터치 기기엔 hover 툴팁이 의미도 없으니 aria-label 만으로 충분. */}
+      <button
+        type="button"
+        className="hamburger-btn"
+        onClick={mobileNav.toggle}
+        aria-label={mobileNav.open ? "Close menu" : "Open menu"}
+        aria-expanded={mobileNav.open}
+      >
+        <IconMenu size={20} />
+      </button>
       {/* 좌측: 팀 전환기 — 오른쪽 계정 메뉴와 폭이 비슷해 검색창이 대략
           헤더 중앙에 온다(정확한 균형보다 팀 전환기 노출이 우선). */}
       <div className="header-side header-side-left" data-tauri-drag-region>

@@ -176,7 +176,21 @@ export async function startDm(
   const { data, error } = await supabase.rpc("start_chat_dm", {
     p_other: otherUserId,
   });
-  if (error || !data) return { error: error?.message || "Could not start the conversation." };
+  if (error || !data) {
+    // 손으로 쓴 문구만 그대로 보여 준다. 함수가 security definer 라 RLS 위반이
+    // 여기까지 올라오지는 않지만, 제약조건 위반 같은 예상 밖 실패는 Postgres 의
+    // 내부 문구("duplicate key value violates unique constraint …")를 그대로
+    // 싣고 온다 — 사용자에겐 아무 의미 없고 테이블 이름만 흘린다. 아는 문구가
+    // 아니면 일반 메시지로 덮는다(repositories/actions.ts 와 같은 방식).
+    const known = [
+      "Authentication required",
+      "Pick another user to message",
+      "User not found",
+      "You can only message people on your current team",
+    ];
+    const raw = error?.message ?? "";
+    return { error: known.includes(raw) ? raw : "Could not start the conversation." };
+  }
   return { id: data };
 }
 

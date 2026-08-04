@@ -14,6 +14,12 @@ export default async function DashboardPage() {
   const { userId, profile } = await requireUser();
   const supabase = await createClient();
 
+  // 아홉 개 조회를 **한 묶음**으로 띄운다. 예전엔 "다음 일정"만 아래에서
+  // 따로 await 했는데, 앞의 묶음이 전부 끝나야 시작하므로 DB 왕복이 한 번 더
+  // 직렬로 붙었다 — 이 앱에서 그 왕복 한 번은 30ms 안팎이고(계측된
+  // calendar.upcoming 중앙값 36.6ms 는 테이블에 행이 5개뿐인 상태의 값이라
+  // 사실상 전부 네트워크 시간이다), 대시보드가 열릴 때마다 그만큼 늦어졌다.
+  // 서로 의존하지 않는 조회이므로 같이 보내면 그 30ms 가 통째로 사라진다.
   const [
     filesRes,
     docsRes,
@@ -23,6 +29,7 @@ export default async function DashboardPage() {
     myUsageRes,
     platformUsageRes,
     weeklyRes,
+    upcomingRes,
   ] = await Promise.all([
     supabase.from("files").select("id", { count: "exact", head: true }),
     supabase.from("documents").select("id", { count: "exact", head: true }),
@@ -32,12 +39,12 @@ export default async function DashboardPage() {
     supabase.rpc("my_content_breakdown"),
     supabase.rpc("platform_content_breakdown"),
     supabase.rpc("my_weekly_activity"),
+    // 다음 일정 — 반복 규칙은 그대로 내려보내고 전개는 화면에서 한다.
+    measure(supabase, "calendar.upcoming", async () =>
+      supabase.rpc("list_upcoming_events", { p_days: 7 })
+    ),
   ]);
-
-  // 다음 일정 — 반복 규칙은 그대로 내려보내고 전개는 화면에서 한다.
-  const { data: upcoming } = await measure(supabase, "calendar.upcoming", async () =>
-    supabase.rpc("list_upcoming_events", { p_days: 7 })
-  );
+  const upcoming = upcomingRes.data;
 
   const fileCount = filesRes.count ?? 0;
   const docCount = docsRes.count ?? 0;

@@ -33,6 +33,10 @@ const DEFAULT_R = 11;
 const MAX_CENTRALITY_BOOST = 7;
 const ZOOM_MIN = 0.3;
 const ZOOM_MAX = 4;
+// 탭(터치)은 손가락이 미세하게 떨려도 pointermove 가 최소 한 번은 온다 —
+// 문턱값 없이 "움직이면 곧 드래그"로 보면 모바일에서 노드를 절대 열 수
+// 없다. 이 거리(px) 안의 움직임은 여전히 탭으로 본다.
+const DRAG_THRESHOLD = 4;
 
 // 커뮤니티(Louvain) 팔레트 — dataviz 스킬의 검증된 인접-쌍 CVD 안전 팔레트와
 // 같은 톤(storage-chart.tsx 와 동일 계열)을 재사용해 앱 전체 색 언어를 맞춘다.
@@ -77,7 +81,7 @@ export function RepositoryGraph({
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, k: 1 });
   const simRef = useRef<Simulation<SimNode, SimLink> | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragging = useRef<{ id: string; moved: boolean } | null>(null);
+  const dragging = useRef<{ id: string; moved: boolean; startX: number; startY: number } | null>(null);
   const panning = useRef<{ x: number; y: number; startTx: number; startTy: number } | null>(null);
   const pinch = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinchDist = useRef<number | undefined>(undefined);
@@ -152,14 +156,24 @@ export function RepositoryGraph({
 
   // ---- SNA: 매개 중심성(Brandes) + 커뮤니티(Louvain) — 노드/간선 집합이
   // 바뀔 때만(새 저장소를 열 때) 다시 계산한다, 시뮬레이션 tick 마다가 아니라.
-  const sna = useMemo(() => {
+  // useMemo(렌더 중 동기 계산)가 아니라 이펙트에서 계산한다 — 큰 저장소(노드
+  // 수백 개)에서는 O(V·E) 계산이 몇십 ms 걸릴 수 있는데, 렌더를 막으면 그만큼
+  // 그래프가 뜨는 게 늦어진다. 이펙트로 미루면 노드는 즉시(기본 반지름/색으로)
+  // 그려지고, SNA 값은 계산되는 대로 곧이어 반영된다 — 화면이 먼저 반응한다.
+  const [sna, setSna] = useState<{
+    centrality: Map<string, number>;
+    community: Map<string, number>;
+    maxCentrality: number;
+  }>({ centrality: new Map(), community: new Map(), maxCentrality: 0 });
+
+  useEffect(() => {
+    if (nodes.length === 0) return;
     const nodeIds = nodes.map((n) => `${n.kind}:${n.id}`);
     const edges = links.map((l) => ({ a: l.source, b: l.target }));
     const centrality = brandesBetweenness(nodeIds, edges);
     const community = louvainCommunities(nodeIds, edges);
     const maxCentrality = Math.max(0, ...Array.from(centrality.values()));
-    return { centrality, community, maxCentrality };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setSna({ centrality, community, maxCentrality });
   }, [nodes, links]);
 
   const drawLinks = useMemo(() => {
@@ -182,7 +196,7 @@ export function RepositoryGraph({
   const onPointerDown = (n: SimNode) => (e: React.PointerEvent) => {
     e.stopPropagation();
     (e.target as Element).setPointerCapture(e.pointerId);
-    dragging.current = { id: `${n.kind}:${n.id}`, moved: false };
+    dragging.current = { id: `${n.kind}:${n.id}`, moved: false, startX: e.clientX, startY: e.clientY };
     n.fx = n.x;
     n.fy = n.y;
     simRef.current?.alphaTarget(0.3).restart();
@@ -226,7 +240,8 @@ export function RepositoryGraph({
     if (dragging.current && svgRef.current) {
       const n = nodes.find((x) => `${x.kind}:${x.id}` === dragging.current!.id);
       if (!n) return;
-      dragging.current.moved = true;
+      const dist = Math.hypot(e.clientX - dragging.current.startX, e.clientY - dragging.current.startY);
+      if (dist > DRAG_THRESHOLD) dragging.current.moved = true;
       const world = toWorld(e.clientX, e.clientY);
       n.fx = world.x;
       n.fy = world.y;

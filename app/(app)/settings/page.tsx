@@ -57,26 +57,24 @@ export default async function SettingsPage() {
           </div>
         </div>
 
-        <div className="panel" style={{ marginBottom: 24 }}>
-          <div className="panel-header">
-            <span className="label">ACCOUNT</span>
-          </div>
-          <div className="panel-body">
-            <div className="field">
-              <span className="label">Email</span>
-              <div className="mono" style={{ color: "var(--text-1)", marginTop: 6 }}>
-                {email}
-              </div>
+        {/* 계정 정보는 "이름 : 값" 짝이 전부라, 항목마다 칸을 새로 만드는 대신
+            애플 설정앱처럼 한 상자에 담고 얇은 선으로만 나눈다. */}
+        <div style={{ marginBottom: 24 }}>
+          <span className="card-group-title">Account</span>
+          <div className="card-group">
+            <div className="card-row">
+              <span className="card-row-label">Email</span>
+              <span className="card-row-value mono">{email}</span>
             </div>
-            <div className="field">
-              <span className="label">Access level</span>
-              <div style={{ marginTop: 6 }}>
+            <div className="card-row">
+              <span className="card-row-label">Access level</span>
+              <span className="card-row-value">
                 {profile.role === "admin" ? (
                   <span className="badge badge-admin">admin</span>
                 ) : (
                   <span className="badge">user</span>
                 )}
-              </div>
+              </span>
             </div>
           </div>
         </div>

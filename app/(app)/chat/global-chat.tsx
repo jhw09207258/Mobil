@@ -1,6 +1,6 @@
 "use client";
 
-import { IconClose, IconExpand, IconCollapse } from "../icons";
+import { IconClose, IconExpand, IconCollapse, IconChat } from "../icons";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -261,7 +261,7 @@ export function GlobalChat({ selfId, selfName }: { selfId: string; selfName: str
         aria-label={`${open ? "Close" : "Open"} chat${unread > 0 ? ` (${unread} unread)` : ""}`}
         title="Chat"
       >
-        Chat
+        <IconChat size={15} />
         {unread > 0 && (
           <span className="chat-unread chat-bubble-badge">
             {unread > 99 ? "99+" : unread}

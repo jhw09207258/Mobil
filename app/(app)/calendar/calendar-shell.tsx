@@ -219,7 +219,10 @@ export function CalendarShell({
         for (let i = 0; i < 60; i += 1) {
           push(dayKey(cursor), occ);
           const next = addDays(cursor, 1);
-          if (next.getTime() > occ.end.getTime()) break;
+          // >= 인 이유: 다음 날 0시에 "끝나는" 일정은 그 다음 날을 차지하지
+          // 않는다. > 로 두면 22시~자정 회의가 다음 날 칸에도 유령처럼 하나 더
+          // 걸렸다(종일 일정은 끝을 23:59:59 로 저장해 이 경계에 걸리지 않는다).
+          if (next.getTime() >= occ.end.getTime()) break;
           cursor = next;
         }
       }
@@ -612,23 +615,44 @@ function MonthView({
                   <IconPlus size={12} />
                 </button>
               </div>
-              {shown.map((occ) => (
-                <button
-                  key={occ.key}
-                  className={`cal-pill ${occ.event.status === "cancelled" ? "cancelled" : ""}`}
-                  style={{
-                    borderLeftColor: eventColor(occ),
-                    background: `color-mix(in srgb, ${eventColor(occ)} 16%, var(--bg-3))`,
-                  }}
-                  onClick={() => onOpen(occ)}
-                  title={occ.event.title}
-                >
-                  {!occ.event.all_day && (
-                    <span className="cal-pill-time">{formatTime(occ.start)}</span>
-                  )}
-                  <span className="cal-pill-title">{occ.event.title}</span>
-                </button>
-              ))}
+              {shown.map((occ) => {
+                // 여러 날에 걸친 일정은 날짜 칸마다 알약이 하나씩 생긴다. 그대로
+                // 두면 사흘짜리 일정이 "서로 무관한 일정 세 개"로 보인다 — 어느
+                // 쪽이 앞이고 뒤인지도 알 수 없다. 그래서 이 칸이 일정의 시작인지
+                // 중간인지 끝인지를 계산해, 이어지는 쪽 모서리를 각지게 만들고
+                // (붙어 보이게) 이어짐 표시를 넣는다.
+                const dayStart = startOfDay(day);
+                const nextDayStart = addDays(dayStart, 1);
+                const contFrom = occ.start.getTime() < dayStart.getTime();
+                // 다음 날 0시에 "끝나는" 일정은 다음 날로 이어지지 않는다.
+                const contTo = occ.end.getTime() > nextDayStart.getTime();
+                return (
+                  <button
+                    key={occ.key}
+                    className={`cal-pill ${occ.event.status === "cancelled" ? "cancelled" : ""} ${
+                      contFrom ? "cont-from" : ""
+                    } ${contTo ? "cont-to" : ""}`}
+                    style={{
+                      borderLeftColor: eventColor(occ),
+                      background: `color-mix(in srgb, ${eventColor(occ)} 16%, var(--bg-3))`,
+                    }}
+                    onClick={() => onOpen(occ)}
+                    title={occ.event.title}
+                  >
+                    {contFrom && <span className="cal-pill-cont" aria-hidden="true">◀</span>}
+                    {/* 이어지는 칸에서는 시각을 반복하지 않는다 — 시작 시각은
+                        첫 칸에만 의미가 있다. */}
+                    {!occ.event.all_day && !contFrom && (
+                      <span className="cal-pill-time">{formatTime(occ.start)}</span>
+                    )}
+                    <span className="cal-pill-title">
+                      {occ.event.title}
+                      {contFrom && <span className="sr-only"> (continued)</span>}
+                    </span>
+                    {contTo && <span className="cal-pill-cont" aria-hidden="true">▶</span>}
+                  </button>
+                );
+              })}
               {list.length > shown.length && (
                 <button className="cal-more" onClick={() => onExpandDay(day)}>
                   +{list.length - shown.length} more

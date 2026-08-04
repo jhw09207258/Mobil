@@ -23,7 +23,7 @@
   flex-direction: column;
   border-left: 1px solid var(--border-0);
   background: var(--bg-1);
-  animation: activity-slide-in 0.22s cubic-bezier(0.32, 0.72, 0.25, 1);
+  animation: activity-slide-in var(--dur-base) var(--ease-spring);
 }
 @keyframes activity-slide-in {
   from { transform: translateX(20px); opacity: 0; }

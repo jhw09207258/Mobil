@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { expandOccurrences } from "@/lib/recurrence";
+import { ShimmeringText } from "@/components/ui/shimmering-text";
 
 /**
  * 대시보드의 "다음 일정" 줄.
@@ -11,6 +12,16 @@ import { expandOccurrences } from "@/lib/recurrence";
  * 사람의 시간대에서 계산해야 한다). 여기서 앞으로 7일치만 펴서 가장 가까운
  * 네 개를 보여 준다. 일정이 하나도 없으면 아무것도 그리지 않는다 — 대시보드는
  * 한 화면에 들어가야 하고, 안 쓰는 기능이 그 높이를 먹으면 안 된다.
+ *
+ * 이 컴포넌트는 "use client" 지만 서버 컴포넌트(dashboard/page.tsx)가 그
+ * 자리에서 그대로 SSR 한다 — new Date()/toLocaleString(undefined, …) 을
+ * 렌더 중에 바로 계산하면, 서버(배포 환경 기본 시간대·로캘, 보통 UTC)와
+ * 클라이언트(보는 사람의 실제 시간대)가 서로 다른 문자열을 만들어 하이드레이션
+ * 불일치가 난다 — 단순 경고로 끝나지 않고, 고쳐지기 전 짧은 순간 실제와 다른
+ * 시각이 화면에 보인다(예: 오전 9시 일정이 자정으로 보였다가 바뀜). 그래서
+ * "지금 몇 시인지"에 기대는 계산은 마운트 후 이펙트에서만 한다 — 첫 렌더는
+ * 서버와 똑같이 빈 상태를 그리고, 실제 목록은 그 직후(네트워크 대기 없이,
+ * 로컬 계산이라 사실상 즉시) 채워진다.
  */
 
 export type UpcomingRow = {
@@ -39,7 +50,9 @@ export function UpcomingStrip({
    * 패널과 같은 자리). */
   variant?: "strip" | "list";
 }) {
-  const next = useMemo(() => {
+  const [next, setNext] = useState<{ key: string; row: UpcomingRow; start: Date }[] | null>(null);
+
+  useEffect(() => {
     const now = new Date();
     const until = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const out: { key: string; row: UpcomingRow; start: Date }[] = [];
@@ -62,10 +75,18 @@ export function UpcomingStrip({
         out.push({ key: `${row.id}:${occ.start.getTime()}`, row, start: occ.start });
       }
     }
-    return out.sort((a, b) => a.start.getTime() - b.start.getTime()).slice(0, 4);
+    setNext(out.sort((a, b) => a.start.getTime() - b.start.getTime()).slice(0, 4));
   }, [rows]);
 
   if (variant === "list") {
+    if (next === null) {
+      return (
+        <div className="dash-card">
+          <span className="label cell-label">UP NEXT</span>
+          <ShimmeringText text="Loading…" style={{ fontSize: 11 }} />
+        </div>
+      );
+    }
     return (
       <div className="dash-card">
         <span className="label cell-label">UP NEXT</span>
@@ -101,7 +122,7 @@ export function UpcomingStrip({
     );
   }
 
-  if (next.length === 0) return null;
+  if (!next || next.length === 0) return null;
 
   return (
     <div className="dash-upnext">
