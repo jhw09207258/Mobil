@@ -50,7 +50,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const client = new Anthropic({ apiKey });
+  // SDK 기본 타임아웃은 10분이라 이 라우트의 maxDuration(60초)보다 한참 길다 —
+  // 그대로 두면 상대가 응답을 안 줄 때 플랫폼이 60초에 요청을 끊을 때까지
+  // 사용자는 아무 안내도 없이 기다리기만 하고, 결국 빈손으로 끝난다. 우리가
+  // 먼저 끊어야 "왜 실패했는지"를 말해 줄 수 있다. 재시도는 한 번까지만 —
+  // 기본값(2회)은 남은 예산 안에서 다 쓸 수 없다.
+  const client = new Anthropic({ apiKey, timeout: 45_000, maxRetries: 1 });
 
   try {
     const message = await client.messages.create({

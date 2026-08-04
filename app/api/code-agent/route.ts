@@ -21,6 +21,17 @@ export const maxDuration = 60;
 
 const MAX_STEPS = 8;
 const MAX_FILE_CHARS = 120_000;
+/**
+ * 루프 전체에 주는 시간 예산(ms). maxDuration(60초)보다 넉넉히 짧게 잡는다.
+ *
+ * 이 라우트는 최대 8번까지 모델을 **연달아** 부르는데, 한 번이라도 느리면
+ * 전체가 60초를 넘긴다. 그때 플랫폼이 요청을 끊으면 응답이 루프 **뒤에서**
+ * 한 번에 나가는 구조라 그때까지 적용한 편집이 전부 사라진다 — 사용자
+ * 입장에서는 한참 기다린 끝에 아무 일도 안 일어난 것이다.
+ * 그래서 다음 단계를 시작하기 전에 남은 예산을 보고, 모자라면 거기서 멈추고
+ * **지금까지의 결과를 정상 응답으로 돌려준다**. 잘린 것보다 부분 결과가 낫다.
+ */
+const STEP_BUDGET_MS = 45_000;
 
 const SYSTEM = `You are a coding agent embedded in an editor, working on one file.
 
@@ -151,8 +162,17 @@ export async function POST(request: NextRequest) {
   const edits: string[] = [];
   let finalText = "";
 
+  const deadline = Date.now() + STEP_BUDGET_MS;
+  let ranOutOfTime = false;
+
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
+      // 아직 한 번도 안 돌았으면 예산을 넘겼더라도 한 번은 시도한다 — 첫 턴도
+      // 못 돌리고 빈손으로 끝내는 것보다는 낫다.
+      if (step > 0 && Date.now() >= deadline) {
+        ranOutOfTime = true;
+        break;
+      }
       const res = await ai.models.generateContent({
         model: "gemini-3.5-flash",
         contents,
@@ -194,11 +214,20 @@ export async function POST(request: NextRequest) {
       contents.push({ role: "user", parts: responses });
     }
 
+    // 시간이 모자라 멈춘 경우에도 200 으로 돌려준다 — 편집은 실제로 적용됐고,
+    // 다만 끝까지 못 갔다는 사실을 분명히 알린다(그래야 사용자가 이어서
+    // 시킬지 판단할 수 있다).
+    const timedOutNote =
+      "Stopped early — the agent ran out of time before finishing. " +
+      "The edits below were applied; send the request again to continue.";
     return NextResponse.json({
-      text: finalText || (edits.length ? "Done." : "(no response)"),
+      text: ranOutOfTime
+        ? `${finalText ? `${finalText}\n\n` : ""}${timedOutNote}`
+        : finalText || (edits.length ? "Done." : "(no response)"),
       content: working,
       changed: working !== original,
       edits,
+      incomplete: ranOutOfTime,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";

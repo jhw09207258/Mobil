@@ -84,13 +84,20 @@
        fast   : 눌림/hover 처럼 손가락에 즉시 붙어야 하는 것
        base   : 요소 하나가 나타나거나 사라지는 기본값
        slow   : 화면 전체가 바뀌는 큰 전환(시트, 드로어)
+
+     길이 재조정(v1.6.22) — 처음 이 척도를 만들 때 base 를 0.24s 로 뒀는데,
+     그건 이 앱에 원래 있던 값들(0.12~0.18s)보다 **느린** 값이었다. 토큰으로
+     바꾼 자리(버튼 hover, 스위치, 토스트)가 그만큼 굼떠졌다 — 척도를 도입한
+     것이 오히려 체감 속도를 떨어뜨린 셈이다. 기존 감각에 맞춰 다시 줄인다.
+     0.24s 는 손이 즉시 반응하길 기대하는 조작에는 확실히 길고, 시트처럼 큰
+     표면이 움직일 때나 어울리는 길이다.
      ------------------------------------------------------------------- */
   --ease-spring: cubic-bezier(0.32, 0.72, 0.25, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --dur-fast: 0.14s;
-  --dur-base: 0.24s;
-  --dur-slow: 0.38s;
+  --dur-fast: 0.1s;
+  --dur-base: 0.16s;
+  --dur-slow: 0.28s;
 
   /* ---- 뉴모피즘(soft UI) --------------------------------------------------
      표면이 배경과 같은 재질에서 "눌러 올라오거나 눌려 들어간" 것처럼 보이게
@@ -371,10 +378,12 @@ img {
   /* 애플식 부드러운 전환 + 누를 때 살짝 눌리는 모션.
      누름(transform)만 --dur-fast 로 더 빠르게 둔다 — 색은 천천히 번져도
      괜찮지만 "눌렸다"는 감각은 손가락 속도를 따라가야 한다. */
-  transition: background var(--dur-base) var(--ease-out),
-    border-color var(--dur-base) var(--ease-out),
+  /* 전부 --dur-fast 다. 버튼은 커서가 닿는 순간 반응해야 하는 대표적인
+     미세 조작이라, 색이 천천히 번지면 그것만으로 앱이 굼떠 보인다. */
+  transition: background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
     transform var(--dur-fast) var(--ease-spring),
-    box-shadow var(--dur-base) var(--ease-out);
+    box-shadow var(--dur-fast) var(--ease-out);
 }
 .btn:hover {
   background: var(--bg-4);
@@ -505,7 +514,7 @@ img {
   border: 1px solid var(--border-1);
   border-radius: var(--radius);
   outline: none;
-  transition: border-color 0.18s var(--ease-spring), box-shadow 0.18s var(--ease-spring);
+  transition: border-color var(--dur-fast) var(--ease-spring), box-shadow var(--dur-fast) var(--ease-spring);
 }
 .textarea {
   height: auto;
@@ -774,8 +783,8 @@ button:focus-visible {
 .panel,
 .stat {
   box-shadow: var(--shadow-card);
-  transition: transform 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring),
-    border-color 0.2s var(--ease-spring);
+  transition: transform var(--dur-base) var(--ease-spring), box-shadow var(--dur-base) var(--ease-spring),
+    border-color var(--dur-base) var(--ease-spring);
 }
 /* 통계·저장소 카드는 hover 시 살짝 떠오른다(애플식 리프트) */
 .stat:hover {

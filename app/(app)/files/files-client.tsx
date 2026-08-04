@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { formatBytes } from "@/lib/format";
 import { startUploads, useUploads } from "../uploads/upload-store";
@@ -26,7 +27,15 @@ import {
 } from "../icons";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
-import { RepositoryGraph } from "../repositories/repository-graph";
+// 그래프 뷰는 기본값이 아니다 — 저장소를 열면 List 로 시작하고, 그래프로
+// 바꾸는 사람만 본다. 그런데 정적 import 면 d3-force 와 시뮬레이션 코드가
+// /files 첫 로드에 무조건 딸려 온다. 실제로 누를 때 받아 오게 미룬다.
+// ssr:false 인 이유: 이 컴포넌트는 마운트 후 ResizeObserver 로 잰 크기에
+// 의존하므로 서버에서 그려 봐야 의미 있는 결과가 안 나온다.
+const RepositoryGraph = dynamic(
+  () => import("../repositories/repository-graph").then((m) => m.RepositoryGraph),
+  { ssr: false, loading: () => <div className="empty" style={{ padding: 40 }}>Loading graph…</div> }
+);
 import {
   deleteFile,
   getSignedUrl,

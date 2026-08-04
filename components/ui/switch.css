@@ -25,8 +25,8 @@
   border: none;
   border-radius: 999px;
   box-shadow: var(--shadow-neo-inset);
-  transition: background var(--dur-base) var(--ease-spring),
-    box-shadow var(--dur-base) var(--ease-spring);
+  transition: background var(--dur-fast) var(--ease-spring),
+    box-shadow var(--dur-fast) var(--ease-spring);
 }
 .switch-thumb {
   width: 16px;
@@ -35,7 +35,7 @@
   background: var(--text-2);
   /* 홈 위로 올라앉은 느낌 — 트랙의 눌림(inset)과 반대 방향 그림자. */
   box-shadow: var(--shadow-neo-sm);
-  transition: transform 0.18s var(--ease-spring), background var(--dur-base) var(--ease-spring);
+  transition: transform var(--dur-base) var(--ease-spring), background var(--dur-fast) var(--ease-spring);
 }
 .switch input:checked + .switch-track {
   background: var(--create);
