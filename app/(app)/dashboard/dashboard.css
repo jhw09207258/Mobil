@@ -21,10 +21,13 @@
   grid-template-columns: repeat(6, 1fr);
   gap: 10px;
 }
+/* 통계 타일은 뉴모픽 표면으로 — 숫자 하나짜리 작은 조각이라 경계선 없이도
+   무엇인지 읽히고, 여섯 개가 나란히 놓여 재질감이 가장 잘 드러나는 자리다.
+   (목록·표처럼 경계가 분명해야 하는 곳에는 쓰지 않는다.) */
 .dash-stat-card {
   background: var(--bg-2);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-neo);
   padding: 14px 14px;
   min-width: 0;
 }

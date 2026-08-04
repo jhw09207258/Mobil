@@ -92,6 +92,23 @@
   --dur-base: 0.24s;
   --dur-slow: 0.38s;
 
+  /* ---- 뉴모피즘(soft UI) --------------------------------------------------
+     표면이 배경과 같은 재질에서 "눌러 올라오거나 눌려 들어간" 것처럼 보이게
+     하는 두 개의 그림자. 왼쪽 위에서 빛이 온다고 가정해 밝은 그림자를 그쪽에,
+     어두운 그림자를 반대쪽에 둔다.
+
+     주의해서 쓴다. 뉴모피즘의 고질적인 문제는 표면과 배경의 대비가 거의
+     없어서 "여기에 뭔가 있다"는 것 자체가 잘 안 보인다는 점이다. 그래서
+     이 프로젝트에서는 글자 대비는 기존 값을 그대로 두고(--text-* 는 손대지
+     않는다), 배경 재질에만 이 그림자를 얹는다 — 읽기 어려워지는 대신
+     촉감만 얻는 방식이다. */
+  --neo-light: rgba(255, 255, 255, 0.045);
+  --neo-dark: rgba(0, 0, 0, 0.5);
+  --shadow-neo: -5px -5px 12px var(--neo-light), 6px 6px 16px var(--neo-dark);
+  --shadow-neo-sm: -2px -2px 6px var(--neo-light), 3px 3px 8px var(--neo-dark);
+  --shadow-neo-inset: inset 2px 2px 6px var(--neo-dark),
+    inset -2px -2px 6px var(--neo-light);
+
   color-scheme: dark;
 }
 
@@ -137,6 +154,12 @@ html[data-theme="light"] {
   --ok: #2e7d43;
   --warn: #9c6f1c;
   --danger: #c0392b;
+
+  /* 라이트에서는 밝은 쪽이 거의 흰색, 어두운 쪽은 아주 옅은 회색이라야
+     "종이를 눌러 만든 자국"처럼 보인다 — 다크의 값을 그대로 쓰면 새까맣게
+     뭉개진다. */
+  --neo-light: rgba(255, 255, 255, 0.9);
+  --neo-dark: rgba(16, 24, 40, 0.13);
 
   color-scheme: light;
 }
@@ -945,10 +968,19 @@ html[data-theme="light"] .btn {
   flex: 1;
   min-height: 0;
 }
+/* 높이를 **확정값**으로 준다. 예전엔 min-height 만 있었는데, 백분율 높이
+   (.repo-graph-svg 의 height:100%)는 부모에 확정 높이가 없으면 해석되지 않고
+   auto 로 떨어진다 — 그러면 <svg> 는 viewBox 비율(800:480)로 제 높이를 정해
+   버린다. 폭 360px 인 모바일에서 360×0.6 = 216px 짜리 그래프가 420px 카드
+   안에 그려져 아래쪽 200px 이 텅 비었던 것이 이 때문이다(데스크톱에서는
+   카드가 SVG 비율만큼 늘어나 우연히 들어맞아 보였을 뿐, 원인은 같다).
+   clamp 로 화면 높이에 맞춰 커지되 상·하한을 둔다. */
 .repo-graph-wrap {
   position: relative;
-  flex: 1;
-  min-height: 420px;
+  /* flex:1 이면 안 된다 — flex-basis:0% 가 주축에서 height 를 이기므로 아래
+     확정 높이가 통째로 무시되고 카드가 0 으로 접힌다. 높이는 여기서 직접 정한다. */
+  flex: none;
+  height: clamp(340px, 58vh, 720px);
   border: 1px solid var(--border-0);
   border-radius: var(--radius-lg);
   background: var(--bg-1);
@@ -962,7 +994,13 @@ html[data-theme="light"] .btn {
   background: var(--bg-2);
   box-shadow: var(--shadow-card);
 }
+/* 카드를 정확히 채운다. absolute + inset:0 이면 부모(.repo-graph-wrap, 이미
+   position:relative)의 상자에 그대로 맞춰지므로, 위의 확정 높이와 함께
+   "카드 크기 = SVG 크기 = viewBox 크기" 가 항상 성립한다 — 비율이 어긋나
+   생기는 레터박스(빈 띠)가 원천적으로 없어진다. */
 .repo-graph-svg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
@@ -1242,6 +1280,56 @@ svg {
 .chat-conv-avatar,
 .dropzone-icon {
   display: flex;
+}
+
+/* =========================================================================
+   뉴모피즘 표면 — .neo(솟아오름) / .neo-inset(눌림)
+
+   기존 카드(.panel/.dash-card/.card-group)를 통째로 바꾸지 않고 **덧붙이는**
+   클래스로 둔다. 이유는 두 가지다.
+     * 뉴모피즘은 배경과 표면의 대비가 거의 없어서, 목록·표처럼 "경계가
+       분명해야 읽히는" 곳에 쓰면 오히려 읽기 어려워진다. 어울리는 자리
+       (통계 타일, 토글, 눌리는 컨트롤)에만 골라 쓰는 게 맞다.
+     * 이미 자리 잡은 --shadow-card 규약을 한 번에 갈아엎으면 앱 전체의
+       인상이 통제 없이 바뀐다.
+   ========================================================================= */
+.neo {
+  background: var(--bg-2);
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-neo);
+}
+.neo-sm {
+  box-shadow: var(--shadow-neo-sm);
+}
+.neo-inset {
+  background: var(--bg-1);
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-neo-inset);
+}
+/* 누를 수 있는 뉴모픽 표면 — 누르는 동안 솟아오름이 눌림으로 뒤집힌다.
+   이 재질에서 가장 자연스러운 피드백이라 transform 을 쓰지 않는다. */
+.neo-pressable {
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+.neo-pressable:active {
+  box-shadow: var(--shadow-neo-inset);
+}
+
+/* 화면에는 안 보이지만 스크린리더에는 읽히는 텍스트 — 시각적 표시(색·모양·
+   화살표)만으로 전달하던 뜻을 소리로도 전할 때 쓴다. display:none 이나
+   visibility:hidden 은 보조기기에서도 사라지므로 쓸 수 없다. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* 설정 화면에서 한 패널 안의 서로 다른 주제를 가르는 선(알림: 푸시 / 메일). */

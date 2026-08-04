@@ -285,6 +285,47 @@
   color: var(--text-1);
 }
 
+/* ---- 메시지 안의 링크 --------------------------------------------------
+   전역 a 규칙(globals.css)은 밑줄을 hover 에서만 그린다. 그런데 말풍선
+   안에서는 그게 두 번 문제가 된다.
+     * 내가 보낸 말풍선의 배경이 --create-ghost(푸른 틴트)라, 링크 색
+       --steel-hover(역시 푸른 계열)가 배경에 묻혀 그냥 본문처럼 보인다.
+     * 모바일에는 hover 자체가 없어 밑줄이 영영 안 나온다 — 링크인 줄
+       모르니 누를 생각을 못 한다("채팅에서 하이퍼링크에 접근할 수 없다"는
+       증상이 이것이다. 클릭 자체는 되지만 링크로 보이지가 않았다).
+   그래서 말풍선 안에서는 항상 밑줄을 긋고, 배경과 대비되는 색을 직접 준다. */
+.chat-msg a {
+  color: var(--steel-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  /* 긴 URL 이 말풍선을 밀어내지 않게. */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.chat-msg a:hover {
+  color: var(--create-hover);
+}
+/* 내 말풍선은 배경이 푸른 틴트라 같은 푸른 링크색이 묻힌다 — 더 밝게. */
+.chat-msg.mine a {
+  color: #cfe0f7;
+  text-decoration-color: rgba(207, 224, 247, 0.6);
+}
+.chat-msg.mine a:hover {
+  color: #ffffff;
+}
+html[data-theme="light"] .chat-msg.mine a {
+  color: var(--create-dim);
+  text-decoration-color: color-mix(in srgb, var(--create-dim) 60%, transparent);
+}
+/* 손가락으로 누르는 화면에서는 줄 사이 링크가 너무 얇다 — 세로 여백을
+   조금 주어 탭 영역을 넓힌다(줄 간격은 line-height 가 잡고 있어 밀리지 않는다). */
+@media (pointer: coarse) {
+  .chat-msg a {
+    padding: 2px 0;
+  }
+}
+
 /* 워크스페이스 항목 칩 — 클릭하면 탭으로 연다 */
 .chat-ref-chip {
   display: inline-flex;
