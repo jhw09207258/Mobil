@@ -8,11 +8,8 @@ more info in www.officialyegrina.com
 
 > Deployment Archive for Infrastructure
 
-## 애플 OS 디자인 언어 도입 + 반복 일정·알림 버그 수정 (v1.6.21)
+## OS Infrastructure update(v1.6.21)
 
-**요청**: 애플 OS 의 아이콘/인터페이스와 UI·UX 를 분석해 우리 SaaS 에 맞게
-리빌딩할 것 — (1) 전환·아이콘·버튼 전반, (2) 카드 섹션의 구성과 분리,
-(3) 채팅을 포함한 각 기능의 디테일, (4) 기능 이상 여부 점검.
 
 ### 모션 — 커브에 이름을 붙였다
 
